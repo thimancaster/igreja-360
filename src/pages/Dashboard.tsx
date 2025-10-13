@@ -16,16 +16,36 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { useTransactions, useTransactionStats } from "@/hooks/useTransactions";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
-  // Mock data para demonstração
-  const mockTransactions = [
-    { id: 1, description: "Dízimo - Janeiro", category: "Receita", type: "Receita", amount: "R$ 12.500,00", date: "2025-01-15", status: "Pago" },
-    { id: 2, description: "Aluguel - Sede", category: "Despesa", type: "Despesa", amount: "R$ 3.500,00", date: "2025-01-10", status: "Pago" },
-    { id: 3, description: "Conta de Luz", category: "Despesa", type: "Despesa", amount: "R$ 850,00", date: "2025-01-20", status: "Pendente" },
-    { id: 4, description: "Ofertas Especiais", category: "Receita", type: "Receita", amount: "R$ 4.200,00", date: "2025-01-18", status: "Pago" },
-    { id: 5, description: "Material de Escritório", category: "Despesa", type: "Despesa", amount: "R$ 420,00", date: "2025-01-05", status: "Vencido" },
-  ];
+  const { data: transactions, isLoading: transactionsLoading } = useTransactions();
+  const { data: stats, isLoading: statsLoading } = useTransactionStats();
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString("pt-BR");
+  };
+
+  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+      case "Pago":
+        return "default";
+      case "Pendente":
+        return "secondary";
+      case "Vencido":
+        return "destructive";
+      default:
+        return "outline";
+    }
+  };
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -36,34 +56,40 @@ export default function Dashboard() {
 
       {/* Cards de Destaque */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Contas a Pagar (Mês Atual)"
-          value="R$ 5.270,00"
-          icon={DollarSign}
-          variant="warning"
-          trend={{ value: "+12% vs mês anterior", isPositive: false }}
-        />
-        <StatsCard
-          title="Contas Pagas (Mês Atual)"
-          value="R$ 16.850,00"
-          icon={TrendingUp}
-          variant="success"
-          trend={{ value: "+8% vs mês anterior", isPositive: true }}
-        />
-        <StatsCard
-          title="Contas Vencidas"
-          value="R$ 420,00"
-          icon={TrendingDown}
-          variant="destructive"
-          trend={{ value: "1 transação pendente", isPositive: false }}
-        />
-        <StatsCard
-          title="Saldo Total"
-          value="R$ 11.160,00"
-          icon={Wallet}
-          variant="default"
-          trend={{ value: "+15% vs mês anterior", isPositive: true }}
-        />
+        {statsLoading ? (
+          <>
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
+            ))}
+          </>
+        ) : (
+          <>
+            <StatsCard
+              title="Contas a Pagar"
+              value={formatCurrency(stats?.totalPayable || 0)}
+              icon={DollarSign}
+              variant="warning"
+            />
+            <StatsCard
+              title="Contas Pagas"
+              value={formatCurrency(stats?.totalPaid || 0)}
+              icon={TrendingUp}
+              variant="success"
+            />
+            <StatsCard
+              title="Contas Vencidas"
+              value={formatCurrency(stats?.totalOverdue || 0)}
+              icon={TrendingDown}
+              variant="destructive"
+            />
+            <StatsCard
+              title="Saldo Total"
+              value={formatCurrency(stats?.balance || 0)}
+              icon={Wallet}
+              variant="default"
+            />
+          </>
+        )}
       </div>
 
       {/* Filtros */}
@@ -121,34 +147,53 @@ export default function Dashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockTransactions.map((transaction) => (
-                <TableRow key={transaction.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">{transaction.description}</TableCell>
-                  <TableCell>{transaction.category}</TableCell>
-                  <TableCell>
-                    <Badge variant={transaction.type === "Receita" ? "default" : "secondary"}>
-                      {transaction.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className={transaction.type === "Receita" ? "text-success" : "text-destructive"}>
-                    {transaction.amount}
-                  </TableCell>
-                  <TableCell>{transaction.date}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        transaction.status === "Pago"
-                          ? "default"
-                          : transaction.status === "Pendente"
-                          ? "secondary"
-                          : "destructive"
-                      }
-                    >
-                      {transaction.status}
-                    </Badge>
+              {transactionsLoading ? (
+                <>
+                  {[...Array(5)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
+                    </TableRow>
+                  ))}
+                </>
+              ) : transactions && transactions.length > 0 ? (
+                transactions.slice(0, 10).map((transaction) => (
+                  <TableRow key={transaction.id} className="hover:bg-muted/50">
+                    <TableCell className="font-medium">{transaction.description}</TableCell>
+                    <TableCell>{transaction.categories?.name || "Sem categoria"}</TableCell>
+                    <TableCell>
+                      <Badge variant={transaction.type === "Receita" ? "default" : "secondary"}>
+                        {transaction.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={transaction.type === "Receita" ? "text-success" : ""}>
+                      {formatCurrency(Number(transaction.amount))}
+                    </TableCell>
+                    <TableCell>
+                      {transaction.payment_date 
+                        ? formatDate(transaction.payment_date)
+                        : transaction.due_date 
+                        ? formatDate(transaction.due_date)
+                        : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(transaction.status)}>
+                        {transaction.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    Nenhuma transação encontrada
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>
