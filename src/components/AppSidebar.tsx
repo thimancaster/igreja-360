@@ -1,4 +1,4 @@
-import { LayoutDashboard, ArrowLeftRight, Upload, FileText, Settings, Users } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Upload, Sheet, FileText, Settings, Users } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import {
   Sidebar,
@@ -17,6 +17,7 @@ const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Transações", url: "/transacoes", icon: ArrowLeftRight },
   { title: "Importação", url: "/importacao", icon: Upload },
+  { title: "Integrações", url: "/integracoes", icon: Sheet },
   { title: "Relatórios", url: "/relatorios", icon: FileText },
   { title: "Administração", url: "/admin", icon: Users },
   { title: "Configurações", url: "/configuracoes", icon: Settings },

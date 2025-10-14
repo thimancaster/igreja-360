@@ -11,6 +11,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Transacoes from "./pages/Transacoes";
 import Importacao from "./pages/Importacao";
+import Integracoes from "./pages/Integracoes";
 import Relatorios from "./pages/Relatorios";
 import Admin from "./pages/Admin";
 import Configuracoes from "./pages/Configuracoes";
@@ -41,6 +42,7 @@ const App = () => (
                           <Route path="/" element={<Dashboard />} />
                           <Route path="/transacoes" element={<Transacoes />} />
                           <Route path="/importacao" element={<Importacao />} />
+                          <Route path="/integracoes" element={<Integracoes />} />
                           <Route path="/relatorios" element={<Relatorios />} />
                           <Route path="/admin" element={<Admin />} />
                           <Route path="/configuracoes" element={<Configuracoes />} />
