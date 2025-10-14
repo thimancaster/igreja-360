@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -109,28 +110,56 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
     setLoading(true);
 
     try {
+      if (!user) {
+        throw new Error("Usuário não autenticado");
+      }
+
+      // Validate input data
+      const transactionSchema = z.object({
+        description: z.string().trim().min(1, "Descrição é obrigatória").max(500, "Descrição muito longa"),
+        amount: z.string().refine((val) => {
+          const num = parseFloat(val);
+          return !isNaN(num) && num > 0 && num <= 999999999;
+        }, "Valor deve ser positivo e menor que 999.999.999"),
+        type: z.enum(["Receita", "Despesa"]),
+        status: z.enum(["Pendente", "Pago", "Vencido"]),
+        due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
+        payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
+        notes: z.string().max(2000, "Notas muito longas").optional().or(z.literal("")),
+      });
+
+      const validated = transactionSchema.parse({
+        description: formData.description,
+        amount: formData.amount,
+        type: formData.type,
+        status: formData.status,
+        due_date: formData.due_date,
+        payment_date: formData.payment_date,
+        notes: formData.notes,
+      });
+
       const { data: profile } = await supabase
         .from("profiles")
         .select("church_id")
-        .eq("id", user?.id)
+        .eq("id", user.id)
         .single();
 
       if (!profile?.church_id) {
-        throw new Error("Church ID not found");
+        throw new Error("Igreja não encontrada");
       }
 
       const dataToSave = {
-        description: formData.description,
+        description: validated.description,
         category_id: formData.category_id || null,
         ministry_id: formData.ministry_id || null,
-        type: formData.type,
-        amount: parseFloat(formData.amount),
-        due_date: formData.due_date || null,
-        payment_date: formData.payment_date || null,
-        status: formData.status,
-        notes: formData.notes || null,
+        type: validated.type,
+        amount: parseFloat(validated.amount),
+        due_date: validated.due_date || null,
+        payment_date: validated.status === "Pago" ? validated.payment_date || null : null,
+        status: validated.status,
+        notes: validated.notes || null,
         church_id: profile.church_id,
-        created_by: user?.id,
+        created_by: user.id,
       };
 
       if (transaction) {
@@ -162,11 +191,19 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
       queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
       onOpenChange(false);
     } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Erro de validação",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
     }

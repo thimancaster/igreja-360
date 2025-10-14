@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { Church } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import { z } from "zod";
 
 export default function Auth() {
   const { user, signIn, signUp } = useAuth();
@@ -26,7 +27,22 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signIn(loginEmail, loginPassword);
+      // Validate login inputs
+      const loginSchema = z.object({
+        email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
+        password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres").max(72, "Senha muito longa"),
+      });
+
+      const validated = loginSchema.parse({
+        email: loginEmail,
+        password: loginPassword,
+      });
+
+      await signIn(validated.email, validated.password);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        // Show validation errors
+      }
     } finally {
       setLoading(false);
     }
@@ -36,7 +52,27 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signUp(signupEmail, signupPassword, signupName);
+      // Validate signup inputs
+      const signupSchema = z.object({
+        name: z.string().trim().min(1, "Nome é obrigatório").max(100, "Nome muito longo"),
+        email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
+        password: z.string()
+          .min(8, "Senha deve ter no mínimo 8 caracteres")
+          .max(72, "Senha muito longa")
+          .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Senha deve conter maiúsculas, minúsculas e números"),
+      });
+
+      const validated = signupSchema.parse({
+        name: signupName,
+        email: signupEmail,
+        password: signupPassword,
+      });
+
+      await signUp(validated.email, validated.password, validated.name);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        // Show validation errors
+      }
     } finally {
       setLoading(false);
     }
