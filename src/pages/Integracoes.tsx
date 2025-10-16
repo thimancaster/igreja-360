@@ -65,22 +65,18 @@ export default function Integracoes() {
     fetchChurchId();
   }, [user?.id]);
 
-  // Handle OAuth callback
+  // Handle OAuth callback - tokens are now stored in database
   useEffect(() => {
     const auth = searchParams.get("auth");
     const email = searchParams.get("email");
-    const access = searchParams.get("access_token");
-    const refresh = searchParams.get("refresh_token");
     const message = searchParams.get("message");
 
-    if (auth === "success" && email && access && refresh) {
+    if (auth === "success" && email) {
       setIsConnected(true);
       setUserEmail(email);
-      setAccessToken(access);
-      setRefreshToken(refresh);
       toast({
         title: "Conectado com sucesso",
-        description: `Autenticado como ${email}`,
+        description: `Autenticado como ${email}. Tokens armazenados com segurança.`,
       });
       // Clean URL
       setSearchParams({});

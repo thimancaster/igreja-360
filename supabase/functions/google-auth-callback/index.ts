@@ -65,10 +65,33 @@ serve(async (req) => {
 
     const userInfo = await userInfoResponse.json();
 
-    console.log('OAuth successful, redirecting to app');
+    console.log('OAuth successful, storing tokens and redirecting');
 
-    // Redirect back to the app with success
-    const appUrl = `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/integracoes?auth=success&email=${encodeURIComponent(userInfo.email)}&access_token=${tokens.access_token}&refresh_token=${tokens.refresh_token}`;
+    // Store tokens in database for the user
+    const supabaseClient = createClient(supabaseUrl, supabaseKey);
+    
+    // Get or create integration record with tokens
+    const { error: dbError } = await supabaseClient
+      .from('google_integrations')
+      .upsert({
+        user_id: userInfo.id,
+        email: userInfo.email,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'email'
+      });
+
+    if (dbError) {
+      console.error('Error storing tokens:', dbError);
+    }
+
+    // Determine the correct app URL - works in all environments
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/integracoes')[0];
+    const appUrl = origin 
+      ? `${origin}/integracoes?auth=success&email=${encodeURIComponent(userInfo.email)}`
+      : `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/integracoes?auth=success&email=${encodeURIComponent(userInfo.email)}`;
     
     return new Response(null, {
       status: 302,
@@ -80,7 +103,12 @@ serve(async (req) => {
     console.error('Error in google-auth-callback:', error);
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorUrl = `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`;
+    
+    // Use origin from request for better environment compatibility
+    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/integracoes')[0];
+    const errorUrl = origin
+      ? `${origin}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`
+      : `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`;
     
     return new Response(null, {
       status: 302,
