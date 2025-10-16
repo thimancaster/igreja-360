@@ -10,6 +10,8 @@ export interface GoogleIntegration {
   column_mapping: Record<string, string>;
   last_sync_at: string | null;
   created_at: string;
+  access_token: string;
+  refresh_token: string;
 }
 
 export interface GoogleSheet {

@@ -65,19 +65,21 @@ export default function Integracoes() {
     fetchChurchId();
   }, [user?.id]);
 
-  // Handle OAuth callback - tokens are now stored in database
+  // Handle OAuth callback - session is now managed via cookies
   useEffect(() => {
     const auth = searchParams.get("auth");
-    const email = searchParams.get("email");
     const message = searchParams.get("message");
 
-    if (auth === "success" && email) {
-      setIsConnected(true);
-      setUserEmail(email);
-      toast({
-        title: "Conectado com sucesso",
-        description: `Autenticado como ${email}. Tokens armazenados com segurança.`,
-      });
+    if (auth === "success") {
+      // Session is automatically available via cookies
+      if (user?.email) {
+        setIsConnected(true);
+        setUserEmail(user.email);
+        toast({
+          title: "Conectado com sucesso",
+          description: `Autenticado como ${user.email}. Sessão segura estabelecida.`,
+        });
+      }
       // Clean URL
       setSearchParams({});
     } else if (auth === "error") {
@@ -88,7 +90,7 @@ export default function Integracoes() {
       });
       setSearchParams({});
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, user]);
 
   const handleConnect = () => {
     startOAuth.mutate();
@@ -102,10 +104,25 @@ export default function Integracoes() {
   };
 
   const handleAddSheet = async () => {
-    if (!accessToken) return;
+    // Fetch access token from integrations if available
+    if (integrations && integrations.length > 0 && !accessToken) {
+      setAccessToken(integrations[0].access_token);
+      setRefreshToken(integrations[0].refresh_token);
+    }
+
+    const tokenToUse = accessToken || integrations?.[0]?.access_token;
+
+    if (!tokenToUse) {
+      toast({
+        title: "Erro",
+        description: "Token de acesso não encontrado. Reconecte sua conta.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      const sheets = await listSheets.mutateAsync(accessToken);
+      const sheets = await listSheets.mutateAsync(tokenToUse);
       setAvailableSheets(sheets);
       setShowMappingDialog(true);
     } catch (error) {

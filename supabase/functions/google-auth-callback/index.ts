@@ -6,6 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper to set cookie
+function setCookie(name: string, value: string, maxAge?: number): string {
+  const cookieParts = [
+    `${name}=${value}`,
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    'Path=/',
+  ];
+  
+  if (maxAge !== undefined) {
+    cookieParts.push(`Max-Age=${maxAge}`);
+  }
+  
+  return cookieParts.join('; ');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -56,26 +73,29 @@ serve(async (req) => {
 
     const tokens = await tokenResponse.json();
 
-    // Get user info to identify the user
-    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: {
-        'Authorization': `Bearer ${tokens.access_token}`,
-      },
-    });
+    console.log('OAuth successful, creating Supabase session');
 
-    const userInfo = await userInfoResponse.json();
-
-    console.log('OAuth successful, storing tokens and redirecting');
-
-    // Store tokens in database for the user
+    // Create Supabase client
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
     
-    // Get or create integration record with tokens
+    // Sign in with Google ID token to create a Supabase session
+    const { data: sessionData, error: sessionError } = await supabaseClient.auth.signInWithIdToken({
+      provider: 'google',
+      token: tokens.id_token,
+    });
+
+    if (sessionError || !sessionData.session) {
+      throw new Error(`Failed to create session: ${sessionError?.message || 'No session returned'}`);
+    }
+
+    console.log('Session created, storing Google Sheets tokens');
+
+    // Store Google Sheets access tokens in database for later use
     const { error: dbError } = await supabaseClient
       .from('google_integrations')
       .upsert({
-        user_id: userInfo.id,
-        email: userInfo.email,
+        user_id: sessionData.user.id,
+        email: sessionData.user.email,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         updated_at: new Date().toISOString(),
@@ -84,36 +104,42 @@ serve(async (req) => {
       });
 
     if (dbError) {
-      console.error('Error storing tokens:', dbError);
+      console.error('Error storing Google tokens:', dbError);
     }
 
-    // Determine the correct app URL - works in all environments
-    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/integracoes')[0];
-    const appUrl = origin 
-      ? `${origin}/integracoes?auth=success&email=${encodeURIComponent(userInfo.email)}`
-      : `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/integracoes?auth=success&email=${encodeURIComponent(userInfo.email)}`;
-    
+    // Get redirect URL from environment
+    const appBaseUrl = Deno.env.get('APP_BASE_URL');
+    if (!appBaseUrl) {
+      throw new Error('APP_BASE_URL environment variable not set');
+    }
+
+    // Prepare cookies for session
+    const cookies = [
+      setCookie('sb-access-token', sessionData.session.access_token),
+      setCookie('sb-refresh-token', sessionData.session.refresh_token),
+      // Clear state and nonce cookies
+      setCookie('oauth-state', '', 0),
+      setCookie('oauth-nonce', '', 0),
+    ];
+
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': appUrl,
+        'Location': `${appBaseUrl}/integracoes`,
+        'Set-Cookie': cookies.join(', '),
       },
     });
   } catch (error) {
     console.error('Error in google-auth-callback:', error);
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    // Use origin from request for better environment compatibility
-    const origin = req.headers.get('origin') || req.headers.get('referer')?.split('/integracoes')[0];
-    const errorUrl = origin
-      ? `${origin}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`
-      : `${supabaseUrl.replace('.supabase.co', '.lovable.app')}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`;
+    // Get redirect URL from environment
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app') || '';
     
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': errorUrl,
+        'Location': `${appBaseUrl}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`,
       },
     });
   }
