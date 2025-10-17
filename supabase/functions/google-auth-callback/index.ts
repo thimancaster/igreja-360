@@ -73,6 +73,22 @@ serve(async (req) => {
 
     const tokens = await tokenResponse.json();
 
+    // Validate tokens before proceeding
+    if (!tokens.access_token || !tokens.refresh_token || !tokens.id_token) {
+      throw new Error('Invalid token response from Google: missing required tokens');
+    }
+
+    // Validate token lengths (OAuth tokens are typically 100-2048 chars)
+    if (tokens.access_token.length > 2048 || tokens.refresh_token.length > 2048 || tokens.id_token.length > 2048) {
+      throw new Error('Token length exceeds maximum allowed size');
+    }
+
+    // Validate token format - should be alphanumeric with some special chars
+    const tokenRegex = /^[A-Za-z0-9\-._~+/]+=*$/;
+    if (!tokenRegex.test(tokens.access_token) || !tokenRegex.test(tokens.refresh_token)) {
+      throw new Error('Invalid token format detected');
+    }
+
     console.log('OAuth successful, creating Supabase session');
 
     // Create Supabase client
@@ -88,24 +104,11 @@ serve(async (req) => {
       throw new Error(`Failed to create session: ${sessionError?.message || 'No session returned'}`);
     }
 
-    console.log('Session created, storing Google Sheets tokens');
+    console.log('Session created successfully');
 
-    // Store Google Sheets access tokens in database for later use
-    const { error: dbError } = await supabaseClient
-      .from('google_integrations')
-      .upsert({
-        user_id: sessionData.user.id,
-        email: sessionData.user.email,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'email'
-      });
-
-    if (dbError) {
-      console.error('Error storing Google tokens:', dbError);
-    }
+    // Note: OAuth tokens are stored in session storage on the client side
+    // The full integration (with sheet_id, church_id, etc.) will be created
+    // by the frontend when the user selects a specific sheet to integrate
 
     // Get redirect URL from environment
     const appBaseUrl = Deno.env.get('APP_BASE_URL');

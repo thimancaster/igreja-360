@@ -15,9 +15,33 @@ serve(async (req) => {
     const { integrationId } = await req.json();
     const authHeader = req.headers.get('Authorization')!;
 
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Extract user ID from JWT
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication token' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     // Get integration details
     const { data: integration, error: integrationError } = await supabase
@@ -27,7 +51,25 @@ serve(async (req) => {
       .single();
 
     if (integrationError || !integration) {
-      throw new Error('Integration not found');
+      return new Response(
+        JSON.stringify({ error: 'Integration not found' }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // SECURITY: Verify user owns this integration
+    if (integration.user_id !== user.id) {
+      console.warn(`Unauthorized sync attempt: user ${user.id} tried to sync integration ${integrationId} owned by ${integration.user_id}`);
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: You do not own this integration' }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     console.log(`Starting sync for sheet: ${integration.sheet_name}`);
