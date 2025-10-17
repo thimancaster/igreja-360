@@ -379,12 +379,12 @@ export default function Importacao() {
 
                   <div className="space-y-2">
                     <Label>Data de Vencimento (Opcional)</Label>
-                    <Select value={columnMapping.due_date} onValueChange={(v) => setColumnMapping({ ...columnMapping, due_date: v })}>
+                    <Select value={columnMapping.due_date || "NONE"} onValueChange={(v) => setColumnMapping({ ...columnMapping, due_date: v === "NONE" ? undefined : v })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Não mapear" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Não mapear</SelectItem>
+                        <SelectItem value="NONE">Não mapear</SelectItem>
                         {headers.map((h) => (
                           <SelectItem key={h} value={h}>
                             {h}
@@ -396,12 +396,12 @@ export default function Importacao() {
 
                   <div className="space-y-2">
                     <Label>Data de Pagamento (Opcional)</Label>
-                    <Select value={columnMapping.payment_date} onValueChange={(v) => setColumnMapping({ ...columnMapping, payment_date: v })}>
+                    <Select value={columnMapping.payment_date || "NONE"} onValueChange={(v) => setColumnMapping({ ...columnMapping, payment_date: v === "NONE" ? undefined : v })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Não mapear" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Não mapear</SelectItem>
+                        <SelectItem value="NONE">Não mapear</SelectItem>
                         {headers.map((h) => (
                           <SelectItem key={h} value={h}>
                             {h}
@@ -413,12 +413,12 @@ export default function Importacao() {
 
                   <div className="space-y-2 md:col-span-2">
                     <Label>Observações (Opcional)</Label>
-                    <Select value={columnMapping.notes} onValueChange={(v) => setColumnMapping({ ...columnMapping, notes: v })}>
+                    <Select value={columnMapping.notes || "NONE"} onValueChange={(v) => setColumnMapping({ ...columnMapping, notes: v === "NONE" ? undefined : v })}>
                       <SelectTrigger>
                         <SelectValue placeholder="Não mapear" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Não mapear</SelectItem>
+                        <SelectItem value="NONE">Não mapear</SelectItem>
                         {headers.map((h) => (
                           <SelectItem key={h} value={h}>
                             {h}
