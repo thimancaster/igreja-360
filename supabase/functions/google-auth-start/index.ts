@@ -63,7 +63,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in google-auth-start:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Internal Server Error' }), {
+    const message = error instanceof Error ? error.message : 'Internal Server Error'
+    return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })
