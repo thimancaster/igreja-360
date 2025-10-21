@@ -73,23 +73,9 @@ serve(async (req) => {
 
     const tokens = await tokenResponse.json();
 
-    // Validate tokens before proceeding
-    if (!tokens.access_token || !tokens.refresh_token || !tokens.id_token) {
+    if (!tokens.access_token || !tokens.id_token) {
       throw new Error('Invalid token response from Google: missing required tokens');
     }
-
-    // Validate token lengths (OAuth tokens are typically 100-2048 chars)
-    if (tokens.access_token.length > 2048 || tokens.refresh_token.length > 2048 || tokens.id_token.length > 2048) {
-      throw new Error('Token length exceeds maximum allowed size');
-    }
-
-    // Validate token format - should be alphanumeric with some special chars
-    const tokenRegex = /^[A-Za-z0-9\-._~+/]+=*$/;
-    if (!tokenRegex.test(tokens.access_token) || !tokenRegex.test(tokens.refresh_token)) {
-      throw new Error('Invalid token format detected');
-    }
-
-    console.log('OAuth successful, creating Supabase session');
 
     // Create Supabase client
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
@@ -104,11 +90,21 @@ serve(async (req) => {
       throw new Error(`Failed to create session: ${sessionError?.message || 'No session returned'}`);
     }
 
-    console.log('Session created successfully');
+    // Store Google tokens in the database
+    const { error: credentialError } = await supabaseClient
+      .from('user_credentials')
+      .upsert({
+        user_id: sessionData.user.id,
+        provider: 'google',
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        updated_at: new Date().toISOString(),
+      });
 
-    // Note: OAuth tokens are stored in session storage on the client side
-    // The full integration (with sheet_id, church_id, etc.) will be created
-    // by the frontend when the user selects a specific sheet to integrate
+    if (credentialError) {
+      console.error('Failed to store user credentials:', credentialError);
+      throw new Error('Could not save authentication tokens.');
+    }
 
     // Get redirect URL from environment
     const appBaseUrl = Deno.env.get('APP_BASE_URL');
@@ -120,7 +116,6 @@ serve(async (req) => {
     const cookies = [
       setCookie('sb-access-token', sessionData.session.access_token),
       setCookie('sb-refresh-token', sessionData.session.refresh_token),
-      // Clear state and nonce cookies
       setCookie('oauth-state', '', 0),
       setCookie('oauth-nonce', '', 0),
     ];
@@ -128,7 +123,7 @@ serve(async (req) => {
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': `${appBaseUrl}/integracoes`,
+        'Location': `${appBaseUrl}/integracoes?auth=success`,
         'Set-Cookie': cookies.join(', '),
       },
     });
@@ -136,8 +131,7 @@ serve(async (req) => {
     console.error('Error in google-auth-callback:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    // Get redirect URL from environment
-    const appBaseUrl = Deno.env.get('APP_BASE_URL') || Deno.env.get('SUPABASE_URL')?.replace('.supabase.co', '.lovable.app') || '';
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || '';
     
     return new Response(null, {
       status: 302,

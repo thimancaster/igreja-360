@@ -24,6 +24,25 @@ export const useIntegrations = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Fetch Google credentials for the user
+  const { data: credentials, isLoading: credentialsLoading } = useQuery({
+    queryKey: ["user-credentials", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from("user_credentials")
+        .select("access_token, refresh_token")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // Ignore "no rows found" error
+        throw error;
+      }
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
   // Fetch integrations
   const { data: integrations, isLoading } = useQuery({
     queryKey: ["google-integrations", user?.id],
@@ -60,6 +79,46 @@ export const useIntegrations = () => {
     },
   });
 
+  // Disconnect Google Account
+  const disconnectGoogle = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error("User not authenticated");
+      
+      const deleteIntegrationsPromise = supabase
+        .from("google_integrations")
+        .delete()
+        .eq("user_id", user.id);
+        
+      const deleteCredentialsPromise = supabase
+        .from("user_credentials")
+        .delete()
+        .eq("user_id", user.id);
+
+      const [integrationsResult, credentialsResult] = await Promise.all([
+        deleteIntegrationsPromise,
+        deleteCredentialsPromise,
+      ]);
+
+      if (integrationsResult.error) throw integrationsResult.error;
+      if (credentialsResult.error) throw credentialsResult.error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["google-integrations"] });
+      queryClient.invalidateQueries({ queryKey: ["user-credentials"] });
+      toast({
+        title: "Desconectado",
+        description: "Sua conta Google foi desconectada.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erro ao desconectar",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // List Google Sheets
   const listSheets = useMutation({
     mutationFn: async (accessToken: string) => {
@@ -80,7 +139,7 @@ export const useIntegrations = () => {
       sheetName: string;
       columnMapping: Record<string, string>;
       accessToken: string;
-      refreshToken: string;
+      refreshToken: string | null;
     }) => {
       const { error } = await supabase.from("google_integrations").insert({
         user_id: user?.id,
@@ -165,8 +224,10 @@ export const useIntegrations = () => {
 
   return {
     integrations,
-    isLoading,
+    isLoading: isLoading || credentialsLoading,
+    credentials,
     startOAuth,
+    disconnectGoogle,
     listSheets,
     createIntegration,
     syncIntegration,

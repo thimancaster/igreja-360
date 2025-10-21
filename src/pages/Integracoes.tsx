@@ -28,17 +28,17 @@ export default function Integracoes() {
   const {
     integrations,
     isLoading,
+    credentials,
     startOAuth,
+    disconnectGoogle,
     listSheets,
     createIntegration,
     syncIntegration,
     deleteIntegration,
   } = useIntegrations();
 
-  const [isConnected, setIsConnected] = useState(false);
-  const [userEmail, setUserEmail] = useState("");
-  const [accessToken, setAccessToken] = useState("");
-  const [refreshToken, setRefreshToken] = useState("");
+  const isConnected = !!credentials;
+
   const [showMappingDialog, setShowMappingDialog] = useState(false);
   const [availableSheets, setAvailableSheets] = useState<GoogleSheet[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<GoogleSheet | null>(null);
@@ -65,22 +65,16 @@ export default function Integracoes() {
     fetchChurchId();
   }, [user?.id]);
 
-  // Handle OAuth callback - session is now managed via cookies
+  // Handle OAuth callback toast message
   useEffect(() => {
     const auth = searchParams.get("auth");
     const message = searchParams.get("message");
 
     if (auth === "success") {
-      // Session is automatically available via cookies
-      if (user?.email) {
-        setIsConnected(true);
-        setUserEmail(user.email);
-        toast({
-          title: "Conectado com sucesso",
-          description: `Autenticado como ${user.email}. Sessão segura estabelecida.`,
-        });
-      }
-      // Clean URL
+      toast({
+        title: "Conectado com sucesso",
+        description: `Sua conta Google foi autenticada.`,
+      });
       setSearchParams({});
     } else if (auth === "error") {
       toast({
@@ -90,29 +84,18 @@ export default function Integracoes() {
       });
       setSearchParams({});
     }
-  }, [searchParams, setSearchParams, user]);
+  }, [searchParams, setSearchParams]);
 
   const handleConnect = () => {
     startOAuth.mutate();
   };
 
   const handleDisconnect = () => {
-    setIsConnected(false);
-    setUserEmail("");
-    setAccessToken("");
-    setRefreshToken("");
+    disconnectGoogle.mutate();
   };
 
   const handleAddSheet = async () => {
-    // Fetch access token from integrations if available
-    if (integrations && integrations.length > 0 && !accessToken) {
-      setAccessToken(integrations[0].access_token);
-      setRefreshToken(integrations[0].refresh_token);
-    }
-
-    const tokenToUse = accessToken || integrations?.[0]?.access_token;
-
-    if (!tokenToUse) {
+    if (!credentials?.access_token) {
       toast({
         title: "Erro",
         description: "Token de acesso não encontrado. Reconecte sua conta.",
@@ -122,7 +105,7 @@ export default function Integracoes() {
     }
 
     try {
-      const sheets = await listSheets.mutateAsync(tokenToUse);
+      const sheets = await listSheets.mutateAsync(credentials.access_token);
       setAvailableSheets(sheets);
       setShowMappingDialog(true);
     } catch (error) {
@@ -140,13 +123,12 @@ export default function Integracoes() {
 
     setSelectedSheet(sheet);
 
-    // Fetch sheet headers (first row)
     try {
       const response = await fetch(
         `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:ZZ1`,
         {
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            Authorization: `Bearer ${credentials?.access_token}`,
           },
         }
       );
@@ -165,21 +147,20 @@ export default function Integracoes() {
   };
 
   const handleSaveIntegration = async () => {
-    if (!selectedSheet || !churchId) {
+    if (!selectedSheet || !churchId || !credentials) {
       toast({
         title: "Erro",
-        description: "Igreja não identificada. Por favor, faça login novamente.",
+        description: "Dados insuficientes para criar a integração. Tente novamente.",
         variant: "destructive",
       });
       return;
     }
 
-    // Validate that all required fields are mapped
     const missingFields = REQUIRED_FIELDS.filter((field) => !columnMapping[field.key]);
     if (missingFields.length > 0) {
       toast({
         title: "Mapeamento incompleto",
-        description: `Por favor, mapeie todos os campos obrigatórios`,
+        description: `Por favor, mapeie todos os campos obrigatórios.`,
         variant: "destructive",
       });
       return;
@@ -190,8 +171,8 @@ export default function Integracoes() {
       sheetId: selectedSheet.id,
       sheetName: selectedSheet.name,
       columnMapping,
-      accessToken,
-      refreshToken,
+      accessToken: credentials.access_token,
+      refreshToken: credentials.refresh_token,
     });
 
     setShowMappingDialog(false);
@@ -244,10 +225,10 @@ export default function Integracoes() {
                   </div>
                   <div>
                     <p className="font-medium">Conectado</p>
-                    <p className="text-sm text-muted-foreground">{userEmail}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" onClick={handleDisconnect}>
+                <Button variant="outline" size="sm" onClick={handleDisconnect} disabled={disconnectGoogle.isPending}>
                   Desconectar
                 </Button>
               </div>
@@ -318,7 +299,6 @@ export default function Integracoes() {
         </CardContent>
       </Card>
 
-      {/* Mapping Dialog */}
       <Dialog open={showMappingDialog} onOpenChange={setShowMappingDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
