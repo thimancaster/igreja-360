@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 
 export default function Configuracoes() {
   const { user } = useAuth();
-  const { isAdmin, isTesoureiro, isPrivileged, isLoading: roleLoading } = useRole();
+  const { isPrivileged, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
 
   // Fetch user profile
@@ -72,17 +72,22 @@ export default function Configuracoes() {
   });
 
   // Update profile data when loaded
-  useState(() => {
+  useEffect(() => {
     if (profile) {
       setProfileData({
         full_name: profile.full_name || "",
         avatar_url: profile.avatar_url || "",
       });
+      setNotificationSettings({
+        email_transactions: profile.email_transactions ?? true,
+        email_reports: profile.email_reports ?? true,
+        email_integrations: profile.email_integrations ?? true,
+      });
     }
-  });
+  }, [profile]);
 
   // Update church data when loaded
-  useState(() => {
+  useEffect(() => {
     if (church) {
       setChurchData({
         name: church.name || "",
@@ -92,7 +97,7 @@ export default function Configuracoes() {
         state: church.state || "",
       });
     }
-  });
+  }, [church]);
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
@@ -136,6 +141,27 @@ export default function Configuracoes() {
     },
   });
 
+  // Update notification settings mutation
+  const updateNotificationSettingsMutation = useMutation({
+    mutationFn: async (data: typeof notificationSettings) => {
+      if (!user?.id) throw new Error("Usuário não autenticado");
+      
+      const { error } = await supabase
+        .from("profiles")
+        .update(data)
+        .eq("id", user.id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      toast.success("Preferências de notificação salvas!");
+    },
+    onError: (error) => {
+      toast.error("Erro ao salvar preferências de notificação: " + error.message);
+    },
+  });
+
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateProfileMutation.mutate(profileData);
@@ -144,6 +170,10 @@ export default function Configuracoes() {
   const handleChurchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateChurchMutation.mutate(churchData);
+  };
+
+  const handleNotificationSettingsSubmit = () => {
+    updateNotificationSettingsMutation.mutate(notificationSettings);
   };
 
   if (profileLoading || roleLoading) {
@@ -412,7 +442,10 @@ export default function Configuracoes() {
 
               <Separator />
 
-              <Button onClick={() => toast.success("Preferências salvas!")}>
+              <Button onClick={handleNotificationSettingsSubmit} disabled={updateNotificationSettingsMutation.isPending}>
+                {updateNotificationSettingsMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Salvar Preferências
               </Button>
             </CardContent>
