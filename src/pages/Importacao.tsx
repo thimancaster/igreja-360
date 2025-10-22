@@ -1,36 +1,33 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { UploadCloud, FileText, ChevronRight, ChevronLeft, Check, Loader2 } from "lucide-react";
+import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Upload, FileSpreadsheet, ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 import { ColumnMapping, ImportPreviewRow, ProcessedTransaction } from "@/types/import";
-import { readSpreadsheet, parseAmount, parseDate, normalizeType, normalizeStatus } from "@/utils/importHelpers";
-import { z } from "zod";
+import { readSpreadsheet, parseAmount, parseDate, normalizeType, normalizeStatus, validateTransaction } from "@/utils/importHelpers";
 
-const transactionSchema = z.object({
-  description: z.string().trim().min(1, "Descrição é obrigatória").max(500, "Descrição muito longa"),
-  amount: z.number().positive("Valor deve ser positivo").max(999999999, "Valor muito alto"),
-  type: z.enum(["Receita", "Despesa"], { required_error: "Tipo é obrigatório" }),
-  status: z.enum(["Pendente", "Pago", "Vencido"], { required_error: "Status é obrigatório" }),
-  due_date: z.string().nullable(),
-  payment_date: z.string().nullable(),
-  notes: z.string().nullable(),
-  category_id: z.string().nullable(),
-  ministry_id: z.string().nullable(),
-  church_id: z.string().uuid(),
-  created_by: z.string().uuid(),
-  origin: z.string(),
-});
+const REQUIRED_FIELDS: (keyof ColumnMapping)[] = ["description", "amount", "type", "status"];
+const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
+  description: "Descrição",
+  amount: "Valor",
+  type: "Tipo (Receita/Despesa)",
+  status: "Status (Pendente/Pago/Vencido)",
+  due_date: "Data de Vencimento",
+  payment_date: "Data de Pagamento",
+  category_id: "Categoria",
+  ministry_id: "Ministério",
+  notes: "Notas",
+};
 
 export default function Importacao() {
   const [step, setStep] = useState(1);
@@ -38,481 +35,264 @@ export default function Importacao() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [dataRows, setDataRows] = useState<any[][]>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
-    description: "",
-    amount: "",
-    type: "",
-    status: "",
+    description: "", amount: "", type: "", status: "", due_date: "",
+    payment_date: "", category_id: "", ministry_id: "", notes: "",
   });
   const [previewData, setPreviewData] = useState<ImportPreviewRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
 
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
-
-    // Validar tamanho (5MB max)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      toast({
-        title: "Arquivo muito grande",
-        description: "O arquivo deve ter no máximo 5MB",
-        variant: "destructive",
-      });
-      return;
+  const onDrop = (acceptedFiles: File[]) => {
+    if (acceptedFiles.length > 0) {
+      const selectedFile = acceptedFiles[0];
+      if (selectedFile.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({ title: "Arquivo muito grande", description: "O tamanho máximo do arquivo é 5MB.", variant: "destructive" });
+        return;
+      }
+      setFile(selectedFile);
     }
-
-    setFile(selectedFile);
   };
 
-  const handleProcessFile = async () => {
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: {
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "text/csv": [".csv"],
+    },
+    maxFiles: 1,
+  });
+
+  const handleFileStep = async () => {
     if (!file) return;
-
     try {
-      toast({ title: "A processar ficheiro..." });
-      const { headers: fileHeaders, rows } = await readSpreadsheet(file);
-
-      if (rows.length === 0) {
-        toast({
-          title: "Arquivo vazio",
-          description: "O arquivo não contém dados para importar",
-          variant: "destructive",
-        });
-        return;
-      }
-
+      const { headers, rows } = await readSpreadsheet(file);
       if (rows.length > 1000) {
-        toast({
-          title: "Muitos registos",
-          description: "O arquivo pode ter no máximo 1000 transações",
-          variant: "destructive",
-        });
+        toast({ title: "Muitas linhas", description: "A importação está limitada a 1000 linhas por vez.", variant: "destructive" });
         return;
       }
-
-      setHeaders(fileHeaders);
+      setHeaders(headers);
       setDataRows(rows);
       setStep(2);
-      toast({ title: "Ficheiro processado com sucesso!" });
-    } catch (error: any) {
-      toast({
-        title: "Erro ao processar ficheiro",
-        description: error.message,
-        variant: "destructive",
-      });
+    } catch (error) {
+      toast({ title: "Erro ao ler arquivo", description: "Não foi possível processar o arquivo. Verifique o formato.", variant: "destructive" });
     }
   };
 
-  const handlePreview = () => {
-    // Validar campos obrigatórios
-    if (!columnMapping.description || !columnMapping.amount || !columnMapping.type || !columnMapping.status) {
-      toast({
-        title: "Mapeamento incompleto",
-        description: "Por favor, mapeie todos os campos obrigatórios",
-        variant: "destructive",
-      });
+  const handleMappingStep = () => {
+    const missingMappings = REQUIRED_FIELDS.filter(field => !columnMapping[field]);
+    if (missingMappings.length > 0) {
+      toast({ title: "Mapeamento Incompleto", description: `Os seguintes campos obrigatórios não foram mapeados: ${missingMappings.map(f => FIELD_LABELS[f]).join(', ')}`, variant: "destructive" });
       return;
     }
 
-    // Processar primeiras 5 linhas para preview
-    const preview: ImportPreviewRow[] = [];
-    const previewRows = dataRows.slice(0, 5);
-
-    previewRows.forEach((row) => {
-      const descIndex = headers.indexOf(columnMapping.description);
-      const amountIndex = headers.indexOf(columnMapping.amount);
-      const typeIndex = headers.indexOf(columnMapping.type);
-      const statusIndex = headers.indexOf(columnMapping.status);
-
-      preview.push({
-        description: row[descIndex] || "",
-        amount: parseAmount(row[amountIndex]) || 0,
-        type: normalizeType(row[typeIndex]) || "",
-        status: normalizeStatus(row[statusIndex]) || "",
+    const preview = dataRows.slice(0, 5).map(row => {
+      const rowData: ImportPreviewRow = {};
+      Object.keys(columnMapping).forEach(key => {
+        const fieldKey = key as keyof ColumnMapping;
+        const header = columnMapping[fieldKey];
+        if (header) {
+          const cellValue = row[headers.indexOf(header)];
+          rowData[fieldKey] = cellValue;
+        }
       });
+      return rowData;
     });
-
     setPreviewData(preview);
     setStep(3);
   };
 
   const handleImport = async () => {
     if (!user) {
-      toast({ title: "Erro", description: "Utilizador não autenticado", variant: "destructive" });
+      toast({ title: "Erro de Autenticação", description: "Usuário não encontrado.", variant: "destructive" });
       return;
     }
-
     setImporting(true);
     setProgress(0);
 
     try {
-      // 1. Obter church_id
       const { data: profile } = await supabase.from("profiles").select("church_id").eq("id", user.id).single();
+      if (!profile?.church_id) throw new Error("Igreja não encontrada para o seu perfil.");
 
-      if (!profile?.church_id) {
-        throw new Error("Igreja não encontrada no perfil do utilizador");
-      }
-
-      // 2. Processar todas as linhas
-      const transactions: ProcessedTransaction[] = [];
+      const transactionsToInsert: ProcessedTransaction[] = [];
       const errors: { row: number; error: string }[] = [];
 
-      dataRows.forEach((row, index) => {
-        try {
-          const descIndex = headers.indexOf(columnMapping.description);
-          const amountIndex = headers.indexOf(columnMapping.amount);
-          const typeIndex = headers.indexOf(columnMapping.type);
-          const statusIndex = headers.indexOf(columnMapping.status);
-          const dueDateIndex = columnMapping.due_date ? headers.indexOf(columnMapping.due_date) : -1;
-          const paymentDateIndex = columnMapping.payment_date ? headers.indexOf(columnMapping.payment_date) : -1;
-          const notesIndex = columnMapping.notes ? headers.indexOf(columnMapping.notes) : -1;
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        const mappedRow: any = {};
+        (Object.keys(columnMapping) as (keyof ColumnMapping)[]).forEach(key => {
+          const header = columnMapping[key];
+          if (header) mappedRow[key] = row[headers.indexOf(header)];
+        });
 
-          // Ignorar linhas vazias
-          if (!row[descIndex] && !row[amountIndex]) return;
+        const processed = {
+          description: mappedRow.description || "",
+          amount: parseAmount(mappedRow.amount),
+          type: normalizeType(mappedRow.type),
+          status: normalizeStatus(mappedRow.status),
+          due_date: parseDate(mappedRow.due_date),
+          payment_date: parseDate(mappedRow.payment_date),
+          notes: mappedRow.notes || null,
+          category_id: null, // Future: Implement lookup
+          ministry_id: null, // Future: Implement lookup
+          church_id: profile.church_id,
+          created_by: user.id,
+        };
 
-          const mapped = {
-            description: String(row[descIndex] || "").trim(),
-            amount: parseAmount(row[amountIndex]),
-            type: normalizeType(row[typeIndex]),
-            status: normalizeStatus(row[statusIndex]),
-            due_date: dueDateIndex >= 0 ? parseDate(row[dueDateIndex]) : null,
-            payment_date: paymentDateIndex >= 0 ? parseDate(row[paymentDateIndex]) : null,
-            notes: notesIndex >= 0 ? String(row[notesIndex] || "").trim() || null : null,
-            category_id: null,
-            ministry_id: null,
-            church_id: profile.church_id,
-            created_by: user.id,
-            origin: "Importação",
-          };
-
-          // Validar
-          const validated = transactionSchema.parse(mapped) as ProcessedTransaction;
-          transactions.push(validated);
-        } catch (error) {
-          errors.push({
-            row: index + 2,
-            error: error instanceof z.ZodError ? error.errors[0].message : "Erro de validação",
-          });
+        const validation = validateTransaction(processed);
+        if (validation.success) {
+          transactionsToInsert.push(validation.data as ProcessedTransaction);
+        } else {
+          errors.push({ row: i + 2, error: validation.error?.errors[0].message || "Erro desconhecido" });
         }
-      });
+        setProgress(((i + 1) / dataRows.length) * 100);
+      }
 
-      setProgress(50);
-
-      // 3. Verificar erros
       if (errors.length > 0) {
-        toast({
-          title: "Erros de Validação",
-          description: `${errors.length} linha(s) com erro. Primeira: Linha ${errors[0].row} - ${errors[0].error}`,
-          variant: "destructive",
-        });
-        setImporting(false);
-        return;
+        throw new Error(`${errors.length} linha(s) com erro. Primeira na Linha ${errors[0].row}: ${errors[0].error}`);
       }
 
-      if (transactions.length === 0) {
-        toast({
-          title: "Nenhuma transação válida",
-          description: "Não foram encontradas transações válidas para importar",
-          variant: "destructive",
-        });
-        setImporting(false);
-        return;
+      if (transactionsToInsert.length === 0) {
+        throw new Error("Nenhuma transação válida para importar.");
       }
 
-      // 4. Insert em massa
-      const { error: insertError } = await supabase.from("transactions").insert(transactions);
-
+      const { error: insertError } = await supabase.from("transactions").insert(transactionsToInsert);
       if (insertError) throw insertError;
 
-      setProgress(100);
-
-      // 5. Sucesso
-      toast({
-        title: "Importação concluída!",
-        description: `${transactions.length} transações importadas com sucesso!`,
-      });
-
-      // 6. Invalidar cache e redirecionar
-      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      toast({ title: "Sucesso!", description: `${transactionsToInsert.length} transações importadas com sucesso.` });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
       navigate("/dashboard");
+
     } catch (error: any) {
-      toast({
-        title: "Erro na Importação",
-        description: error.message || "Ocorreu um erro ao importar as transações",
-        variant: "destructive",
-      });
+      toast({ title: "Erro na Importação", description: error.message, variant: "destructive" });
     } finally {
       setImporting(false);
-      setProgress(0);
     }
   };
 
-  const getBadgeVariant = (status: string) => {
-    if (status === "Pago") return "default";
-    if (status === "Pendente") return "secondary";
-    return "destructive";
-  };
-
   return (
-    <div className="flex-1 space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold">Importação de Planilhas</h1>
-        <p className="text-muted-foreground mt-1">Importe dados de Excel ou CSV em 3 passos simples</p>
-      </div>
+    <div className="container mx-auto p-6">
+      <Card className="max-w-4xl mx-auto">
+        {step === 1 && (
+          <>
+            <CardHeader>
+              <CardTitle>Passo 1: Upload do Arquivo</CardTitle>
+              <CardDescription>Selecione ou arraste um arquivo .xlsx, .xls ou .csv para importar.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div {...getRootProps()} className={`p-10 border-2 border-dashed rounded-lg text-center cursor-pointer ${isDragActive ? 'border-primary' : 'border-border'}`}>
+                <input {...getInputProps()} />
+                <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                <p className="mt-4 text-muted-foreground">
+                  {isDragActive ? "Solte o arquivo aqui..." : "Arraste e solte o arquivo aqui, ou clique para selecionar"}
+                </p>
+              </div>
+              {file && (
+                <div className="mt-6 flex items-center justify-center space-x-3 p-3 bg-muted rounded-lg">
+                  <FileText className="h-6 w-6 text-primary" />
+                  <span className="font-medium">{file.name}</span>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button onClick={handleFileStep} disabled={!file} className="ml-auto">
+                Próximo <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardFooter>
+          </>
+        )}
 
-      <div className="grid gap-6 md:grid-cols-[2fr_1fr]">
-        <Card>
-          {step === 1 && (
-            <>
-              <CardHeader>
-                <CardTitle>Passo 1: Envie a sua Planilha</CardTitle>
-                <CardDescription>Selecione um ficheiro .xlsx ou .csv contendo as suas transações</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-smooth">
-                  <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <Label htmlFor="file-upload" className="cursor-pointer">
-                    <span className="text-sm text-muted-foreground">
-                      {file ? file.name : "Clique para selecionar um ficheiro"}
-                    </span>
+        {step === 2 && (
+          <>
+            <CardHeader>
+              <CardTitle>Passo 2: Mapeamento de Colunas</CardTitle>
+              <CardDescription>Associe as colunas do seu arquivo aos campos de transação do sistema. Campos com * são obrigatórios.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {(Object.keys(FIELD_LABELS) as (keyof ColumnMapping)[]).map(field => (
+                <div key={field} className="space-y-2">
+                  <Label htmlFor={field}>
+                    {FIELD_LABELS[field]}
+                    {REQUIRED_FIELDS.includes(field) && <span className="text-destructive">*</span>}
                   </Label>
-                  <Input
-                    id="file-upload"
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
+                  <Select value={columnMapping[field]} onValueChange={value => setColumnMapping(prev => ({ ...prev, [field]: value }))}>
+                    <SelectTrigger id={field}>
+                      <SelectValue placeholder="Selecione uma coluna" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {headers.map(header => (
+                        <SelectItem key={header} value={header}>{header}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <p className="text-xs text-muted-foreground">Tamanho máximo: 5MB | Máximo 1000 transações</p>
-              </CardContent>
-              <CardFooter>
-                <Button onClick={handleProcessFile} disabled={!file} className="ml-auto">
-                  Próximo <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </>
-          )}
+              ))}
+            </CardContent>
+            <CardFooter className="justify-between">
+              <Button variant="outline" onClick={() => setStep(1)}>
+                <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+              </Button>
+              <Button onClick={handleMappingStep}>
+                Pré-visualizar Dados <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardFooter>
+          </>
+        )}
 
-          {step === 2 && (
-            <>
-              <CardHeader>
-                <CardTitle>Passo 2: Mapeie as Colunas</CardTitle>
-                <CardDescription>Corresponda as colunas da planilha com os campos do sistema</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label>
-                      Descrição da Transação <span className="text-destructive">*</span>
-                    </Label>
-                    <Select value={columnMapping.description} onValueChange={(v) => setColumnMapping({ ...columnMapping, description: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a coluna" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>
-                      Valor (Amount) <span className="text-destructive">*</span>
-                    </Label>
-                    <Select value={columnMapping.amount} onValueChange={(v) => setColumnMapping({ ...columnMapping, amount: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a coluna" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>
-                      Tipo (Receita/Despesa) <span className="text-destructive">*</span>
-                    </Label>
-                    <Select value={columnMapping.type} onValueChange={(v) => setColumnMapping({ ...columnMapping, type: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a coluna" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>
-                      Status <span className="text-destructive">*</span>
-                    </Label>
-                    <Select value={columnMapping.status} onValueChange={(v) => setColumnMapping({ ...columnMapping, status: v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione a coluna" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Data de Vencimento (Opcional)</Label>
-                    <Select value={columnMapping.due_date || "NONE"} onValueChange={(v) => setColumnMapping({ ...columnMapping, due_date: v === "NONE" ? undefined : v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Não mapear" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">Não mapear</SelectItem>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Data de Pagamento (Opcional)</Label>
-                    <Select value={columnMapping.payment_date || "NONE"} onValueChange={(v) => setColumnMapping({ ...columnMapping, payment_date: v === "NONE" ? undefined : v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Não mapear" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">Não mapear</SelectItem>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>Observações (Opcional)</Label>
-                    <Select value={columnMapping.notes || "NONE"} onValueChange={(v) => setColumnMapping({ ...columnMapping, notes: v === "NONE" ? undefined : v })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Não mapear" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="NONE">Não mapear</SelectItem>
-                        {headers.map((h) => (
-                          <SelectItem key={h} value={h}>
-                            {h}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+        {step === 3 && (
+          <>
+            <CardHeader>
+              <CardTitle>Passo 3: Pré-visualização e Confirmação</CardTitle>
+              <CardDescription>Confira as primeiras 5 linhas para garantir que o mapeamento está correto. Um total de {dataRows.length} linhas serão importadas.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {importing ? (
+                <div className="space-y-4 text-center">
+                  <p>Importando... Por favor, aguarde.</p>
+                  <Progress value={progress} className="w-full" />
+                  <p>{Math.round(progress)}%</p>
                 </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(1)}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
-                </Button>
-                <Button onClick={handlePreview}>
-                  Pré-visualizar Dados <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardFooter>
-            </>
-          )}
-
-          {step === 3 && (
-            <>
-              <CardHeader>
-                <CardTitle>Passo 3: Confirme os Dados</CardTitle>
-                <CardDescription>
-                  Verifique se os dados foram mapeados corretamente. A mostrar 5 de {dataRows.length} transações.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-md border">
+              ) : (
+                <div className="border rounded-lg">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Descrição</TableHead>
-                        <TableHead>Valor</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Status</TableHead>
+                        {Object.keys(previewData[0] || {}).map(key => <TableHead key={key}>{FIELD_LABELS[key as keyof ColumnMapping]}</TableHead>)}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {previewData.map((row, i) => (
-                        <TableRow key={i}>
-                          <TableCell className="font-medium">{row.description}</TableCell>
-                          <TableCell>€{Number(row.amount).toFixed(2)}</TableCell>
-                          <TableCell>
-                            <Badge variant={row.type === "Receita" ? "default" : "secondary"}>{row.type}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getBadgeVariant(String(row.status))}>{row.status}</Badge>
-                          </TableCell>
+                      {previewData.map((row, index) => (
+                        <TableRow key={index}>
+                          {Object.entries(row).map(([key, value]) => (
+                            <TableCell key={key}>
+                              {key === 'status' ? <Badge>{String(value)}</Badge> : String(value)}
+                            </TableCell>
+                          ))}
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
-                {importing && (
-                  <div className="mt-4 space-y-2">
-                    <Progress value={progress} />
-                    <p className="text-sm text-muted-foreground text-center">A importar transações...</p>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" onClick={() => setStep(2)} disabled={importing}>
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
-                </Button>
-                <Button onClick={handleImport} disabled={importing}>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  {importing ? "A Importar..." : "Importar Transações"}
-                </Button>
-              </CardFooter>
-            </>
-          )}
-        </Card>
-
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5" />
-              Google Sheets
-            </CardTitle>
-            <CardDescription>Sincronize automaticamente com o Google</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              Já tem as suas transações numa planilha do Google? Configure uma sincronização automática.
-            </p>
-            <Button variant="outline" onClick={() => navigate("/integracoes")} className="w-full">
-              Conectar Google Sheets
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+              )}
+            </CardContent>
+            <CardFooter className="justify-between">
+              <Button variant="outline" onClick={() => setStep(2)} disabled={importing}>
+                <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
+              </Button>
+              <Button onClick={handleImport} disabled={importing}>
+                {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
+                Importar {dataRows.length} Transações
+              </Button>
+            </CardFooter>
+          </>
+        )}
+      </Card>
     </div>
   );
 }
