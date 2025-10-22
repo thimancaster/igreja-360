@@ -174,6 +174,55 @@ export function useRevenueByMinistry(filters: ReportFilters) {
   });
 }
 
+export function useCashFlow(filters: ReportFilters) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["cash-flow", user?.id, filters],
+    queryFn: async () => {
+      if (!user || !filters.startDate || !filters.endDate) return null;
+
+      const { data: profile } = await supabase.from("profiles").select("church_id").eq("id", user.id).single();
+      if (!profile?.church_id) throw new Error("Igreja não encontrada");
+
+      let query = supabase
+        .from("transactions")
+        .select("payment_date, description, type, amount")
+        .eq("church_id", profile.church_id)
+        .eq("status", "Pago")
+        .gte("payment_date", filters.startDate)
+        .lte("payment_date", filters.endDate)
+        .order("payment_date", { ascending: true });
+
+      if (filters.categoryId && filters.categoryId !== 'all') {
+        query = query.eq("category_id", filters.categoryId);
+      }
+      if (filters.ministryId && filters.ministryId !== 'all') {
+        query = query.eq("ministry_id", filters.ministryId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      let runningBalance = 0;
+      const cashFlowData = data.map(tx => {
+        const value = tx.type === "Receita" ? tx.amount : -tx.amount;
+        runningBalance += value;
+        return {
+          date: tx.payment_date,
+          description: tx.description,
+          type: tx.type,
+          value: tx.amount,
+          balance: runningBalance,
+        };
+      });
+
+      return cashFlowData;
+    },
+    enabled: false,
+  });
+}
+
 export function useReportFiltersData() {
   const { user } = useAuth();
 

@@ -5,9 +5,10 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFinancialSummary, useReportFiltersData, useExpensesByCategory, useRevenueByMinistry } from "@/hooks/useReports";
+import { useFinancialSummary, useReportFiltersData, useExpensesByCategory, useRevenueByMinistry, useCashFlow } from "@/hooks/useReports";
 import { ExpensesByCategoryChart } from "@/components/reports/ExpensesByCategoryChart";
 import { RevenueByMinistryChart } from "@/components/reports/RevenueByMinistryChart";
+import { CashFlowReport } from "@/components/reports/CashFlowReport";
 import { Loader2, TrendingUp, TrendingDown, Scale, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -39,9 +40,10 @@ export default function Relatorios() {
   const { data: summary, isFetching: summaryFetching, refetch: refetchSummary } = useFinancialSummary(filters);
   const { data: expensesData, isFetching: expensesFetching, refetch: refetchExpenses } = useExpensesByCategory(filters);
   const { data: revenueData, isFetching: revenueFetching, refetch: refetchRevenue } = useRevenueByMinistry(filters);
+  const { data: cashFlowData, isFetching: cashFlowFetching, refetch: refetchCashFlow } = useCashFlow(filters);
   const { data: filterOptions, isLoading: filtersLoading } = useReportFiltersData();
 
-  const isFetching = summaryFetching || expensesFetching || revenueFetching;
+  const isFetching = summaryFetching || expensesFetching || revenueFetching || cashFlowFetching;
 
   const handleGenerateReport = () => {
     if (!startDate || !endDate) {
@@ -64,6 +66,7 @@ export default function Relatorios() {
       refetchSummary();
       refetchExpenses();
       refetchRevenue();
+      refetchCashFlow();
     }, 0);
   };
 
@@ -108,6 +111,30 @@ export default function Relatorios() {
 
       const fileName = `Receitas_por_Ministerio_${format(new Date(), "yyyy-MM-dd")}`;
       exportToExcel(dataToExport, fileName, 'Receitas');
+      
+      toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
+    } catch (error: any) {
+      toast({ title: "Erro na Exportação", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleExportCashFlow = () => {
+    if (!cashFlowData || cashFlowData.length === 0) {
+      toast({ title: "Nenhum dado para exportar", description: "Gere um relatório primeiro.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const dataToExport = cashFlowData.map(item => ({
+        'Data': item.date ? new Date(item.date + 'T00:00:00').toLocaleDateString("pt-BR") : '-',
+        'Descrição': item.description,
+        'Tipo': item.type,
+        'Valor': item.value,
+        'Saldo': item.balance,
+      }));
+
+      const fileName = `Fluxo_de_Caixa_${format(new Date(), "yyyy-MM-dd")}`;
+      exportToExcel(dataToExport, fileName, 'Fluxo de Caixa');
       
       toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
     } catch (error: any) {
@@ -202,6 +229,24 @@ export default function Relatorios() {
             <div className="p-6 border rounded-lg bg-success/10"><div className="flex items-center justify-between"><h3 className="text-sm font-medium text-success">Total de Receitas</h3><TrendingUp className="h-5 w-5 text-success" /></div><p className="mt-2 text-3xl font-bold text-foreground">{formatCurrency(summary.totalRevenue)}</p></div>
             <div className="p-6 border rounded-lg bg-destructive/10"><div className="flex items-center justify-between"><h3 className="text-sm font-medium text-destructive">Total de Despesas</h3><TrendingDown className="h-5 w-5 text-destructive" /></div><p className="mt-2 text-3xl font-bold text-foreground">{formatCurrency(summary.totalExpenses)}</p></div>
             <div className="p-6 border rounded-lg bg-primary/10"><div className="flex items-center justify-between"><h3 className="text-sm font-medium text-primary">Saldo Líquido</h3><Scale className="h-5 w-5 text-primary" /></div><p className={`mt-2 text-3xl font-bold ${summary.netBalance >= 0 ? 'text-foreground' : 'text-destructive'}`}>{formatCurrency(summary.netBalance)}</p></div>
+          </CardContent>
+        </Card>
+      )}
+
+      {cashFlowData && !isFetching && cashFlowData.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Fluxo de Caixa Detalhado</CardTitle>
+              <CardDescription>Movimentações e saldo acumulado no período.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExportCashFlow}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar Excel
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <CashFlowReport data={cashFlowData} />
           </CardContent>
         </Card>
       )}
