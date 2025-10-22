@@ -7,16 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Database } from "@/integrations/supabase/types";
+
+type AppRole = Database["public"]["Enums"]["app_role"];
 
 type ProfileWithRoles = {
   id: string;
   full_name: string | null;
   email: string | null;
   avatar_url: string | null;
-  user_roles: { role: string }[];
+  roles: AppRole[]; // Changed to an array of AppRole
 };
 
-const ROLES = ["admin", "tesoureiro", "pastor", "lider"];
+const ROLES: AppRole[] = ["admin", "tesoureiro", "pastor", "lider"];
 
 export default function GerenciarUsuarios() {
   const queryClient = useQueryClient();
@@ -24,40 +27,54 @@ export default function GerenciarUsuarios() {
   const { data: profiles, isLoading } = useQuery({
     queryKey: ["admin-profiles"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch profiles
+      const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
         .select(`
           id,
           full_name,
           avatar_url,
-          user:users(email),
-          user_roles(role)
+          user:users(email)
         `);
 
-      if (error) throw error;
+      if (profilesError) throw profilesError;
 
-      // Manually structure the data to match what the component expects
-      return data.map(p => ({
+      // Fetch user roles separately
+      const { data: userRolesData, error: userRolesError } = await supabase
+        .from("user_roles")
+        .select("user_id, role");
+
+      if (userRolesError) throw userRolesError;
+
+      const rolesMap = new Map<string, AppRole[]>();
+      userRolesData.forEach(ur => {
+        if (!rolesMap.has(ur.user_id)) {
+          rolesMap.set(ur.user_id, []);
+        }
+        rolesMap.get(ur.user_id)?.push(ur.role);
+      });
+
+      return profilesData.map(p => ({
         id: p.id,
         full_name: p.full_name,
         avatar_url: p.avatar_url,
-        // @ts-ignore
-        email: p.user?.email,
-        // @ts-ignore
-        user_roles: p.user_roles,
+        // @ts-ignore - Supabase types for joined tables can be tricky
+        email: p.user?.email || null,
+        roles: rolesMap.get(p.id) || [],
       })) as ProfileWithRoles[];
     },
   });
 
   const updateUserRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      // This is a simple implementation: remove all roles and add the new one.
+    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
+      // Remove existing roles for the user
       const { error: deleteError } = await supabase
         .from("user_roles")
         .delete()
         .eq("user_id", userId);
       if (deleteError) throw deleteError;
 
+      // Insert the new role
       const { error: insertError } = await supabase
         .from("user_roles")
         .insert({ user_id: userId, role });
@@ -122,13 +139,13 @@ export default function GerenciarUsuarios() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
-                          {profile.user_roles[0]?.role || "Nenhum"}
+                          {profile.roles[0] || "Nenhum"}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <Select
-                          defaultValue={profile.user_roles[0]?.role}
-                          onValueChange={(role) => updateUserRoleMutation.mutate({ userId: profile.id, role })}
+                          defaultValue={profile.roles[0]}
+                          onValueChange={(role: AppRole) => updateUserRoleMutation.mutate({ userId: profile.id, role })}
                           disabled={updateUserRoleMutation.isPending}
                         >
                           <SelectTrigger>

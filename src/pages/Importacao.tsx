@@ -130,11 +130,11 @@ export default function Importacao() {
           if (header) mappedRow[key] = row[headers.indexOf(header)];
         });
 
-        const processed = {
+        const processed: Partial<ProcessedTransaction> = {
           description: mappedRow.description || "",
-          amount: parseAmount(mappedRow.amount),
-          type: normalizeType(mappedRow.type),
-          status: normalizeStatus(mappedRow.status),
+          amount: parseAmount(mappedRow.amount) || 0, // Ensure amount is a number
+          type: normalizeType(mappedRow.type) || "Despesa", // Default type if not provided
+          status: normalizeStatus(mappedRow.status) || "Pendente", // Default status if not provided
           due_date: parseDate(mappedRow.due_date),
           payment_date: parseDate(mappedRow.payment_date),
           notes: mappedRow.notes || null,
@@ -142,6 +142,7 @@ export default function Importacao() {
           ministry_id: null, // Future: Implement lookup
           church_id: profile.church_id,
           created_by: user.id,
+          origin: 'Importação de Planilha', // Add origin field
         };
 
         const validation = validateTransaction(processed);

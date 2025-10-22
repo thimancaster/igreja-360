@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { Database } from "@/integrations/supabase/types";
 
 export interface GoogleIntegration {
   id: string;
@@ -19,6 +20,9 @@ export interface GoogleSheet {
   name: string;
   modifiedTime: string;
 }
+
+// Define a type for user_credentials
+type UserCredentials = Database["public"]["Tables"]["user_credentials"]["Row"];
 
 export const useIntegrations = () => {
   const { user } = useAuth();
@@ -38,7 +42,7 @@ export const useIntegrations = () => {
       if (error && error.code !== 'PGRST116') { // Ignore "no rows found" error
         throw error;
       }
-      return data;
+      return data as UserCredentials | null; // Explicitly cast to UserCredentials
     },
     enabled: !!user?.id,
   });

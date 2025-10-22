@@ -132,6 +132,6 @@ export const normalizeStatus = (value: string): 'Pendente' | 'Pago' | 'Vencido' 
  * @param transaction The transaction object to validate.
  * @returns An object with the validation result and potential errors.
  */
-export const validateTransaction = (transaction: Partial<ProcessedTransaction>): { success: boolean; data?: ProcessedTransaction; error?: z.ZodError } => {
+export const validateTransaction = (transaction: Partial<ProcessedTransaction>): z.SafeParseReturnType<Partial<ProcessedTransaction>, ProcessedTransaction> => {
   return transactionImportSchema.safeParse(transaction);
 };
