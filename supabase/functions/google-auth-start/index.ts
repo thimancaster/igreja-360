@@ -1,85 +1,88 @@
-// supabase/functions/google-auth-start/index.ts
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { corsHeaders } from '../_shared/cors.ts' // Verifique se este ficheiro existe e o caminho está correto
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 
-// Helper para gerar strings aleatórias seguras
-const generateRandomString = (length: number): string => {
-  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  let result = ''
-  const charactersLength = characters.length
-  const buffer = new Uint8Array(length)
-  crypto.getRandomValues(buffer)
-  for (let i = 0; i < length; i++) {
-    result += characters.charAt(buffer[i] % charactersLength)
-  }
-  return result
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 serve(async (req) => {
-  // Tratamento da requisição OPTIONS para CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID')
+    // 1. Check for required environment variables first
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
 
-    if (!supabaseUrl || !googleClientId) {
-      console.error('Missing environment variables: SUPABASE_URL or GOOGLE_CLIENT_ID')
-      throw new Error('Configuration error: Missing Google Client ID or Supabase URL.')
+    if (!supabaseUrl || !anonKey || !clientId) {
+      const errorMessage = 'Server configuration error: Missing SUPABASE_URL, SUPABASE_ANON_KEY, or GOOGLE_CLIENT_ID.';
+      console.error(errorMessage);
+      return new Response(JSON.stringify({ error: errorMessage }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    // --- CORREÇÃO PRINCIPAL ---
-    // Usar o URL FIXO da função de CALLBACK, que está registado no Google Cloud Console
-    const redirectUri = `${supabaseUrl}/functions/v1/google-auth-callback` // ESTA É A LINHA CORRIGIDA
-    // --- FIM DA CORREÇÃO ---
+    // 2. Check for Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'User not authenticated: Missing Authorization header.' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    console.log(`[google-auth-start] Using redirectUri: ${redirectUri}`) // Adicionado para depuração
+    // Create a Supabase client with the user's auth token
+    const supabaseClient = createClient(
+      supabaseUrl,
+      anonKey,
+      { global: { headers: { Authorization: authHeader } } }
+    );
 
-    // Gerar state e nonce para segurança CSRF e Replay Attack
-    const state = generateRandomString(32)
-    const nonce = generateRandomString(32)
+    // Get the user from the session to ensure the token is valid
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+    if (userError || !user) {
+      console.error('User authentication failed:', userError);
+      return new Response(JSON.stringify({ error: 'User not authenticated: Invalid token.' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Construir a URL de autorização do Google
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-    authUrl.searchParams.set('client_id', googleClientId)
-    authUrl.searchParams.set('redirect_uri', redirectUri) // Envia o URI de callback correto
-    authUrl.searchParams.set('response_type', 'code')
-    authUrl.searchParams.set('scope', 'openid email profile https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.metadata.readonly')
-    authUrl.searchParams.set('state', state)
-    authUrl.searchParams.set('nonce', nonce)
-    authUrl.searchParams.set('access_type', 'offline') // Para obter refresh_token
-    authUrl.searchParams.set('prompt', 'consent') // Forçar consentimento para garantir refresh_token
+    // All checks passed, proceed with OAuth URL generation
+    const redirectUri = `${supabaseUrl}/functions/v1/google-auth-callback`;
+    const state = Math.random().toString(36).substring(2);
+    const nonce = Math.random().toString(36).substring(2);
 
-    // Definir cookies HttpOnly para state e nonce
-    const headers = new Headers({
-      ...corsHeaders,
-      'Location': authUrl.toString(),
-      // Configurar cookies de forma segura (Max-Age=300 -> 5 minutos)
-      // Adicione 'Secure;' se estiver a testar em HTTPS (como no Lovable Cloud)
-      // Remova 'Secure;' temporariamente apenas se estiver a testar em HTTP localmente
-      'Set-Cookie': `sb-google-oauth-state=${state}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=300, sb-google-oauth-nonce=${nonce}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=300`,
-    })
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', clientId);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', 'openid email profile https://www.googleapis.com/auth/spreadsheets.readonly');
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('prompt', 'consent');
+    authUrl.searchParams.set('state', state);
+    authUrl.searchParams.set('nonce', nonce);
 
-    // Redirecionar o utilizador para o Google
-    return new Response(null, { status: 302, headers })
+    const headers = new Headers(corsHeaders);
+    headers.set('Content-Type', 'application/json');
+    // Set cookies for state and nonce to be validated in the callback
+    headers.append('Set-Cookie', `oauth-state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+    headers.append('Set-Cookie', `oauth-nonce=${nonce}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+
+    return new Response(JSON.stringify({ authUrl: authUrl.toString() }), {
+      headers: headers,
+      status: 200,
+    });
 
   } catch (error) {
-    console.error('Error in google-auth-start:', error)
-    return new Response(JSON.stringify({ error: error.message || 'Internal Server Error' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.error('Unexpected error in google-auth-start:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-    })
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
-})
-
-// Certifique-se que o ficheiro _shared/cors.ts existe:
-/*
-// supabase/functions/_shared/cors.ts
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*', // Em produção, restrinja para o seu domínio
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-}
-*/
+});

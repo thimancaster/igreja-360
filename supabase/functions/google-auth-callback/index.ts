@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { getCookies } from "https://deno.land/std@0.168.0/http/cookie.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,7 +32,16 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
+
+    // Validate state for CSRF protection
+    const cookies = getCookies(req.headers);
+    const storedState = cookies['oauth-state'];
+
+    if (!state || !storedState || state !== storedState) {
+      throw new Error('Invalid state parameter. Possible CSRF attack.');
+    }
 
     if (error) {
       throw new Error(`OAuth error: ${error}`);
@@ -113,7 +123,7 @@ serve(async (req) => {
     }
 
     // Prepare cookies for session
-    const cookies = [
+    const sessionCookies = [
       setCookie('sb-access-token', sessionData.session.access_token),
       setCookie('sb-refresh-token', sessionData.session.refresh_token),
       setCookie('oauth-state', '', 0),
@@ -124,7 +134,7 @@ serve(async (req) => {
       status: 302,
       headers: {
         'Location': `${appBaseUrl}/integracoes?auth=success`,
-        'Set-Cookie': cookies.join(', '),
+        'Set-Cookie': sessionCookies.join(', '),
       },
     });
   } catch (error) {
