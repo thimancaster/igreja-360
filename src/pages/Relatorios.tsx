@@ -5,8 +5,9 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFinancialSummary, useReportFiltersData, useExpensesByCategory } from "@/hooks/useReports";
+import { useFinancialSummary, useReportFiltersData, useExpensesByCategory, useRevenueByMinistry } from "@/hooks/useReports";
 import { ExpensesByCategoryChart } from "@/components/reports/ExpensesByCategoryChart";
+import { RevenueByMinistryChart } from "@/components/reports/RevenueByMinistryChart";
 import { Loader2, TrendingUp, TrendingDown, Scale, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -37,9 +38,10 @@ export default function Relatorios() {
   const { toast } = useToast();
   const { data: summary, isFetching: summaryFetching, refetch: refetchSummary } = useFinancialSummary(filters);
   const { data: expensesData, isFetching: expensesFetching, refetch: refetchExpenses } = useExpensesByCategory(filters);
+  const { data: revenueData, isFetching: revenueFetching, refetch: refetchRevenue } = useRevenueByMinistry(filters);
   const { data: filterOptions, isLoading: filtersLoading } = useReportFiltersData();
 
-  const isFetching = summaryFetching || expensesFetching;
+  const isFetching = summaryFetching || expensesFetching || revenueFetching;
 
   const handleGenerateReport = () => {
     if (!startDate || !endDate) {
@@ -61,6 +63,7 @@ export default function Relatorios() {
     setTimeout(() => {
       refetchSummary();
       refetchExpenses();
+      refetchRevenue();
     }, 0);
   };
 
@@ -81,6 +84,30 @@ export default function Relatorios() {
 
       const fileName = `Despesas_por_Categoria_${format(new Date(), "yyyy-MM-dd")}`;
       exportToExcel(dataToExport, fileName, 'Despesas');
+      
+      toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
+    } catch (error: any) {
+      toast({ title: "Erro na Exportação", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleExportRevenue = () => {
+    if (!revenueData || revenueData.length === 0) {
+      toast({ title: "Nenhum dado para exportar", description: "Gere um relatório primeiro.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const dataToExport = revenueData.map(item => ({
+        'Ministério': item.name,
+        'Valor': item.value,
+      }));
+
+      const total = revenueData.reduce((sum, item) => sum + item.value, 0);
+      dataToExport.push({ 'Ministério': 'TOTAL', 'Valor': total });
+
+      const fileName = `Receitas_por_Ministerio_${format(new Date(), "yyyy-MM-dd")}`;
+      exportToExcel(dataToExport, fileName, 'Receitas');
       
       toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
     } catch (error: any) {
@@ -210,6 +237,44 @@ export default function Relatorios() {
                         <span className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: item.color }} />
                         {item.name}
                       </TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {revenueData && !isFetching && revenueData.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Receitas por Ministério</CardTitle>
+              <CardDescription>Distribuição das receitas nos diferentes ministérios no período selecionado.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExportRevenue}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar Excel
+            </Button>
+          </CardHeader>
+          <CardContent className="grid gap-8 md:grid-cols-2 items-center">
+            <div className="min-h-[300px]">
+              <RevenueByMinistryChart data={revenueData} />
+            </div>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ministério</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {revenueData.map(item => (
+                    <TableRow key={item.name}>
+                      <TableCell className="font-medium">{item.name}</TableCell>
                       <TableCell className="text-right">{formatCurrency(item.value)}</TableCell>
                     </TableRow>
                   ))}

@@ -126,6 +126,54 @@ export function useExpensesByCategory(filters: ReportFilters) {
   });
 }
 
+export function useRevenueByMinistry(filters: ReportFilters) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["revenue-by-ministry", user?.id, filters],
+    queryFn: async () => {
+      if (!user || !filters.startDate || !filters.endDate) return null;
+
+      const { data: profile } = await supabase.from("profiles").select("church_id").eq("id", user.id).single();
+      if (!profile?.church_id) throw new Error("Igreja não encontrada");
+
+      let query = supabase
+        .from("transactions")
+        .select("amount, ministries(id, name)")
+        .eq("church_id", profile.church_id)
+        .eq("type", "Receita")
+        .gte("payment_date", filters.startDate)
+        .lte("payment_date", filters.endDate);
+
+      if (filters.status && filters.status !== 'all') {
+        query = query.eq("status", filters.status);
+      } else {
+        query = query.eq("status", "Pago");
+      }
+      
+      if (filters.categoryId && filters.categoryId !== 'all') {
+        query = query.eq("category_id", filters.categoryId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const revenueByMinistry = data.reduce((acc, transaction) => {
+        const ministryName = transaction.ministries?.name || "Sem Ministério";
+        
+        if (!acc[ministryName]) {
+          acc[ministryName] = { name: ministryName, value: 0 };
+        }
+        acc[ministryName].value += transaction.amount;
+        return acc;
+      }, {} as Record<string, { name: string; value: number }>);
+
+      return Object.values(revenueByMinistry).sort((a, b) => b.value - a.value);
+    },
+    enabled: false,
+  });
+}
+
 export function useReportFiltersData() {
   const { user } = useAuth();
 
