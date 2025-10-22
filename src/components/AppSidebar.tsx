@@ -14,13 +14,13 @@ import {
 } from "@/components/ui/sidebar";
 
 const menuItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Transações", url: "/transacoes", icon: ArrowLeftRight },
-  { title: "Importação", url: "/importacao", icon: Upload },
-  { title: "Integrações", url: "/integracoes", icon: Sheet },
-  { title: "Relatórios", url: "/relatorios", icon: FileText },
-  { title: "Administração", url: "/admin", icon: Users },
-  { title: "Configurações", url: "/configuracoes", icon: Settings },
+  { title: "Dashboard", url: "/app/dashboard", icon: LayoutDashboard },
+  { title: "Transações", url: "/app/transacoes", icon: ArrowLeftRight },
+  { title: "Importação", url: "/app/importacao", icon: Upload },
+  { title: "Integrações", url: "/app/integracoes", icon: Sheet },
+  { title: "Relatórios", url: "/app/relatorios", icon: FileText },
+  { title: "Administração", url: "/app/admin", icon: Users },
+  { title: "Configurações", url: "/app/configuracoes", icon: Settings },
 ];
 
 export function AppSidebar() {
