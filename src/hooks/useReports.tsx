@@ -5,6 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 interface ReportFilters {
   startDate?: string;
   endDate?: string;
+  categoryId?: string;
+  ministryId?: string;
+  status?: string;
 }
 
 export function useFinancialSummary(filters: ReportFilters) {
@@ -27,13 +30,29 @@ export function useFinancialSummary(filters: ReportFilters) {
         throw new Error("Igreja não encontrada");
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("transactions")
         .select("amount, type")
         .eq("church_id", profile.church_id)
-        .eq("status", "Pago")
         .gte("payment_date", filters.startDate)
         .lte("payment_date", filters.endDate);
+
+      if (filters.status && filters.status !== 'all') {
+        query = query.eq("status", filters.status);
+      } else {
+        // Default to 'Pago' if no status is selected
+        query = query.eq("status", "Pago");
+      }
+
+      if (filters.categoryId && filters.categoryId !== 'all') {
+        query = query.eq("category_id", filters.categoryId);
+      }
+
+      if (filters.ministryId && filters.ministryId !== 'all') {
+        query = query.eq("ministry_id", filters.ministryId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -56,5 +75,40 @@ export function useFinancialSummary(filters: ReportFilters) {
       return summary;
     },
     enabled: false, // This query will be run manually via refetch
+  });
+}
+
+export function useReportFiltersData() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["report-filters-data", user?.id],
+    queryFn: async () => {
+      if (!user) return { categories: [], ministries: [] };
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("church_id")
+        .eq("id", user.id)
+        .single();
+
+      if (!profile?.church_id) {
+        return { categories: [], ministries: [] };
+      }
+
+      const [categoriesRes, ministriesRes] = await Promise.all([
+        supabase.from("categories").select("id, name").eq("church_id", profile.church_id),
+        supabase.from("ministries").select("id, name").eq("church_id", profile.church_id),
+      ]);
+
+      if (categoriesRes.error) throw categoriesRes.error;
+      if (ministriesRes.error) throw ministriesRes.error;
+
+      return {
+        categories: categoriesRes.data,
+        ministries: ministriesRes.data,
+      };
+    },
+    enabled: !!user,
   });
 }
