@@ -1,9 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Users, Building2, Plus } from "lucide-react";
-import { Navigate } from "react-router-dom";
+import { Users, Building2, ChevronRight } from "lucide-react";
+import { Link, Navigate } from "react-router-dom";
 import { useRole } from "@/hooks/useRole";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect } from "react";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Admin() {
   const { isPrivileged, isLoading } = useRole();
@@ -39,33 +39,35 @@ export default function Admin() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <h3 className="text-lg font-semibold">Usuários</h3>
-            </div>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">Gerencie os usuários do sistema</p>
-        </div>
+        <Link to="/admin/usuarios" className="block hover:shadow-lg transition-shadow rounded-lg">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <Users className="h-6 w-6 text-primary" />
+                  <CardTitle>Gerenciar Usuários</CardTitle>
+                </div>
+                <CardDescription className="mt-2">Visualize e edite os cargos dos usuários.</CardDescription>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+          </Card>
+        </Link>
 
-        <div className="rounded-lg border border-border bg-card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-secondary" />
-              <h3 className="text-lg font-semibold">Ministérios</h3>
-            </div>
-            <Button size="sm" variant="outline">
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">Configure os ministérios da igreja</p>
-        </div>
+        <Link to="/admin/ministerios" className="block hover:shadow-lg transition-shadow rounded-lg">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <Building2 className="h-6 w-6 text-secondary" />
+                  <CardTitle>Gerenciar Ministérios</CardTitle>
+                </div>
+                <CardDescription className="mt-2">Adicione e configure os ministérios da igreja.</CardDescription>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+          </Card>
+        </Link>
       </div>
     </div>
   );

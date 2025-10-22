@@ -14,6 +14,8 @@ import Importacao from "./pages/Importacao";
 import Integracoes from "./pages/Integracoes";
 import Relatorios from "./pages/Relatorios";
 import Admin from "./pages/Admin";
+import GerenciarUsuarios from "./pages/admin/GerenciarUsuarios";
+import GerenciarMinisterios from "./pages/admin/GerenciarMinisterios";
 import Configuracoes from "./pages/Configuracoes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -45,6 +47,8 @@ const App = () => (
                           <Route path="/integracoes" element={<Integracoes />} />
                           <Route path="/relatorios" element={<Relatorios />} />
                           <Route path="/admin" element={<Admin />} />
+                          <Route path="/admin/usuarios" element={<GerenciarUsuarios />} />
+                          <Route path="/admin/ministerios" element={<GerenciarMinisterios />} />
                           <Route path="/configuracoes" element={<Configuracoes />} />
                           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                           <Route path="*" element={<NotFound />} />
