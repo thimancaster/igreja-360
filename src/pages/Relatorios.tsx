@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFinancialSummary, useReportFiltersData, useExpensesByCategory } from "@/hooks/useReports";
 import { ExpensesByCategoryChart } from "@/components/reports/ExpensesByCategoryChart";
-import { Loader2, TrendingUp, TrendingDown, Scale } from "lucide-react";
+import { Loader2, TrendingUp, TrendingDown, Scale, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { exportToExcel } from "@/utils/exportHelpers";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("pt-BR", {
@@ -61,6 +62,30 @@ export default function Relatorios() {
       refetchSummary();
       refetchExpenses();
     }, 0);
+  };
+
+  const handleExportExpenses = () => {
+    if (!expensesData || expensesData.length === 0) {
+      toast({ title: "Nenhum dado para exportar", description: "Gere um relatório primeiro.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const dataToExport = expensesData.map(item => ({
+        'Categoria': item.name,
+        'Valor': item.value,
+      }));
+
+      const total = expensesData.reduce((sum, item) => sum + item.value, 0);
+      dataToExport.push({ 'Categoria': 'TOTAL', 'Valor': total });
+
+      const fileName = `Despesas_por_Categoria_${format(new Date(), "yyyy-MM-dd")}`;
+      exportToExcel(dataToExport, fileName, 'Despesas');
+      
+      toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
+    } catch (error: any) {
+      toast({ title: "Erro na Exportação", description: error.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -156,9 +181,15 @@ export default function Relatorios() {
 
       {expensesData && !isFetching && expensesData.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle>Despesas por Categoria</CardTitle>
-            <CardDescription>Distribuição das despesas nas diferentes categorias no período selecionado.</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Despesas por Categoria</CardTitle>
+              <CardDescription>Distribuição das despesas nas diferentes categorias no período selecionado.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExportExpenses}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar Excel
+            </Button>
           </CardHeader>
           <CardContent className="grid gap-8 md:grid-cols-2 items-center">
             <div className="min-h-[300px]">
