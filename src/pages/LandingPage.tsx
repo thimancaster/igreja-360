@@ -1,35 +1,63 @@
-import { Link } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import MockupDevice from "@/components/MockupDevice";
+import { Clock, AlertTriangle, BarChart, EyeOff, Zap, Lightbulb, Timer, UploadCloud, FileText, Settings, Users, Bell, LineChart, MapPin, Sheet } from "lucide-react";
+import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Clock,
-  AlertTriangle,
-  BarChartHorizontal,
-  EyeOff,
-  Zap,
-  BarChart,
-  Lightbulb,
-  Timer,
-  UploadCloud,
-  FileText,
-  Settings,
-  Users,
-  ShieldCheck,
-  DollarSign,
-  ArrowRight,
-  Church,
-  Handshake,
-  LineChart,
-  Bell,
-  CheckCircle,
-  MapPin,
-  Calendar,
-  Sheet, // Adicionado o ícone Sheet
-} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useNavigate, Link } from "react-router-dom";
+import lottie from 'lottie-web';
 
-export default function LandingPage() {
+const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+  const lottieContainerRef = useRef<HTMLDivElement>(null);
+  const lottieInstance = useRef<any>(null);
+  const [lottieLoaded, setLottieLoaded] = useState(false);
+
+  useEffect(() => {
+    if (lottieContainerRef.current) {
+      lottieInstance.current = lottie.loadAnimation({
+        container: lottieContainerRef.current,
+        renderer: 'svg',
+        loop: true,
+        autoplay: false, // Start paused, play on intersection
+        path: '/mockup.json', // Path to your Lottie JSON file
+      });
+
+      lottieInstance.current.addEventListener('data_ready', () => {
+        setLottieLoaded(true);
+      });
+
+      lottieInstance.current.addEventListener('data_failed', () => {
+        console.error("Failed to load Lottie animation. Using fallback image.");
+        setLottieLoaded(false); // Ensure fallback is used
+      });
+
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          if (lottieInstance.current) {
+            if (entry.isIntersecting) {
+              lottieInstance.current.play();
+            } else {
+              lottieInstance.current.pause();
+            }
+          }
+        });
+      }, { threshold: 0.5 }); // Play when 50% of the element is visible
+
+      observer.observe(lottieContainerRef.current);
+
+      return () => {
+        if (lottieInstance.current) {
+          lottieInstance.current.destroy();
+        }
+        if (lottieContainerRef.current) {
+          observer.unobserve(lottieContainerRef.current);
+        }
+      };
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Header da Landing Page */}
@@ -66,8 +94,12 @@ export default function LandingPage() {
               <Link to="/auth">Quero Organizar Minhas Finanças</Link>
             </Button>
             <div className="mt-16 max-w-5xl mx-auto">
-              <div className="w-full h-64 md:h-96 bg-gray-200 rounded-xl shadow-2xl flex items-center justify-center text-muted-foreground text-xl font-semibold border border-border">
-                Mockup Placeholder - Dashboard Igreja360
+              <div className="w-full max-w-md mx-auto mockup-container">
+                {lottieLoaded ? (
+                  <div ref={lottieContainerRef} className="w-full h-72 md:h-96" style={{ maxWidth: '600px' }}></div>
+                ) : (
+                  <img src="/fallback-mockup.png" alt="Mockup do SaaS" className="w-full h-72 md:h-96 object-cover rounded-xl" style={{ maxWidth: '600px' }} />
+                )}
               </div>
             </div>
           </div>
@@ -99,7 +131,7 @@ export default function LandingPage() {
                 </CardDescription>
               </Card>
               <Card className="p-6 text-center hover:shadow-lg transition-shadow duration-300">
-                <BarChartHorizontal className="h-10 w-10 text-secondary mx-auto mb-4" />
+                <BarChart className="h-10 w-10 text-secondary mx-auto mb-4" />
                 <CardTitle className="text-xl">Relatórios Difíceis</CardTitle>
                 <CardDescription className="mt-2">
                   Dificuldade em gerar relatórios claros e tomar decisões rápidas.
@@ -122,9 +154,7 @@ export default function LandingPage() {
             {/* Benefício 1: Automatize */}
             <div className="flex flex-col md:flex-row items-center gap-12">
               <div className="md:w-1/2">
-                <div className="w-full h-64 bg-gray-200 rounded-xl shadow-lg flex items-center justify-center text-muted-foreground text-lg font-semibold border border-border">
-                  Mockup Placeholder - Automação
-                </div>
+                <MockupDevice src="/assets/mockup-automate.png" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-primary/80">
@@ -140,9 +170,7 @@ export default function LandingPage() {
             {/* Benefício 2: Visualize */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-12">
               <div className="md:w-1/2">
-                <div className="w-full h-64 bg-gray-200 rounded-xl shadow-lg flex items-center justify-center text-muted-foreground text-lg font-semibold border border-border">
-                  Mockup Placeholder - Visualização
-                </div>
+                <MockupDevice src="/assets/mockup-visualize.png" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-secondary/80">
@@ -158,9 +186,7 @@ export default function LandingPage() {
             {/* Benefício 3: Decida */}
             <div className="flex flex-col md:flex-row items-center gap-12">
               <div className="md:w-1/2">
-                <div className="w-full h-64 bg-gray-200 rounded-xl shadow-lg flex items-center justify-center text-muted-foreground text-lg font-semibold border border-border">
-                  Mockup Placeholder - Decisão
-                </div>
+                <MockupDevice src="/assets/mockup-decide.png" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-accent/80">
@@ -176,9 +202,7 @@ export default function LandingPage() {
             {/* Benefício 4: Ganhe Tempo */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-12">
               <div className="md:w-1/2">
-                <div className="w-full h-64 bg-gray-200 rounded-xl shadow-lg flex items-center justify-center text-muted-foreground text-lg font-semibold border border-border">
-                  Mockup Placeholder - Tempo
-                </div>
+                <MockupDevice src="/assets/mockup-time.png" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-warning/80">
