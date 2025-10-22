@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Login realizado com sucesso.",
       });
       
-      navigate("/");
+      navigate("/app/dashboard"); // Redireciona para o dashboard após o login
     } catch (error: any) {
       toast({
         title: "Erro no login",
@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      const redirectUrl = `${window.location.origin}/`;
+      const redirectUrl = `${window.location.origin}/app/dashboard`; // Redireciona para o dashboard após o cadastro
       
       const { error } = await supabase.auth.signUp({
         email,
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Bem-vindo ao Igreja360.",
       });
       
-      navigate("/");
+      navigate("/app/dashboard"); // Redireciona para o dashboard após o cadastro
     } catch (error: any) {
       toast({
         title: "Erro no cadastro",

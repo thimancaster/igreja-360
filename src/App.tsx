@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AuthRedirect } from "@/components/AuthRedirect"; // Importar o novo componente
 import Dashboard from "./pages/Dashboard";
 import Transacoes from "./pages/Transacoes";
 import Importacao from "./pages/Importacao";
@@ -18,9 +19,8 @@ import GerenciarUsuarios from "./pages/admin/GerenciarUsuarios";
 import GerenciarMinisterios from "./pages/admin/GerenciarMinisterios";
 import Configuracoes from "./pages/Configuracoes";
 import Auth from "./pages/Auth";
-import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
-import { queryClient } from "./lib/queryClient"; // Importando o queryClient
+import { queryClient } from "./lib/queryClient";
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -30,10 +30,15 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<LandingPage />} />
+            {/* Rota pública para autenticação */}
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Rota raiz que gerencia o redirecionamento para usuários autenticados ou exibe a LandingPage */}
+            <Route path="/" element={<AuthRedirect />} />
+
+            {/* Rotas protegidas, agora sob o prefixo /app */}
             <Route
-              path="/*"
+              path="/app/*"
               element={
                 <ProtectedRoute>
                   <SidebarProvider defaultOpen={true}>
@@ -42,15 +47,15 @@ const App = () => (
                       <div className="flex-1 flex flex-col">
                         <AppHeader />
                         <Routes>
-                          <Route path="/dashboard" element={<Dashboard />} />
-                          <Route path="/transacoes" element={<Transacoes />} />
-                          <Route path="/importacao" element={<Importacao />} />
-                          <Route path="/integracoes" element={<Integracoes />} />
-                          <Route path="/relatorios" element={<Relatorios />} />
-                          <Route path="/admin" element={<Admin />} />
-                          <Route path="/admin/usuarios" element={<GerenciarUsuarios />} />
-                          <Route path="/admin/ministerios" element={<GerenciarMinisterios />} />
-                          <Route path="/configuracoes" element={<Configuracoes />} />
+                          <Route path="dashboard" element={<Dashboard />} />
+                          <Route path="transacoes" element={<Transacoes />} />
+                          <Route path="importacao" element={<Importacao />} />
+                          <Route path="integracoes" element={<Integracoes />} />
+                          <Route path="relatorios" element={<Relatorios />} />
+                          <Route path="admin" element={<Admin />} />
+                          <Route path="admin/usuarios" element={<GerenciarUsuarios />} />
+                          <Route path="admin/ministerios" element={<GerenciarMinisterios />} />
+                          <Route path="configuracoes" element={<Configuracoes />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </div>
@@ -59,6 +64,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* Rota de fallback para qualquer outra URL não encontrada */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
