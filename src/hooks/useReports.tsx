@@ -40,7 +40,6 @@ export function useFinancialSummary(filters: ReportFilters) {
       if (filters.status && filters.status !== 'all') {
         query = query.eq("status", filters.status);
       } else {
-        // Default to 'Pago' if no status is selected
         query = query.eq("status", "Pago");
       }
 
@@ -74,7 +73,56 @@ export function useFinancialSummary(filters: ReportFilters) {
 
       return summary;
     },
-    enabled: false, // This query will be run manually via refetch
+    enabled: false,
+  });
+}
+
+export function useExpensesByCategory(filters: ReportFilters) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["expenses-by-category", user?.id, filters],
+    queryFn: async () => {
+      if (!user || !filters.startDate || !filters.endDate) return null;
+
+      const { data: profile } = await supabase.from("profiles").select("church_id").eq("id", user.id).single();
+      if (!profile?.church_id) throw new Error("Igreja não encontrada");
+
+      let query = supabase
+        .from("transactions")
+        .select("amount, categories(id, name, color)")
+        .eq("church_id", profile.church_id)
+        .eq("type", "Despesa")
+        .gte("payment_date", filters.startDate)
+        .lte("payment_date", filters.endDate);
+
+      if (filters.status && filters.status !== 'all') {
+        query = query.eq("status", filters.status);
+      } else {
+        query = query.eq("status", "Pago");
+      }
+      
+      if (filters.ministryId && filters.ministryId !== 'all') {
+        query = query.eq("ministry_id", filters.ministryId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const expensesByCategory = data.reduce((acc, transaction) => {
+        const categoryName = transaction.categories?.name || "Sem Categoria";
+        const categoryColor = transaction.categories?.color || "#8884d8";
+        
+        if (!acc[categoryName]) {
+          acc[categoryName] = { name: categoryName, value: 0, color: categoryColor };
+        }
+        acc[categoryName].value += transaction.amount;
+        return acc;
+      }, {} as Record<string, { name: string; value: number; color: string }>);
+
+      return Object.values(expensesByCategory).sort((a, b) => b.value - a.value);
+    },
+    enabled: false,
   });
 }
 

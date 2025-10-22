@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useFinancialSummary, useReportFiltersData } from "@/hooks/useReports";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFinancialSummary, useReportFiltersData, useExpensesByCategory } from "@/hooks/useReports";
+import { ExpensesByCategoryChart } from "@/components/reports/ExpensesByCategoryChart";
 import { Loader2, TrendingUp, TrendingDown, Scale } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -32,8 +34,11 @@ export default function Relatorios() {
   }>({});
 
   const { toast } = useToast();
-  const { data: summary, isFetching, refetch } = useFinancialSummary(filters);
+  const { data: summary, isFetching: summaryFetching, refetch: refetchSummary } = useFinancialSummary(filters);
+  const { data: expensesData, isFetching: expensesFetching, refetch: refetchExpenses } = useExpensesByCategory(filters);
   const { data: filterOptions, isLoading: filtersLoading } = useReportFiltersData();
+
+  const isFetching = summaryFetching || expensesFetching;
 
   const handleGenerateReport = () => {
     if (!startDate || !endDate) {
@@ -52,7 +57,10 @@ export default function Relatorios() {
       status: selectedStatus,
     };
     setFilters(newFilters);
-    setTimeout(() => refetch(), 0);
+    setTimeout(() => {
+      refetchSummary();
+      refetchExpenses();
+    }, 0);
   };
 
   return (
@@ -139,28 +147,43 @@ export default function Relatorios() {
             </p>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
-            <div className="p-6 border rounded-lg bg-success/10">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-success">Total de Receitas</h3>
-                <TrendingUp className="h-5 w-5 text-success" />
-              </div>
-              <p className="mt-2 text-3xl font-bold text-foreground">{formatCurrency(summary.totalRevenue)}</p>
+            <div className="p-6 border rounded-lg bg-success/10"><div className="flex items-center justify-between"><h3 className="text-sm font-medium text-success">Total de Receitas</h3><TrendingUp className="h-5 w-5 text-success" /></div><p className="mt-2 text-3xl font-bold text-foreground">{formatCurrency(summary.totalRevenue)}</p></div>
+            <div className="p-6 border rounded-lg bg-destructive/10"><div className="flex items-center justify-between"><h3 className="text-sm font-medium text-destructive">Total de Despesas</h3><TrendingDown className="h-5 w-5 text-destructive" /></div><p className="mt-2 text-3xl font-bold text-foreground">{formatCurrency(summary.totalExpenses)}</p></div>
+            <div className="p-6 border rounded-lg bg-primary/10"><div className="flex items-center justify-between"><h3 className="text-sm font-medium text-primary">Saldo Líquido</h3><Scale className="h-5 w-5 text-primary" /></div><p className={`mt-2 text-3xl font-bold ${summary.netBalance >= 0 ? 'text-foreground' : 'text-destructive'}`}>{formatCurrency(summary.netBalance)}</p></div>
+          </CardContent>
+        </Card>
+      )}
+
+      {expensesData && !isFetching && expensesData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Despesas por Categoria</CardTitle>
+            <CardDescription>Distribuição das despesas nas diferentes categorias no período selecionado.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-8 md:grid-cols-2 items-center">
+            <div className="min-h-[300px]">
+              <ExpensesByCategoryChart data={expensesData} />
             </div>
-            <div className="p-6 border rounded-lg bg-destructive/10">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-destructive">Total de Despesas</h3>
-                <TrendingDown className="h-5 w-5 text-destructive" />
-              </div>
-              <p className="mt-2 text-3xl font-bold text-foreground">{formatCurrency(summary.totalExpenses)}</p>
-            </div>
-            <div className="p-6 border rounded-lg bg-primary/10">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-primary">Saldo Líquido</h3>
-                <Scale className="h-5 w-5 text-primary" />
-              </div>
-              <p className={`mt-2 text-3xl font-bold ${summary.netBalance >= 0 ? 'text-foreground' : 'text-destructive'}`}>
-                {formatCurrency(summary.netBalance)}
-              </p>
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Categoria</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {expensesData.map(item => (
+                    <TableRow key={item.name}>
+                      <TableCell className="font-medium flex items-center">
+                        <span className="h-2 w-2 rounded-full mr-2" style={{ backgroundColor: item.color }} />
+                        {item.name}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(item.value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
