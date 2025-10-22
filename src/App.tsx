@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/Dashboard"; // Renomeado de Index para Dashboard
 import Transacoes from "./pages/Transacoes";
 import Importacao from "./pages/Importacao";
 import Integracoes from "./pages/Integracoes";
@@ -18,6 +18,7 @@ import GerenciarUsuarios from "./pages/admin/GerenciarUsuarios";
 import GerenciarMinisterios from "./pages/admin/GerenciarMinisterios";
 import Configuracoes from "./pages/Configuracoes";
 import Auth from "./pages/Auth";
+import LandingPage from "./pages/LandingPage"; // Importar a nova página
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,9 +31,10 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            <Route path="/" element={<LandingPage />} /> {/* Nova rota pública */}
             <Route path="/auth" element={<Auth />} />
             <Route
-              path="/*"
+              path="/*" // Rota catch-all para rotas protegidas
               element={
                 <ProtectedRoute>
                   <SidebarProvider defaultOpen={true}>
@@ -41,7 +43,7 @@ const App = () => (
                       <div className="flex-1 flex flex-col">
                         <AppHeader />
                         <Routes>
-                          <Route path="/" element={<Dashboard />} />
+                          <Route path="/dashboard" element={<Dashboard />} /> {/* Rota do dashboard movida */}
                           <Route path="/transacoes" element={<Transacoes />} />
                           <Route path="/importacao" element={<Importacao />} />
                           <Route path="/integracoes" element={<Integracoes />} />
