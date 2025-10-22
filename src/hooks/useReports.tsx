@@ -8,6 +8,7 @@ interface ReportFilters {
   categoryId?: string;
   ministryId?: string;
   status?: string;
+  searchTerm?: string;
 }
 
 export function useFinancialSummary(filters: ReportFilters) {
@@ -49,6 +50,10 @@ export function useFinancialSummary(filters: ReportFilters) {
 
       if (filters.ministryId && filters.ministryId !== 'all') {
         query = query.eq("ministry_id", filters.ministryId);
+      }
+
+      if (filters.searchTerm) {
+        query = query.ilike("description", `%${filters.searchTerm}%`);
       }
 
       const { data, error } = await query;
@@ -106,6 +111,10 @@ export function useExpensesByCategory(filters: ReportFilters) {
         query = query.eq("ministry_id", filters.ministryId);
       }
 
+      if (filters.searchTerm) {
+        query = query.ilike("description", `%${filters.searchTerm}%`);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
@@ -155,6 +164,10 @@ export function useRevenueByMinistry(filters: ReportFilters) {
         query = query.eq("category_id", filters.categoryId);
       }
 
+      if (filters.searchTerm) {
+        query = query.ilike("description", `%${filters.searchTerm}%`);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
 
@@ -199,6 +212,10 @@ export function useCashFlow(filters: ReportFilters) {
       }
       if (filters.ministryId && filters.ministryId !== 'all') {
         query = query.eq("ministry_id", filters.ministryId);
+      }
+
+      if (filters.searchTerm) {
+        query = query.ilike("description", `%${filters.searchTerm}%`);
       }
 
       const { data, error } = await query;

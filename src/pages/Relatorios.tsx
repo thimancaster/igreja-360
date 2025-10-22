@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFinancialSummary, useReportFiltersData, useExpensesByCategory, useRevenueByMinistry, useCashFlow } from "@/hooks/useReports";
@@ -27,6 +28,7 @@ export default function Relatorios() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [selectedMinistry, setSelectedMinistry] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("Pago");
+  const [searchTerm, setSearchTerm] = useState<string>("");
 
   const [filters, setFilters] = useState<{
     startDate?: string;
@@ -34,6 +36,7 @@ export default function Relatorios() {
     categoryId?: string;
     ministryId?: string;
     status?: string;
+    searchTerm?: string;
   }>({});
 
   const { toast } = useToast();
@@ -60,6 +63,7 @@ export default function Relatorios() {
       categoryId: selectedCategory,
       ministryId: selectedMinistry,
       status: selectedStatus,
+      searchTerm: searchTerm.trim(),
     };
     setFilters(newFilters);
     setTimeout(() => {
@@ -153,7 +157,7 @@ export default function Relatorios() {
         <CardHeader>
           <CardTitle>Filtros do Relatório</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
           <div className="space-y-2">
             <Label>Data de Início</Label>
             <DatePicker date={startDate} setDate={setStartDate} />
@@ -204,7 +208,16 @@ export default function Relatorios() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleGenerateReport} disabled={isFetching} className="w-full md:w-auto">
+          <div className="space-y-2 lg:col-span-2">
+            <Label htmlFor="search">Buscar por Descrição</Label>
+            <Input
+              id="search"
+              placeholder="Ex: Dízimo, conta de luz, oferta..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button onClick={handleGenerateReport} disabled={isFetching} className="w-full">
             {isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Gerar Relatório
           </Button>
