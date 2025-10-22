@@ -40,26 +40,29 @@ serve(async (req) => {
     const storedState = cookies['oauth-state'];
 
     if (!state || !storedState || state !== storedState) {
-      throw new Error('Invalid state parameter. Possible CSRF attack.');
+      throw new Error('Parâmetro de estado inválido. Possível ataque CSRF.');
     }
 
     if (error) {
-      throw new Error(`OAuth error: ${error}`);
+      throw new Error(`Erro OAuth: ${error}`);
     }
 
     if (!code) {
-      throw new Error('No authorization code received');
+      throw new Error('Nenhum código de autorização recebido');
     }
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const redirectUri = `${supabaseUrl}/functions/v1/google-auth-callback`;
+    const appBaseUrl = Deno.env.get('APP_BASE_URL'); // Novo: Obter APP_BASE_URL
 
-    if (!clientId || !clientSecret || !supabaseUrl || !supabaseKey) {
-      throw new Error('Missing required environment variables');
+    if (!clientId || !clientSecret || !supabaseUrl || !supabaseKey || !appBaseUrl) { // Novo: Verificar appBaseUrl
+      throw new Error('Variáveis de ambiente obrigatórias ausentes');
     }
+
+    // Usar APP_BASE_URL para o URI de redirecionamento
+    const redirectUri = `${appBaseUrl}/functions/v1/google-auth-callback`; // URI de redirecionamento corrigido
 
     // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -78,13 +81,13 @@ serve(async (req) => {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
-      throw new Error(`Token exchange failed: ${errorData}`);
+      throw new Error(`Falha na troca de token: ${errorData}`);
     }
 
     const tokens = await tokenResponse.json();
 
     if (!tokens.access_token || !tokens.id_token) {
-      throw new Error('Invalid token response from Google: missing required tokens');
+      throw new Error('Resposta de token inválida do Google: tokens obrigatórios ausentes');
     }
 
     // Create Supabase client
@@ -97,7 +100,7 @@ serve(async (req) => {
     });
 
     if (sessionError || !sessionData.session) {
-      throw new Error(`Failed to create session: ${sessionError?.message || 'No session returned'}`);
+      throw new Error(`Falha ao criar sessão: ${sessionError?.message || 'Nenhuma sessão retornada'}`);
     }
 
     // Store Google tokens in the database
@@ -112,14 +115,15 @@ serve(async (req) => {
       });
 
     if (credentialError) {
-      console.error('Failed to store user credentials:', credentialError);
-      throw new Error('Could not save authentication tokens.');
+      console.error('Falha ao armazenar credenciais do usuário:', credentialError);
+      throw new Error('Não foi possível salvar os tokens de autenticação.');
     }
 
     // Get redirect URL from environment
-    const appBaseUrl = Deno.env.get('APP_BASE_URL');
+    // Este já está usando APP_BASE_URL, então está ok.
+    // const appBaseUrl = Deno.env.get('APP_BASE_URL'); // Já obtido acima
     if (!appBaseUrl) {
-      throw new Error('APP_BASE_URL environment variable not set');
+      throw new Error('Variável de ambiente APP_BASE_URL não definida');
     }
 
     // Prepare cookies for session
@@ -138,8 +142,8 @@ serve(async (req) => {
       },
     });
   } catch (error) {
-    console.error('Error in google-auth-callback:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Erro em google-auth-callback:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     
     const appBaseUrl = Deno.env.get('APP_BASE_URL') || '';
     

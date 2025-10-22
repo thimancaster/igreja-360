@@ -16,9 +16,10 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const appBaseUrl = Deno.env.get('APP_BASE_URL'); // Novo: Obter APP_BASE_URL
 
-    if (!supabaseUrl || !anonKey || !clientId) {
-      const errorMessage = 'Server configuration error: Missing SUPABASE_URL, SUPABASE_ANON_KEY, or GOOGLE_CLIENT_ID.';
+    if (!supabaseUrl || !anonKey || !clientId || !appBaseUrl) { // Novo: Verificar appBaseUrl
+      const errorMessage = 'Erro de configuração do servidor: Faltando SUPABASE_URL, SUPABASE_ANON_KEY, GOOGLE_CLIENT_ID, ou APP_BASE_URL.';
       console.error(errorMessage);
       return new Response(JSON.stringify({ error: errorMessage }), {
         status: 500,
@@ -29,7 +30,7 @@ serve(async (req) => {
     // 2. Check for Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'User not authenticated: Missing Authorization header.' }), {
+      return new Response(JSON.stringify({ error: 'Usuário não autenticado: Faltando cabeçalho de Autorização.' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -45,15 +46,16 @@ serve(async (req) => {
     // Get the user from the session to ensure the token is valid
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      console.error('User authentication failed:', userError);
-      return new Response(JSON.stringify({ error: 'User not authenticated: Invalid token.' }), {
+      console.error('Falha na autenticação do usuário:', userError);
+      return new Response(JSON.stringify({ error: 'Usuário não autenticado: Token inválido.' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // All checks passed, proceed with OAuth URL generation
-    const redirectUri = `${supabaseUrl}/functions/v1/google-auth-callback`;
+    // Usar APP_BASE_URL para o URI de redirecionamento
+    const redirectUri = `${appBaseUrl}/functions/v1/google-auth-callback`; // URI de redirecionamento corrigido
     const state = Math.random().toString(36).substring(2);
     const nonce = Math.random().toString(36).substring(2);
 
@@ -79,7 +81,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Unexpected error in google-auth-start:', error);
+    console.error('Erro inesperado em google-auth-start:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
