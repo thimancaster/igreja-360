@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">igreja-360-hub</string>
+    <string name="title_activity_main">igreja-360-hub</string>
+    <string name="package_name">com.example.igreja360hub</string>
+    <string name="custom_url_scheme">com.example.igreja360hub</string>
+</resources>
