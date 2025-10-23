@@ -26,9 +26,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { TransactionDialog } from "@/components/transactions/TransactionDialog";
+import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries"; // Importar o novo hook
 
 export default function Transacoes() {
   const { data: transactions, isLoading } = useTransactions();
+  const { data: categoriesAndMinistries, isLoading: filtersLoading } = useCategoriesAndMinistries(); // Usar o novo hook
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -213,6 +215,8 @@ export default function Transacoes() {
         open={dialogOpen}
         onOpenChange={handleDialogClose}
         transaction={selectedTransaction}
+        categories={categoriesAndMinistries?.categories || []} // Passar categorias
+        ministries={categoriesAndMinistries?.ministries || []} // Passar ministérios
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

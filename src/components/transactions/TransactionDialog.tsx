@@ -23,31 +23,21 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Transaction } from "@/hooks/useTransactions";
+import { Tables } from "@/integrations/supabase/types"; // Importar Tables para tipos
 
 interface TransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction?: Transaction | null;
+  categories: Tables<'categories'>[]; // Receber categorias via props
+  ministries: Tables<'ministries'>[]; // Receber ministérios via props
 }
 
-interface Category {
-  id: string;
-  name: string;
-  type: string;
-}
-
-interface Ministry {
-  id: string;
-  name: string;
-}
-
-export function TransactionDialog({ open, onOpenChange, transaction }: TransactionDialogProps) {
+export function TransactionDialog({ open, onOpenChange, transaction, categories, ministries }: TransactionDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [ministries, setMinistries] = useState<Ministry[]>([]);
   
   const [formData, setFormData] = useState({
     description: "",
@@ -88,22 +78,6 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
       });
     }
   }, [transaction, open]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const [categoriesRes, ministriesRes] = await Promise.all([
-        supabase.from("categories").select("id, name, type"),
-        supabase.from("ministries").select("id, name"),
-      ]);
-
-      if (categoriesRes.data) setCategories(categoriesRes.data);
-      if (ministriesRes.data) setMinistries(ministriesRes.data);
-    };
-
-    if (open) {
-      fetchData();
-    }
-  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
