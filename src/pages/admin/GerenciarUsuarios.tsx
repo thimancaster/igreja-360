@@ -13,10 +13,10 @@ type AppRole = Database["public"]["Enums"]["app_role"];
 
 type ProfileWithRoles = {
   id: string;
-  full_name: string | null;
+  full_name: string | null; // Alterado para full_name
   email: string | null;
   avatar_url: string | null;
-  roles: AppRole[]; // Changed to an array of AppRole
+  roles: AppRole[];
 };
 
 const ROLES: AppRole[] = ["admin", "tesoureiro", "pastor", "lider"];
@@ -32,7 +32,7 @@ export default function GerenciarUsuarios() {
         .from("profiles")
         .select(`
           id,
-          full_name,
+          full_name, /* Alterado para full_name */
           avatar_url,
           user:users(email)
         `);
@@ -56,7 +56,7 @@ export default function GerenciarUsuarios() {
 
       return profilesData.map(p => ({
         id: p.id,
-        full_name: p.full_name,
+        full_name: p.full_name, // Alterado para full_name
         avatar_url: p.avatar_url,
         // @ts-ignore - Supabase types for joined tables can be tricky
         email: p.user?.email || null,

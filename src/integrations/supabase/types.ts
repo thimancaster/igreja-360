@@ -65,6 +65,8 @@ export type Database = {
           name: string
           state: string | null
           updated_at: string | null
+          owner_user_id: string | null
+          status: string | null
         }
         Insert: {
           address?: string | null
@@ -75,6 +77,8 @@ export type Database = {
           name: string
           state?: string | null
           updated_at?: string | null
+          owner_user_id?: string | null
+          status?: string | null
         }
         Update: {
           address?: string | null
@@ -85,6 +89,8 @@ export type Database = {
           name?: string
           state?: string | null
           updated_at?: string | null
+          owner_user_id?: string | null
+          status?: string | null
         }
         Relationships: []
       }
@@ -257,34 +263,34 @@ export type Database = {
           avatar_url: string | null
           church_id: string | null
           created_at: string | null
-          full_name: string | null
+          full_name: string | null /* Renomeado de first_name e last_name removido */
           id: string
           updated_at: string | null
-          email_transactions: boolean | null // Adicionado
-          email_reports: boolean | null      // Adicionado
-          email_integrations: boolean | null // Adicionado
+          email_transactions: boolean | null
+          email_reports: boolean | null
+          email_integrations: boolean | null
         }
         Insert: {
           avatar_url?: string | null
           church_id?: string | null
           created_at?: string | null
-          full_name?: string | null
+          full_name?: string | null /* Renomeado de first_name e last_name removido */
           id: string
           updated_at?: string | null
-          email_transactions?: boolean | null // Adicionado
-          email_reports?: boolean | null      // Adicionado
-          email_integrations?: boolean | null // Adicionado
+          email_transactions?: boolean | null
+          email_reports?: boolean | null
+          email_integrations?: boolean | null
         }
         Update: {
           avatar_url?: string | null
           church_id?: string | null
           created_at?: string | null
-          full_name?: string | null
+          full_name?: string | null /* Renomeado de first_name e last_name removido */
           id?: string
           updated_at?: string | null
-          email_transactions?: boolean | null // Adicionado
-          email_reports?: boolean | null      // Adicionado
-          email_integrations?: boolean | null // Adicionado
+          email_transactions?: boolean | null
+          email_reports?: boolean | null
+          email_integrations?: boolean | null
         }
         Relationships: [
           {

@@ -8,7 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppHeader } from "@/components/AppHeader";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AuthRedirect } from "@/components/AuthRedirect"; // Importar o novo componente
+import { AuthRedirect } from "@/components/AuthRedirect";
 import Dashboard from "./pages/Dashboard";
 import Transacoes from "./pages/Transacoes";
 import Importacao from "./pages/Importacao";
@@ -20,6 +20,7 @@ import GerenciarMinisterios from "./pages/admin/GerenciarMinisterios";
 import Configuracoes from "./pages/Configuracoes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import CreateChurchPage from "./pages/CreateChurch"; // Importar a nova página
 import { queryClient } from "./lib/queryClient";
 
 const App = () => (
@@ -56,6 +57,7 @@ const App = () => (
                           <Route path="admin/usuarios" element={<GerenciarUsuarios />} />
                           <Route path="admin/ministerios" element={<GerenciarMinisterios />} />
                           <Route path="configuracoes" element={<Configuracoes />} />
+                          <Route path="create-church" element={<CreateChurchPage />} /> {/* Nova rota */}
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </div>

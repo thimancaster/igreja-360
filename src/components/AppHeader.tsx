@@ -18,11 +18,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function AppHeader() {
-  const { user, signOut } = useAuth();
+  const { user, profile, signOut } = useAuth(); // Obter profile do AuthContext
   const { notifications, unreadCount, isLoading, markAsRead, markAllAsRead, isMarkingAsRead } = useNotifications();
 
-  const getInitials = (email: string) => {
-    return email.substring(0, 2).toUpperCase();
+  const getInitials = (name: string) => {
+    return name.substring(0, 2).toUpperCase();
   };
 
   return (
@@ -31,7 +31,7 @@ export function AppHeader() {
         <div className="flex items-center gap-4">
           <SidebarTrigger className="text-foreground" />
           <div className="hidden md:block">
-            <h2 className="text-lg font-semibold">Bem-vindo, {user?.user_metadata?.full_name || "Usuário"}</h2>
+            <h2 className="text-lg font-semibold">Bem-vindo, {profile?.full_name || user?.user_metadata?.full_name || "Usuário"}</h2>
             <p className="text-sm text-muted-foreground">Gerencie as finanças com clareza</p>
           </div>
         </div>
@@ -110,9 +110,9 @@ export function AppHeader() {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
                 <Avatar>
-                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarImage src={profile?.avatar_url || user?.user_metadata?.avatar_url} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {user?.email ? getInitials(user.email) : "U"}
+                    {profile?.full_name ? getInitials(profile.full_name) : (user?.email ? getInitials(user.email) : "U")}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -121,7 +121,7 @@ export function AppHeader() {
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium leading-none">
-                    {user?.user_metadata?.full_name || "Usuário"}
+                    {profile?.full_name || user?.user_metadata?.full_name || "Usuário"}
                   </p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {user?.email}

@@ -4,18 +4,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import LandingPage from "@/pages/LandingPage";
 
 export function AuthRedirect() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth(); // Get profile from context
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading) {
       if (user) {
-        // Se o usuário estiver autenticado, redireciona para o dashboard
-        navigate("/app/dashboard", { replace: true });
+        // Se o usuário estiver autenticado, verifica se ele tem um church_id
+        if (profile && !profile.church_id) {
+          navigate("/app/create-church", { replace: true });
+        } else {
+          navigate("/app/dashboard", { replace: true });
+        }
       }
       // Se não estiver autenticado, permanece na LandingPage (que será renderizada abaixo)
     }
-  }, [user, loading, navigate]);
+  }, [user, profile, loading, navigate]); // Add profile to dependencies
 
   if (loading) {
     return (

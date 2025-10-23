@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Loader2, User, Building2, Bell } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { Database, Tables, TablesUpdate } from "@/integrations/supabase/types"; // Importar tipos do Supabase
+import { Database, Tables, TablesUpdate } from "@/integrations/supabase/types";
 
 // Definir tipos para as linhas das tabelas e para os dados de atualização
 type ProfileRow = Tables<'profiles'>;
@@ -23,26 +23,9 @@ type NotificationSettingsUpdateData = Pick<ProfileRow, 'email_transactions' | 'e
 type ChurchUpdateData = Pick<ChurchRow, 'name' | 'cnpj' | 'address' | 'city' | 'state'>;
 
 export default function Configuracoes() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth(); // Obter profile do AuthContext
   const { isPrivileged, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
-
-  // Fetch user profile
-  const { data: profile, isLoading: profileLoading } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      
-      if (error) throw error;
-      return data as ProfileRow; // Explicitamente tipar como ProfileRow
-    },
-    enabled: !!user?.id,
-  });
 
   // Fetch church data
   const { data: church, isLoading: churchLoading } = useQuery({
@@ -56,7 +39,7 @@ export default function Configuracoes() {
         .single();
       
       if (error) throw error;
-      return data as ChurchRow; // Explicitamente tipar como ChurchRow
+      return data as ChurchRow;
     },
     enabled: !!profile?.church_id && isPrivileged,
   });
@@ -87,7 +70,6 @@ export default function Configuracoes() {
         full_name: profile.full_name || "",
         avatar_url: profile.avatar_url || "",
       });
-      // As colunas já existem no DB, agora o tipo 'profile' deve incluí-las
       setNotificationSettings({
         email_transactions: profile.email_transactions ?? true,
         email_reports: profile.email_reports ?? true,
@@ -111,7 +93,7 @@ export default function Configuracoes() {
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: ProfileUpdateData) => { // Usar o tipo específico para atualização de perfil
+    mutationFn: async (data: ProfileUpdateData) => {
       if (!user?.id) throw new Error("Usuário não autenticado");
       
       const { error } = await supabase
@@ -132,7 +114,7 @@ export default function Configuracoes() {
 
   // Update church mutation
   const updateChurchMutation = useMutation({
-    mutationFn: async (data: ChurchUpdateData) => { // Usar o tipo específico para atualização de igreja
+    mutationFn: async (data: ChurchUpdateData) => {
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
       
       const { error } = await supabase
@@ -153,7 +135,7 @@ export default function Configuracoes() {
 
   // Update notification settings mutation
   const updateNotificationSettingsMutation = useMutation({
-    mutationFn: async (data: NotificationSettingsUpdateData) => { // Usar o tipo específico para atualização de notificações
+    mutationFn: async (data: NotificationSettingsUpdateData) => {
       if (!user?.id) throw new Error("Usuário não autenticado");
       
       const { error } = await supabase
@@ -186,7 +168,7 @@ export default function Configuracoes() {
     updateNotificationSettingsMutation.mutate(notificationSettings);
   };
 
-  if (profileLoading || roleLoading) {
+  if (roleLoading) { // profileLoading não é mais necessário aqui, pois o profile já vem do AuthContext
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
