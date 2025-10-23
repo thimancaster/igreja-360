@@ -12,6 +12,15 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Loader2, User, Building2, Bell } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Database, Tables, TablesUpdate } from "@/integrations/supabase/types"; // Importar tipos do Supabase
+
+// Definir tipos para as linhas das tabelas e para os dados de atualização
+type ProfileRow = Tables<'profiles'>;
+type ChurchRow = Tables<'churches'>;
+
+type ProfileUpdateData = Pick<ProfileRow, 'full_name' | 'avatar_url'>;
+type NotificationSettingsUpdateData = Pick<ProfileRow, 'email_transactions' | 'email_reports' | 'email_integrations'>;
+type ChurchUpdateData = Pick<ChurchRow, 'name' | 'cnpj' | 'address' | 'city' | 'state'>;
 
 export default function Configuracoes() {
   const { user } = useAuth();
@@ -30,7 +39,7 @@ export default function Configuracoes() {
         .single();
       
       if (error) throw error;
-      return data;
+      return data as ProfileRow; // Explicitamente tipar como ProfileRow
     },
     enabled: !!user?.id,
   });
@@ -47,17 +56,17 @@ export default function Configuracoes() {
         .single();
       
       if (error) throw error;
-      return data;
+      return data as ChurchRow; // Explicitamente tipar como ChurchRow
     },
     enabled: !!profile?.church_id && isPrivileged,
   });
 
-  const [profileData, setProfileData] = useState({
+  const [profileData, setProfileData] = useState<ProfileUpdateData>({
     full_name: "",
     avatar_url: "",
   });
 
-  const [churchData, setChurchData] = useState({
+  const [churchData, setChurchData] = useState<ChurchUpdateData>({
     name: "",
     cnpj: "",
     address: "",
@@ -65,7 +74,7 @@ export default function Configuracoes() {
     state: "",
   });
 
-  const [notificationSettings, setNotificationSettings] = useState({
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettingsUpdateData>({
     email_transactions: true,
     email_reports: true,
     email_integrations: true,
@@ -78,6 +87,7 @@ export default function Configuracoes() {
         full_name: profile.full_name || "",
         avatar_url: profile.avatar_url || "",
       });
+      // As colunas já existem no DB, agora o tipo 'profile' deve incluí-las
       setNotificationSettings({
         email_transactions: profile.email_transactions ?? true,
         email_reports: profile.email_reports ?? true,
@@ -101,7 +111,7 @@ export default function Configuracoes() {
 
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: typeof profileData) => {
+    mutationFn: async (data: ProfileUpdateData) => { // Usar o tipo específico para atualização de perfil
       if (!user?.id) throw new Error("Usuário não autenticado");
       
       const { error } = await supabase
@@ -122,7 +132,7 @@ export default function Configuracoes() {
 
   // Update church mutation
   const updateChurchMutation = useMutation({
-    mutationFn: async (data: typeof churchData) => {
+    mutationFn: async (data: ChurchUpdateData) => { // Usar o tipo específico para atualização de igreja
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
       
       const { error } = await supabase
@@ -143,7 +153,7 @@ export default function Configuracoes() {
 
   // Update notification settings mutation
   const updateNotificationSettingsMutation = useMutation({
-    mutationFn: async (data: typeof notificationSettings) => {
+    mutationFn: async (data: NotificationSettingsUpdateData) => { // Usar o tipo específico para atualização de notificações
       if (!user?.id) throw new Error("Usuário não autenticado");
       
       const { error } = await supabase
