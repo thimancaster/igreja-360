@@ -17,10 +17,11 @@ import Relatorios from "./pages/Relatorios";
 import Admin from "./pages/Admin";
 import GerenciarUsuarios from "./pages/admin/GerenciarUsuarios";
 import GerenciarMinisterios from "./pages/admin/GerenciarMinisterios";
+import GerenciarIgreja from "./pages/admin/GerenciarIgreja"; // Importar a nova página
 import Configuracoes from "./pages/Configuracoes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import CreateChurchPage from "./pages/CreateChurch"; // Importar a nova página
+import CreateChurchPage from "./pages/CreateChurch";
 import { queryClient } from "./lib/queryClient";
 
 const App = () => (
@@ -56,8 +57,9 @@ const App = () => (
                           <Route path="admin" element={<Admin />} />
                           <Route path="admin/usuarios" element={<GerenciarUsuarios />} />
                           <Route path="admin/ministerios" element={<GerenciarMinisterios />} />
+                          <Route path="admin/igreja" element={<GerenciarIgreja />} /> {/* Nova rota */}
                           <Route path="configuracoes" element={<Configuracoes />} />
-                          <Route path="create-church" element={<CreateChurchPage />} /> {/* Nova rota */}
+                          <Route path="create-church" element={<CreateChurchPage />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </div>
