@@ -1,35 +1,10 @@
 import { Users, Building2, ChevronRight } from "lucide-react";
-import { Link, Navigate } from "react-router-dom";
-import { useRole } from "@/hooks/useRole";
-import { useToast } from "@/hooks/use-toast";
-import { useEffect } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Admin() {
-  const { isPrivileged, isLoading } = useRole();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    if (!isLoading && !isPrivileged) {
-      toast({
-        title: "Acesso Negado",
-        description: "Você não tem permissão para acessar esta página.",
-        variant: "destructive",
-      });
-    }
-  }, [isLoading, isPrivileged, toast]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!isPrivileged) {
-    return <Navigate to="/" replace />;
-  }
+  // As restrições de acesso baseadas em cargo foram removidas.
+  // Esta página agora é acessível a qualquer usuário autenticado.
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -39,7 +14,7 @@ export default function Admin() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Link to="/admin/usuarios" className="block hover:shadow-lg transition-shadow rounded-lg">
+        <Link to="/app/admin/usuarios" className="block hover:shadow-lg transition-shadow rounded-lg">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -54,7 +29,7 @@ export default function Admin() {
           </Card>
         </Link>
 
-        <Link to="/admin/ministerios" className="block hover:shadow-lg transition-shadow rounded-lg">
+        <Link to="/app/admin/ministerios" className="block hover:shadow-lg transition-shadow rounded-lg">
           <Card className="h-full">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
