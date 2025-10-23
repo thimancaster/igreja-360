@@ -260,6 +260,9 @@ export type Database = {
           full_name: string | null
           id: string
           updated_at: string | null
+          email_transactions: boolean | null // Adicionado
+          email_reports: boolean | null      // Adicionado
+          email_integrations: boolean | null // Adicionado
         }
         Insert: {
           avatar_url?: string | null
@@ -268,6 +271,9 @@ export type Database = {
           full_name?: string | null
           id: string
           updated_at?: string | null
+          email_transactions?: boolean | null // Adicionado
+          email_reports?: boolean | null      // Adicionado
+          email_integrations?: boolean | null // Adicionado
         }
         Update: {
           avatar_url?: string | null
@@ -276,6 +282,9 @@ export type Database = {
           full_name?: string | null
           id?: string
           updated_at?: string | null
+          email_transactions?: boolean | null // Adicionado
+          email_reports?: boolean | null      // Adicionado
+          email_integrations?: boolean | null // Adicionado
         }
         Relationships: [
           {
