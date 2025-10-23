@@ -12,14 +12,14 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Check for required environment variables first
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const appBaseUrl = Deno.env.get('APP_BASE_URL'); // Novo: Obter APP_BASE_URL
+    const frontendBaseUrl = Deno.env.get('FRONTEND_BASE_URL'); // Nova variável para a URL do frontend
+    const supabaseFunctionsUrl = Deno.env.get('SUPABASE_FUNCTIONS_URL'); // Nova variável para a URL das funções Supabase
 
-    if (!supabaseUrl || !anonKey || !clientId || !appBaseUrl) { // Novo: Verificar appBaseUrl
-      const errorMessage = 'Erro de configuração do servidor: Faltando SUPABASE_URL, SUPABASE_ANON_KEY, GOOGLE_CLIENT_ID, ou APP_BASE_URL.';
+    if (!supabaseUrl || !anonKey || !clientId || !frontendBaseUrl || !supabaseFunctionsUrl) {
+      const errorMessage = 'Erro de configuração do servidor: Faltando SUPABASE_URL, SUPABASE_ANON_KEY, GOOGLE_CLIENT_ID, FRONTEND_BASE_URL, ou SUPABASE_FUNCTIONS_URL.';
       console.error(errorMessage);
       return new Response(JSON.stringify({ error: errorMessage }), {
         status: 500,
@@ -27,7 +27,6 @@ serve(async (req) => {
       });
     }
 
-    // 2. Check for Authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Usuário não autenticado: Faltando cabeçalho de Autorização.' }), {
@@ -36,14 +35,12 @@ serve(async (req) => {
       });
     }
 
-    // Create a Supabase client with the user's auth token
     const supabaseClient = createClient(
       supabaseUrl,
       anonKey,
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Get the user from the session to ensure the token is valid
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
       console.error('Falha na autenticação do usuário:', userError);
@@ -53,9 +50,8 @@ serve(async (req) => {
       });
     }
 
-    // All checks passed, proceed with OAuth URL generation
-    // Usar APP_BASE_URL para o URI de redirecionamento
-    const redirectUri = `${appBaseUrl}/functions/v1/google-auth-callback`; // URI de redirecionamento corrigido
+    // Usar SUPABASE_FUNCTIONS_URL para o URI de redirecionamento do Google
+    const redirectUri = `${supabaseFunctionsUrl}/functions/v1/google-auth-callback`;
     const state = Math.random().toString(36).substring(2);
     const nonce = Math.random().toString(36).substring(2);
 
@@ -71,7 +67,6 @@ serve(async (req) => {
 
     const headers = new Headers(corsHeaders);
     headers.set('Content-Type', 'application/json');
-    // Set cookies for state and nonce to be validated in the callback
     headers.append('Set-Cookie', `oauth-state=${state}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
     headers.append('Set-Cookie', `oauth-nonce=${nonce}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
 

@@ -35,7 +35,6 @@ serve(async (req) => {
     const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
 
-    // Validate state for CSRF protection
     const cookies = getCookies(req.headers);
     const storedState = cookies['oauth-state'];
 
@@ -55,16 +54,16 @@ serve(async (req) => {
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const appBaseUrl = Deno.env.get('APP_BASE_URL'); // Novo: Obter APP_BASE_URL
+    const frontendBaseUrl = Deno.env.get('FRONTEND_BASE_URL'); // Nova variável para a URL do frontend
+    const supabaseFunctionsUrl = Deno.env.get('SUPABASE_FUNCTIONS_URL'); // Nova variável para a URL das funções Supabase
 
-    if (!clientId || !clientSecret || !supabaseUrl || !supabaseKey || !appBaseUrl) { // Novo: Verificar appBaseUrl
+    if (!clientId || !clientSecret || !supabaseUrl || !supabaseKey || !frontendBaseUrl || !supabaseFunctionsUrl) {
       throw new Error('Variáveis de ambiente obrigatórias ausentes');
     }
 
-    // Usar APP_BASE_URL para o URI de redirecionamento
-    const redirectUri = `${appBaseUrl}/functions/v1/google-auth-callback`; // URI de redirecionamento corrigido
+    // Usar SUPABASE_FUNCTIONS_URL para o URI de redirecionamento do Google
+    const redirectUri = `${supabaseFunctionsUrl}/functions/v1/google-auth-callback`;
 
-    // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -90,10 +89,8 @@ serve(async (req) => {
       throw new Error('Resposta de token inválida do Google: tokens obrigatórios ausentes');
     }
 
-    // Create Supabase client
     const supabaseClient = createClient(supabaseUrl, supabaseKey);
     
-    // Sign in with Google ID token to create a Supabase session
     const { data: sessionData, error: sessionError } = await supabaseClient.auth.signInWithIdToken({
       provider: 'google',
       token: tokens.id_token,
@@ -103,7 +100,6 @@ serve(async (req) => {
       throw new Error(`Falha ao criar sessão: ${sessionError?.message || 'Nenhuma sessão retornada'}`);
     }
 
-    // Store Google tokens in the database
     const { error: credentialError } = await supabaseClient
       .from('user_credentials')
       .upsert({
@@ -119,14 +115,7 @@ serve(async (req) => {
       throw new Error('Não foi possível salvar os tokens de autenticação.');
     }
 
-    // Get redirect URL from environment
-    // Este já está usando APP_BASE_URL, então está ok.
-    // const appBaseUrl = Deno.env.get('APP_BASE_URL'); // Já obtido acima
-    if (!appBaseUrl) {
-      throw new Error('Variável de ambiente APP_BASE_URL não definida');
-    }
-
-    // Prepare cookies for session
+    // Redirecionar para o frontend usando FRONTEND_BASE_URL
     const sessionCookies = [
       setCookie('sb-access-token', sessionData.session.access_token),
       setCookie('sb-refresh-token', sessionData.session.refresh_token),
@@ -137,7 +126,7 @@ serve(async (req) => {
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': `${appBaseUrl}/integracoes?auth=success`,
+        'Location': `${frontendBaseUrl}/integracoes?auth=success`,
         'Set-Cookie': sessionCookies.join(', '),
       },
     });
@@ -145,12 +134,12 @@ serve(async (req) => {
     console.error('Erro em google-auth-callback:', error);
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
     
-    const appBaseUrl = Deno.env.get('APP_BASE_URL') || '';
+    const frontendBaseUrl = Deno.env.get('FRONTEND_BASE_URL') || '';
     
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': `${appBaseUrl}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`,
+        'Location': `${frontendBaseUrl}/integracoes?auth=error&message=${encodeURIComponent(errorMessage)}`,
       },
     });
   }
