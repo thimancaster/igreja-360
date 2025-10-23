@@ -3,9 +3,9 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Database } from "@/integrations/supabase/types"; // Import Database type
+import { Tables } from "@/integrations/supabase/types"; // Import Tables helper type
 
-interface Profile extends Database["public"]["Tables"]["profiles"]["Row"] {} // Define Profile type
+interface Profile extends Tables<'profiles'> {} // Define Profile type using Tables helper
 
 interface AuthContextType {
   user: User | null;
