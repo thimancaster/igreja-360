@@ -30,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription, // Adicionado DialogDescription aqui
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -287,7 +288,7 @@ export default function GerenciarMinisterios() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(saveMinistryMutation.mutate)} className="space-y-4 py-4">
+            <form onSubmit={form.handleSubmit((values) => saveMinistryMutation.mutate(values))} className="space-y-4 py-4">
               <FormField
                 control={form.control}
                 name="name"
