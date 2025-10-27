@@ -3,28 +3,50 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label"; // Keep Label for general use if needed, but FormLabel is preferred
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
 
 type ChurchRow = Tables<'churches'>;
-type ChurchUpdateData = Pick<ChurchRow, 'name' | 'cnpj' | 'address' | 'city' | 'state'>;
+
+const churchSchema = z.object({
+  name: z.string().min(1, "Nome da igreja é obrigatório").max(100, "Nome muito longo"),
+  cnpj: z.string().optional().or(z.literal("")), // CNPJ can be optional
+  address: z.string().optional().or(z.literal("")),
+  city: z.string().optional().or(z.literal("")),
+  state: z.string().max(2, "Estado deve ter 2 caracteres").optional().or(z.literal("")),
+});
+
+type ChurchFormValues = z.infer<typeof churchSchema>;
 
 export default function GerenciarIgreja() {
   const { user, profile, loading: authLoading } = useAuth();
   const { isPrivileged, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
 
-  const [churchData, setChurchData] = useState<ChurchUpdateData>({
-    name: "",
-    cnpj: "",
-    address: "",
-    city: "",
-    state: "",
+  const form = useForm<ChurchFormValues>({
+    resolver: zodResolver(churchSchema),
+    defaultValues: {
+      name: "",
+      cnpj: "",
+      address: "",
+      city: "",
+      state: "",
+    },
   });
 
   // Fetch church data
@@ -44,10 +66,10 @@ export default function GerenciarIgreja() {
     enabled: !!profile?.church_id && isPrivileged, // Only fetch if user is privileged and has a church
   });
 
-  // Update church data when loaded
+  // Update form with fetched church data
   useEffect(() => {
     if (church) {
-      setChurchData({
+      form.reset({
         name: church.name || "",
         cnpj: church.cnpj || "",
         address: church.address || "",
@@ -55,16 +77,22 @@ export default function GerenciarIgreja() {
         state: church.state || "",
       });
     }
-  }, [church]);
+  }, [church, form]);
 
   // Update church mutation
   const updateChurchMutation = useMutation({
-    mutationFn: async (data: ChurchUpdateData) => {
+    mutationFn: async (data: ChurchFormValues) => {
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
       
       const { error } = await supabase
         .from("churches")
-        .update(data)
+        .update({
+          name: data.name,
+          cnpj: data.cnpj || null,
+          address: data.address || null,
+          city: data.city || null,
+          state: data.state || null,
+        })
         .eq("id", profile.church_id);
       
       if (error) throw error;
@@ -78,9 +106,8 @@ export default function GerenciarIgreja() {
     },
   });
 
-  const handleChurchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateChurchMutation.mutate(churchData);
+  const onSubmit = (values: ChurchFormValues) => {
+    updateChurchMutation.mutate(values);
   };
 
   if (authLoading || roleLoading || churchLoading) {
@@ -130,80 +157,91 @@ export default function GerenciarIgreja() {
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleChurchSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="church_name">Nome da Igreja</Label>
-              <Input
-                id="church_name"
-                value={churchData.name}
-                onChange={(e) =>
-                  setChurchData({ ...churchData, name: e.target.value })
-                }
-                placeholder="Nome da igreja"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Igreja</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome da igreja" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="cnpj">CNPJ</Label>
-              <Input
-                id="cnpj"
-                value={churchData.cnpj}
-                onChange={(e) =>
-                  setChurchData({ ...churchData, cnpj: e.target.value })
-                }
-                placeholder="00.000.000/0000-00"
+              <FormField
+                control={form.control}
+                name="cnpj"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CNPJ (Opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="00.000.000/0000-00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Endereço</Label>
-              <Input
-                id="address"
-                value={churchData.address}
-                onChange={(e) =>
-                  setChurchData({ ...churchData, address: e.target.value })
-                }
-                placeholder="Rua, número, complemento"
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Endereço (Opcional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Rua, número, complemento" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="city">Cidade</Label>
-                <Input
-                  id="city"
-                  value={churchData.city}
-                  onChange={(e) =>
-                    setChurchData({ ...churchData, city: e.target.value })
-                  }
-                  placeholder="Cidade"
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cidade (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Cidade" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estado (Opcional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="UF" maxLength={2} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="state">Estado</Label>
-                <Input
-                  id="state"
-                  value={churchData.state}
-                  onChange={(e) =>
-                    setChurchData({ ...churchData, state: e.target.value })
-                  }
-                  placeholder="UF"
-                  maxLength={2}
-                />
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={updateChurchMutation.isPending}
-            >
-              {updateChurchMutation.isPending && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              Salvar Alterações
-            </Button>
-          </form>
+              <Button
+                type="submit"
+                disabled={updateChurchMutation.isPending}
+              >
+                {updateChurchMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Salvar Alterações
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
