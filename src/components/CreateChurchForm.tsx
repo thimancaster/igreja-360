@@ -61,8 +61,11 @@ export function CreateChurchForm() {
         .select()
         .single();
 
-      if (churchError) throw churchError;
-      if (!newChurch) throw new Error("Falha ao criar a igreja.");
+      if (churchError) {
+        console.error("Supabase error creating church:", churchError); // Log detalhado
+        throw new Error(churchError.message || "Falha ao criar a igreja.");
+      }
+      if (!newChurch) throw new Error("Falha ao criar a igreja: resposta vazia.");
 
       // 2. Update the user's profile with the new church_id
       const { error: profileUpdateError } = await supabase
@@ -70,7 +73,10 @@ export function CreateChurchForm() {
         .update({ church_id: newChurch.id })
         .eq("id", user.id);
 
-      if (profileUpdateError) throw profileUpdateError;
+      if (profileUpdateError) {
+        console.error("Supabase error updating profile with church_id:", profileUpdateError); // Log detalhado
+        throw new Error(profileUpdateError.message || "Falha ao associar igreja ao perfil.");
+      }
 
       return newChurch;
     },
@@ -83,10 +89,11 @@ export function CreateChurchForm() {
       queryClient.invalidateQueries({ queryKey: ["church", user?.id] }); // Invalidate church data
       navigate("/app/dashboard"); // Redirect to dashboard
     },
-    onError: (error: any) => {
+    onError: (error: Error) => { // Tipagem do erro para melhor segurança
+      console.error("Erro ao criar igreja (mutation):", error); // Log do objeto de erro completo
       toast({
         title: "Erro ao criar igreja",
-        description: error.message,
+        description: error.message, // Usar a mensagem do erro lançado
         variant: "destructive",
       });
     },
