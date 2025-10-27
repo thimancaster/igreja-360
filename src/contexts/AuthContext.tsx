@@ -3,14 +3,14 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
-import { Tables } from "@/integrations/supabase/types"; // Import Tables helper type
+import { Tables } from "@/integrations/supabase/types";
 
-interface Profile extends Tables<'profiles'> {} // Define Profile type using Tables helper
+interface Profile extends Tables<'profiles'> {}
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  profile: Profile | null; // Add profile to context
+  profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
@@ -22,49 +22,71 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null); // State for profile
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Function to fetch user profile
   const fetchProfile = async (userId: string) => {
+    console.log("AuthContext: Fetching profile for user:", userId);
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
     if (error) {
-      console.error("Error fetching profile:", error);
+      console.error("AuthContext: Error fetching profile:", error);
       setProfile(null);
     } else {
+      console.log("AuthContext: Profile fetched:", data);
       setProfile(data as Profile);
     }
   };
 
   useEffect(() => {
+    console.log("AuthContext: useEffect triggered");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, currentSession) => { // Make it async
+      async (_event, currentSession) => {
+        console.log("AuthContext: onAuthStateChange event:", _event, "session:", currentSession);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         if (currentSession?.user) {
-          await fetchProfile(currentSession.user.id); // Fetch profile on auth state change
+          try {
+            await fetchProfile(currentSession.user.id);
+          } catch (error) {
+            console.error("AuthContext: Error in onAuthStateChange fetchProfile:", error);
+            setProfile(null);
+          }
         } else {
           setProfile(null);
         }
         setLoading(false);
+        console.log("AuthContext: onAuthStateChange finished, loading set to false.");
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => { // Make it async
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+      console.log("AuthContext: getSession resolved, initialSession:", initialSession);
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       if (initialSession?.user) {
-        await fetchProfile(initialSession.user.id); // Fetch profile on initial session
+        try {
+          await fetchProfile(initialSession.user.id);
+        } catch (error) {
+          console.error("AuthContext: Error in getSession fetchProfile:", error);
+          setProfile(null);
+        }
       }
+      setLoading(false);
+      console.log("AuthContext: getSession finished, loading set to false.");
+    }).catch(error => {
+      console.error("AuthContext: Error in getSession:", error);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("AuthContext: Unsubscribing from auth state changes.");
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -81,7 +103,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Login realizado com sucesso.",
       });
       
-      // O redirecionamento será tratado pelo AuthRedirect
     } catch (error: any) {
       toast({
         title: "Erro no login",
@@ -114,7 +135,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Bem-vindo ao Igreja360.",
       });
       
-      // O redirecionamento será tratado pelo AuthRedirect
     } catch (error: any) {
       toast({
         title: "Erro no cadastro",
