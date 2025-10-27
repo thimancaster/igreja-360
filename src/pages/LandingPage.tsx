@@ -5,6 +5,7 @@ import { Card, CardTitle, CardDescription, CardContent } from "@/components/ui/c
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "react-router-dom";
+import MockupDevice from "@/components/MockupDevice"; // Import MockupDevice
 
 const LandingPage: React.FC = () => {
   return (
@@ -43,9 +44,8 @@ const LandingPage: React.FC = () => {
               <Link to="/auth">Quero Organizar Minhas Finanças</Link>
             </Button>
             <div className="mt-16 max-w-5xl mx-auto">
-              <div className="w-full max-w-md mx-auto">
-                <img src="/placeholder.svg" alt="Mockup do SaaS" className="w-full h-72 md:h-96 object-cover rounded-xl" style={{ maxWidth: '600px' }} />
-              </div>
+              {/* Mockup Principal (Visão Geral do Dashboard) */}
+              <MockupDevice src="/mockups/dashboard-overview.png" alt="Visão Geral do Dashboard" className="w-full max-w-md mx-auto md:max-w-full" />
             </div>
           </div>
         </section>
@@ -99,7 +99,7 @@ const LandingPage: React.FC = () => {
             {/* Benefício 1: Automatize */}
             <div className="flex flex-col md:flex-row items-center gap-12">
               <div className="md:w-1/2">
-                <img src="/placeholder.svg" alt="Mockup de Automação" className="w-full h-72 object-cover rounded-xl" />
+                <img src="/mockups/automate-import.png" alt="Mockup de Automação" className="w-full h-72 object-cover rounded-xl" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-primary/80">
@@ -115,7 +115,7 @@ const LandingPage: React.FC = () => {
             {/* Benefício 2: Visualize */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-12">
               <div className="md:w-1/2">
-                <img src="/placeholder.svg" alt="Mockup de Visualização" className="w-full h-72 object-cover rounded-xl" />
+                <img src="/mockups/visualize-charts.png" alt="Mockup de Visualização" className="w-full h-72 object-cover rounded-xl" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-secondary/80">
@@ -131,7 +131,7 @@ const LandingPage: React.FC = () => {
             {/* Benefício 3: Decida */}
             <div className="flex flex-col md:flex-row items-center gap-12">
               <div className="md:w-1/2">
-                <img src="/placeholder.svg" alt="Mockup de Decisão" className="w-full h-72 object-cover rounded-xl" />
+                <img src="/mockups/decision-report.png" alt="Mockup de Decisão" className="w-full h-72 object-cover rounded-xl" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-accent/80">
@@ -147,7 +147,7 @@ const LandingPage: React.FC = () => {
             {/* Benefício 4: Ganhe Tempo */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-12">
               <div className="md:w-1/2">
-                <img src="/placeholder.svg" alt="Mockup de Tempo" className="w-full h-72 object-cover rounded-xl" />
+                <img src="/mockups/time-peace.png" alt="Mockup de Tempo" className="w-full h-72 object-cover rounded-xl" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
                 <Badge variant="secondary" className="text-primary-foreground bg-warning/80">
