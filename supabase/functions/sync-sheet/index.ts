@@ -27,6 +27,18 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const googleApiKey = Deno.env.get('GOOGLE_SHEETS_API_KEY')!; // Obter a chave de API do Google Sheets
+
+    if (!googleApiKey) {
+      return new Response(
+        JSON.stringify({ error: 'Google Sheets API Key is not configured.' }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Extract user ID from JWT
@@ -43,7 +55,7 @@ serve(async (req) => {
       );
     }
 
-    // Get integration details
+    // Get integration details, including sheet_url and column_mapping
     const { data: integration, error: integrationError } = await supabase
       .from('google_integrations')
       .select('*')
@@ -72,14 +84,38 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Starting sync for sheet: ${integration.sheet_name}`);
+    if (!integration.sheet_url) {
+      return new Response(
+        JSON.stringify({ error: 'Sheet URL not found for this integration.' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
-    // Get spreadsheet data
+    console.log(`Starting sync for sheet: ${integration.sheet_name} from URL: ${integration.sheet_url}`);
+
+    // Extract sheet_id from sheet_url
+    const sheetIdMatch = integration.sheet_url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    const sheetId = sheetIdMatch ? sheetIdMatch[1] : null;
+
+    if (!sheetId) {
+      return new Response(
+        JSON.stringify({ error: 'Could not extract Sheet ID from the provided URL.' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Get spreadsheet data using Google Sheets API Key
     const sheetResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${integration.sheet_id}/values/A1:ZZ`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:ZZ?key=${googleApiKey}`,
       {
         headers: {
-          'Authorization': `Bearer ${integration.access_token}`,
+          'Accept': 'application/json',
         },
       }
     );
@@ -93,14 +129,14 @@ serve(async (req) => {
     const rows = sheetData.values || [];
 
     if (rows.length === 0) {
-      throw new Error('Sheet is empty');
+      throw new Error('Sheet is empty or no data found.');
     }
 
     // First row contains headers
     const headers = rows[0];
     const dataRows = rows.slice(1);
 
-    const mapping = integration.column_mapping;
+    const mapping = integration.column_mapping as Record<string, string>; // Cast to specific type
 
     // Transform data rows to transactions
     const transactions = [];
@@ -120,10 +156,10 @@ serve(async (req) => {
           // Special handling for specific fields
           if (field === 'amount') {
             // Remove currency symbols and convert to number
-            value = parseFloat(value.replace(/[^\d.-]/g, ''));
+            value = parseFloat(String(value).replace(/[^\d.-]/g, ''));
           } else if (field === 'due_date' || field === 'payment_date') {
             // Convert date formats (assuming DD/MM/YYYY)
-            const parts = value.split('/');
+            const parts = String(value).split('/');
             if (parts.length === 3) {
               value = `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to YYYY-MM-DD
             }

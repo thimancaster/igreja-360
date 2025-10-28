@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
 
+// Atualizando a interface para refletir o novo esquema do banco de dados
 export interface GoogleIntegration {
   id: string;
   sheet_id: string;
@@ -11,41 +12,20 @@ export interface GoogleIntegration {
   column_mapping: Record<string, string>;
   last_sync_at: string | null;
   created_at: string;
-  access_token: string;
-  refresh_token: string;
+  sheet_url: string | null; // Adicionando a nova coluna
+  user_id: string; // Adicionando user_id para consistência
+  church_id: string; // Adicionando church_id para consistência
 }
 
-export interface GoogleSheet {
-  id: string;
-  name: string;
-  modifiedTime: string;
-}
-
-// Define a type for user_credentials
-type UserCredentials = Database["public"]["Tables"]["user_credentials"]["Row"];
+// Removendo a interface GoogleSheet, pois não listaremos mais planilhas via API do Drive
+// Removendo o tipo UserCredentials, pois não armazenaremos mais tokens OAuth
 
 export const useIntegrations = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Fetch Google credentials for the user
-  const { data: credentials, isLoading: credentialsLoading } = useQuery({
-    queryKey: ["user-credentials", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from("user_credentials")
-        .select("access_token, refresh_token")
-        .eq("user_id", user.id)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') { // Ignore "no rows found" error
-        throw error;
-      }
-      return data as UserCredentials | null; // Explicitly cast to UserCredentials
-    },
-    enabled: !!user?.id,
-  });
+  // Removendo a query para credentials, pois não usaremos mais tokens OAuth
+  // const { data: credentials, isLoading: credentialsLoading } = useQuery(...)
 
   // Fetch integrations
   const { data: integrations, isLoading } = useQuery({
@@ -63,77 +43,9 @@ export const useIntegrations = () => {
     enabled: !!user?.id,
   });
 
-  // Start OAuth flow
-  const startOAuth = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("google-auth-start");
-      
-      if (error) throw error;
-      
-      if (data.authUrl) {
-        window.location.href = data.authUrl;
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erro ao conectar",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Disconnect Google Account
-  const disconnectGoogle = useMutation({
-    mutationFn: async () => {
-      if (!user?.id) throw new Error("User not authenticated");
-      
-      const deleteIntegrationsPromise = supabase
-        .from("google_integrations")
-        .delete()
-        .eq("user_id", user.id);
-        
-      const deleteCredentialsPromise = supabase
-        .from("user_credentials")
-        .delete()
-        .eq("user_id", user.id);
-
-      const [integrationsResult, credentialsResult] = await Promise.all([
-        deleteIntegrationsPromise,
-        deleteCredentialsPromise,
-      ]);
-
-      if (integrationsResult.error) throw integrationsResult.error;
-      if (credentialsResult.error) throw credentialsResult.error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["google-integrations"] });
-      queryClient.invalidateQueries({ queryKey: ["user-credentials"] });
-      toast({
-        title: "Desconectado",
-        description: "Sua conta Google foi desconectada.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erro ao desconectar",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // List Google Sheets
-  const listSheets = useMutation({
-    mutationFn: async (accessToken: string) => {
-      const { data, error } = await supabase.functions.invoke("list-google-sheets", {
-        body: { accessToken },
-      });
-
-      if (error) throw error;
-      return data.sheets as GoogleSheet[];
-    },
-  });
+  // Removendo startOAuth mutation
+  // Removendo disconnectGoogle mutation
+  // Removendo listSheets mutation
 
   // Create integration
   const createIntegration = useMutation({
@@ -142,8 +54,7 @@ export const useIntegrations = () => {
       sheetId: string;
       sheetName: string;
       columnMapping: Record<string, string>;
-      accessToken: string;
-      refreshToken: string | null;
+      sheetUrl: string; // Agora aceita a URL da planilha
     }) => {
       const { error } = await supabase.from("google_integrations").insert({
         user_id: user?.id,
@@ -151,8 +62,7 @@ export const useIntegrations = () => {
         sheet_id: params.sheetId,
         sheet_name: params.sheetName,
         column_mapping: params.columnMapping,
-        access_token: params.accessToken,
-        refresh_token: params.refreshToken,
+        sheet_url: params.sheetUrl, // Usando a URL da planilha
       });
 
       if (error) throw error;
@@ -176,6 +86,8 @@ export const useIntegrations = () => {
   // Sync integration
   const syncIntegration = useMutation({
     mutationFn: async (integrationId: string) => {
+      // A Edge Function 'sync-sheet' agora buscará a sheet_url e a column_mapping
+      // diretamente da tabela google_integrations usando o integrationId.
       const { data, error } = await supabase.functions.invoke("sync-sheet", {
         body: { integrationId },
       });
@@ -228,11 +140,11 @@ export const useIntegrations = () => {
 
   return {
     integrations,
-    isLoading: isLoading || credentialsLoading,
-    credentials,
-    startOAuth,
-    disconnectGoogle,
-    listSheets,
+    isLoading: isLoading, // credentialsLoading removido
+    // credentials removido
+    // startOAuth removido
+    // disconnectGoogle removido
+    // listSheets removido
     createIntegration,
     syncIntegration,
     deleteIntegration,
