@@ -1,20 +1,20 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon } from "lucide-react"; // Adicionado LinkIcon
+import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"; // Adicionado DialogFooter
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // Importar Input
-import { useIntegrations } from "@/hooks/useIntegrations"; // GoogleSheet removido
+import { Input } from "@/components/ui/input";
+import { useIntegrations } from "@/hooks/useIntegrations";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from 'xlsx'; // Importar XLSX para ler headers localmente
+import * as XLSX from 'xlsx';
 
 const REQUIRED_FIELDS = [
   { key: "amount", label: "Valor da Transação" },
@@ -26,7 +26,7 @@ const REQUIRED_FIELDS = [
 
 export default function Integracoes() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, profile } = useAuth(); // Obter profile do AuthContext
   const {
     integrations,
     isLoading,
@@ -36,18 +36,23 @@ export default function Integracoes() {
   } = useIntegrations();
 
   const [showMappingDialog, setShowMappingDialog] = useState(false);
-  const [sheetUrl, setSheetUrl] = useState<string>(""); // Novo estado para a URL da planilha
-  const [sheetId, setSheetId] = useState<string>(""); // ID da planilha extraído da URL
-  const [sheetName, setSheetName] = useState<string>(""); // Nome da planilha (pode ser o nome do arquivo ou um nome padrão)
+  const [sheetUrl, setSheetUrl] = useState<string>("");
+  const [sheetId, setSheetId] = useState<string>("");
+  const [sheetName, setSheetName] = useState<string>("");
   const [sheetHeaders, setSheetHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [churchId, setChurchId] = useState<string | null>(null);
-  const [isProcessingSheet, setIsProcessingSheet] = useState(false); // Novo estado para indicar processamento da planilha
+  const [isProcessingSheet, setIsProcessingSheet] = useState(false);
 
   // Fetch user's church_id from profile
   useEffect(() => {
+    console.log("Integracoes: useEffect - user.id changed:", user?.id);
     const fetchChurchId = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        console.log("Integracoes: No user ID, cannot fetch church_id.");
+        setChurchId(null);
+        return;
+      }
       
       const { data, error } = await supabase
         .from("profiles")
@@ -56,15 +61,20 @@ export default function Integracoes() {
         .single();
 
       if (!error && data) {
+        console.log("Integracoes: Fetched church_id:", data.church_id);
         setChurchId(data.church_id);
+      } else {
+        console.error("Integracoes: Error fetching church_id or no church_id found:", error);
+        setChurchId(null);
       }
     };
 
     fetchChurchId();
-  }, [user?.id]);
+  }, [user?.id, profile?.church_id]); // Adicionado profile?.church_id como dependência para reagir a mudanças no perfil
 
-  // Removendo o useEffect para o callback OAuth, pois não é mais usado
-  // useEffect(() => { ... }, [searchParams, setSearchParams]);
+  useEffect(() => {
+    console.log("Integracoes: Current churchId state:", churchId);
+  }, [churchId]);
 
   const extractSheetIdFromUrl = (url: string): string | null => {
     const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -76,7 +86,6 @@ export default function Integracoes() {
     setSheetUrl(url);
     const extractedId = extractSheetIdFromUrl(url);
     setSheetId(extractedId || "");
-    // Tentativa de extrair um nome simples da URL ou usar um padrão
     const nameMatch = url.match(/\/spreadsheets\/d\/[a-zA-Z0-9_-]+\/edit#gid=(\d+)/);
     setSheetName(nameMatch ? `Planilha ${nameMatch[1]}` : "Nova Planilha");
   };
@@ -88,21 +97,8 @@ export default function Integracoes() {
     }
     setIsProcessingSheet(true);
     try {
-      // Usar a API do Google Sheets para obter os cabeçalhos
-      // NOTA: Isso requer uma chave de API do Google Sheets configurada como variável de ambiente
-      // no Supabase Edge Function e a planilha deve ser publicamente acessível.
-      // Para o frontend, podemos simular ou usar uma função de borda para isso.
-      // Por simplicidade, vamos simular a leitura de cabeçalhos aqui,
-      // mas a leitura real da planilha será feita na Edge Function de sync.
-
-      // Para obter os cabeçalhos no frontend, precisaríamos de uma chave de API exposta
-      // ou de uma Edge Function para proxy. Para manter a segurança, vamos assumir
-      // que a Edge Function de sync fará a leitura completa.
-      // Por enquanto, para o mapeamento, vamos usar um conjunto de headers de exemplo
-      // ou pedir ao usuário para inseri-los manualmente se a planilha não for pública.
-
-      // Para este exemplo, vamos simular alguns cabeçalhos comuns.
-      // Em um cenário real, você chamaria uma Edge Function para buscar os cabeçalhos.
+      // Simulação de carregamento de cabeçalhos. Em um cenário real,
+      // você faria uma chamada para uma Edge Function que buscaria os cabeçalhos reais.
       const dummyHeaders = ["Descrição", "Valor", "Tipo", "Status", "Data de Vencimento", "Data de Pagamento", "Categoria", "Ministério", "Notas"];
       setSheetHeaders(dummyHeaders);
       toast({ title: "Cabeçalhos Carregados", description: "Cabeçalhos da planilha carregados com sucesso. Prossiga para o mapeamento.", variant: "success" });
@@ -116,11 +112,12 @@ export default function Integracoes() {
   };
 
   const handleSaveIntegration = async () => {
-    // Alterado selectedSheet para sheetName e adicionado verificação de sheetId
+    console.log("handleSaveIntegration: sheetName:", sheetName, "sheetId:", sheetId, "churchId:", churchId, "sheetUrl:", sheetUrl);
+
     if (!sheetName || !sheetId || !churchId || !sheetUrl) {
       toast({
         title: "Erro",
-        description: "Dados insuficientes para criar a integração. Tente novamente.",
+        description: "Dados insuficientes para criar a integração. Certifique-se de que a URL da planilha é válida e que sua igreja está associada ao seu perfil.",
         variant: "destructive",
       });
       return;
@@ -138,10 +135,10 @@ export default function Integracoes() {
 
     await createIntegration.mutateAsync({
       churchId,
-      sheetId: sheetId, // Usar o ID extraído
-      sheetName: sheetName, // Usar o nome extraído/padrão
+      sheetId: sheetId,
+      sheetName: sheetName,
       columnMapping,
-      sheetUrl, // Passar a URL completa
+      sheetUrl,
     });
 
     setShowMappingDialog(false);
@@ -151,6 +148,8 @@ export default function Integracoes() {
     setColumnMapping({});
     setSheetHeaders([]);
   };
+
+  const isAddSheetButtonDisabled = !churchId;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -180,11 +179,16 @@ export default function Integracoes() {
         <CardContent className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Planilhas Sincronizadas</h3>
-            <Button onClick={() => setShowMappingDialog(true)}> {/* Abrir dialog diretamente */}
+            <Button onClick={() => setShowMappingDialog(true)} disabled={isAddSheetButtonDisabled}>
               <Plus className="mr-2 h-4 w-4" />
               Adicionar Planilha
             </Button>
           </div>
+          {isAddSheetButtonDisabled && (
+            <p className="text-sm text-destructive text-center">
+              Você precisa ter uma igreja associada ao seu perfil para adicionar planilhas. Por favor, crie uma igreja primeiro.
+            </p>
+          )}
 
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Carregando...</div>
@@ -194,7 +198,7 @@ export default function Integracoes() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nome da Planilha</TableHead>
-                    <TableHead>URL</TableHead> {/* Nova coluna para URL */}
+                    <TableHead>URL</TableHead>
                     <TableHead>Última Sincronização</TableHead>
                     <TableHead className="text-right">Ações</TableHead>
                   </TableRow>
