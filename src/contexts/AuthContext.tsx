@@ -27,64 +27,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   const fetchProfile = async (userId: string) => {
-    console.log("AuthContext: Fetching profile for user:", userId);
+    console.log("AuthContext: fetchProfile - Iniciando busca do perfil para user_id:", userId);
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
     if (error) {
-      console.error("AuthContext: Error fetching profile:", error);
+      console.error("AuthContext: fetchProfile - Erro ao buscar perfil:", error);
       setProfile(null);
+      throw error; // Propagar o erro para o chamador
     } else {
-      console.log("AuthContext: Profile fetched:", data);
+      console.log("AuthContext: fetchProfile - Perfil encontrado:", data);
       setProfile(data as Profile);
+      return data as Profile; // Retornar o perfil para uso imediato
     }
   };
 
   useEffect(() => {
-    console.log("AuthContext: useEffect triggered");
+    console.log("AuthContext: useEffect - Iniciando monitoramento de estado de autenticação.");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, currentSession) => {
-        console.log("AuthContext: onAuthStateChange event:", _event, "session:", currentSession);
+        console.log("AuthContext: onAuthStateChange - Evento:", _event, "Sessão:", currentSession);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         if (currentSession?.user) {
           try {
             await fetchProfile(currentSession.user.id);
           } catch (error) {
-            console.error("AuthContext: Error in onAuthStateChange fetchProfile:", error);
+            console.error("AuthContext: onAuthStateChange - Erro ao buscar perfil após mudança de estado:", error);
             setProfile(null);
           }
         } else {
           setProfile(null);
         }
         setLoading(false);
-        console.log("AuthContext: onAuthStateChange finished, loading set to false.");
+        console.log("AuthContext: onAuthStateChange - Finalizado, loading setado para false.");
       }
     );
 
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      console.log("AuthContext: getSession resolved, initialSession:", initialSession);
+      console.log("AuthContext: getSession - Sessão inicial resolvida:", initialSession);
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       if (initialSession?.user) {
         try {
           await fetchProfile(initialSession.user.id);
         } catch (error) {
-          console.error("AuthContext: Error in getSession fetchProfile:", error);
+          console.error("AuthContext: getSession - Erro ao buscar perfil na sessão inicial:", error);
           setProfile(null);
         }
       }
       setLoading(false);
-      console.log("AuthContext: getSession finished, loading set to false.");
+      console.log("AuthContext: getSession - Finalizado, loading setado para false.");
     }).catch(error => {
-      console.error("AuthContext: Error in getSession:", error);
+      console.error("AuthContext: getSession - Erro ao obter sessão:", error);
       setLoading(false);
     });
 
     return () => {
-      console.log("AuthContext: Unsubscribing from auth state changes.");
+      console.log("AuthContext: useEffect - Desinscrevendo do monitoramento de estado de autenticação.");
       subscription.unsubscribe();
     };
   }, []);

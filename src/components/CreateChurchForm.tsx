@@ -86,14 +86,23 @@ export function CreateChurchForm() {
 
       return newChurch;
     },
-    onSuccess: () => {
+    onSuccess: async () => { // Adicionado async aqui para await o refetch
       toast({
         title: "Sucesso!",
         description: "Igreja criada e associada ao seu perfil.",
       });
+      console.log("CreateChurchForm: Mutation successful. Invalidating queries...");
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] }); // Invalidate profile to refetch church_id
       queryClient.invalidateQueries({ queryKey: ["church", user?.id] }); // Invalidate church data
-      console.log("CreateChurchForm: Mutation successful, navigating to dashboard.");
+      
+      // Forçar um refetch imediato do perfil para garantir que o AuthContext tenha o church_id atualizado
+      // Isso é crucial para que o AuthRedirect não redirecione de volta para create-church
+      if (user?.id) {
+        console.log("CreateChurchForm: Forçando refetch do perfil após criação da igreja.");
+        await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+      }
+
+      console.log("CreateChurchForm: Navigating to dashboard.");
       navigate("/app/dashboard"); // Redirect to dashboard
     },
     onError: (error: Error) => { // Tipagem do erro para melhor segurança
