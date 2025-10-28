@@ -39,8 +39,8 @@ export function useRole() {
   const isTesoureiro = hasRole('tesoureiro');
   const isPastor = hasRole('pastor');
   const isLider = hasRole('lider');
-  // Incluindo 'lider' como um papel privilegiado para acesso total conforme solicitado
-  const isPrivileged = hasAnyRole(['admin', 'tesoureiro', 'pastor', 'lider']);
+  // Temporariamente, qualquer usuário logado é considerado privilegiado para acesso interno.
+  const isPrivileged = !!user?.id;
 
   return {
     roles: roles || [],

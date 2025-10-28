@@ -8,6 +8,7 @@ import { Loader2, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "@/integrations/supabase/types";
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -23,6 +24,7 @@ const ROLES: AppRole[] = ["admin", "tesoureiro", "pastor", "lider"];
 
 export default function GerenciarUsuarios() {
   const queryClient = useQueryClient();
+  const { user, loading: authLoading } = useAuth(); // Get user from AuthContext
 
   const { data: profiles, isLoading } = useQuery({
     queryKey: ["admin-profiles"],
@@ -63,6 +65,7 @@ export default function GerenciarUsuarios() {
         roles: rolesMap.get(p.id) || [],
       })) as ProfileWithRoles[];
     },
+    enabled: !!user?.id, // Enable query only if user is logged in
   });
 
   const updateUserRoleMutation = useMutation({
@@ -83,6 +86,7 @@ export default function GerenciarUsuarios() {
     onSuccess: () => {
       toast.success("Cargo do usuário atualizado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
+      queryClient.invalidateQueries({ queryKey: ["user-roles", user?.id] }); // Invalidate current user's roles
     },
     onError: (error) => {
       toast.error(`Erro ao atualizar cargo: ${error.message}`);
@@ -92,6 +96,28 @@ export default function GerenciarUsuarios() {
   const getInitials = (name: string) => {
     return name.substring(0, 2).toUpperCase();
   };
+
+  if (authLoading || isLoading) { // Check authLoading as well
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // No longer blocking based on isPrivileged, only if user is not logged in
+  if (!user) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Acesso Negado</CardTitle>
+            <CardDescription>Você precisa estar logado para gerenciar usuários.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -106,11 +132,7 @@ export default function GerenciarUsuarios() {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
+          {profiles && profiles.length > 0 ? (
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
@@ -164,6 +186,10 @@ export default function GerenciarUsuarios() {
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>Nenhum usuário encontrado.</p>
             </div>
           )}
         </CardContent>

@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRole } from "@/hooks/useRole";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -30,7 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
-  DialogDescription, // Adicionado DialogDescription aqui
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -58,7 +57,6 @@ type MinistryFormValues = z.infer<typeof ministrySchema>;
 
 export default function GerenciarMinisterios() {
   const { user, profile, loading: authLoading } = useAuth();
-  const { isPrivileged, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -88,7 +86,7 @@ export default function GerenciarMinisterios() {
       if (error) throw error;
       return data as Ministry[];
     },
-    enabled: !!profile?.church_id && isPrivileged,
+    enabled: !!profile?.church_id && !!user?.id, // Enable query only if user is logged in and has a church
   });
 
   // Create/Update ministry mutation
@@ -178,7 +176,7 @@ export default function GerenciarMinisterios() {
     setDeleteDialogOpen(true);
   };
 
-  if (authLoading || roleLoading || ministriesLoading) {
+  if (authLoading || ministriesLoading) { // Check authLoading as well
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -186,13 +184,14 @@ export default function GerenciarMinisterios() {
     );
   }
 
-  if (!isPrivileged) {
+  // No longer blocking based on isPrivileged, only if user is not logged in
+  if (!user) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle>Acesso Negado</CardTitle>
-            <CardDescription>Você não tem permissão para gerenciar ministérios.</CardDescription>
+            <CardDescription>Você precisa estar logado para gerenciar ministérios.</CardDescription>
           </CardHeader>
         </Card>
       </div>

@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRole } from "@/hooks/useRole";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label"; // Keep Label for general use if needed, but FormLabel is preferred
+import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Loader2, Building2 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,7 +24,7 @@ type ChurchRow = Tables<'churches'>;
 
 const churchSchema = z.object({
   name: z.string().min(1, "Nome da igreja é obrigatório").max(100, "Nome muito longo"),
-  cnpj: z.string().optional().or(z.literal("")), // CNPJ can be optional
+  cnpj: z.string().optional().or(z.literal("")),
   address: z.string().optional().or(z.literal("")),
   city: z.string().optional().or(z.literal("")),
   state: z.string().max(2, "Estado deve ter 2 caracteres").optional().or(z.literal("")),
@@ -35,7 +34,6 @@ type ChurchFormValues = z.infer<typeof churchSchema>;
 
 export default function GerenciarIgreja() {
   const { user, profile, loading: authLoading } = useAuth();
-  const { isPrivileged, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
 
   const form = useForm<ChurchFormValues>({
@@ -63,7 +61,7 @@ export default function GerenciarIgreja() {
       if (error) throw error;
       return data as ChurchRow;
     },
-    enabled: !!profile?.church_id && isPrivileged, // Only fetch if user is privileged and has a church
+    enabled: !!profile?.church_id && !!user?.id, // Enable query only if user is logged in and has a church
   });
 
   // Update form with fetched church data
@@ -110,7 +108,7 @@ export default function GerenciarIgreja() {
     updateChurchMutation.mutate(values);
   };
 
-  if (authLoading || roleLoading || churchLoading) {
+  if (authLoading || churchLoading) { // Check authLoading as well
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -118,13 +116,14 @@ export default function GerenciarIgreja() {
     );
   }
 
-  if (!isPrivileged) {
+  // No longer blocking based on isPrivileged, only if user is not logged in
+  if (!user) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle>Acesso Negado</CardTitle>
-            <CardDescription>Você não tem permissão para gerenciar os dados da igreja.</CardDescription>
+            <CardDescription>Você precisa estar logado para gerenciar os dados da igreja.</CardDescription>
           </CardHeader>
         </Card>
       </div>
