@@ -26,7 +26,7 @@ const churchSchema = z.object({
 type ChurchFormValues = z.infer<typeof churchSchema>;
 
 export function CreateChurchForm() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, refetchProfile } = useAuth(); // Adicionado refetchProfile
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -86,7 +86,7 @@ export function CreateChurchForm() {
 
       return newChurch;
     },
-    onSuccess: async () => { // Adicionado async aqui para await o refetch
+    onSuccess: async () => {
       toast({
         title: "Sucesso!",
         description: "Igreja criada e associada ao seu perfil.",
@@ -95,21 +95,20 @@ export function CreateChurchForm() {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] }); // Invalidate profile to refetch church_id
       queryClient.invalidateQueries({ queryKey: ["church", user?.id] }); // Invalidate church data
       
-      // Forçar um refetch imediato do perfil para garantir que o AuthContext tenha o church_id atualizado
-      // Isso é crucial para que o AuthRedirect não redirecione de volta para create-church
+      // Forçar um refetch imediato do perfil usando a função do AuthContext
       if (user?.id) {
         console.log("CreateChurchForm: Forçando refetch do perfil após criação da igreja.");
-        await queryClient.refetchQueries({ queryKey: ["profile", user.id] });
+        await refetchProfile(); // Usar a função refetchProfile do contexto
       }
 
       console.log("CreateChurchForm: Navigating to dashboard.");
       navigate("/app/dashboard"); // Redirect to dashboard
     },
-    onError: (error: Error) => { // Tipagem do erro para melhor segurança
-      console.error("CreateChurchForm: Erro ao criar igreja (mutation):", error); // Log do objeto de erro completo
+    onError: (error: Error) => {
+      console.error("CreateChurchForm: Erro ao criar igreja (mutation):", error);
       toast({
         title: "Erro ao criar igreja",
-        description: error.message, // Usar a mensagem do erro lançado
+        description: error.message,
         variant: "destructive",
       });
     },
@@ -130,7 +129,7 @@ export function CreateChurchForm() {
 
   // If user already has a church_id, redirect them
   if (profile?.church_id) {
-    console.log("CreateChurchForm: User already has a church_id, redirecting to dashboard:", profile.church_id); // Added log
+    console.log("CreateChurchForm: User already has a church_id, redirecting to dashboard:", profile.church_id);
     navigate("/app/dashboard", { replace: true });
     return null;
   }
@@ -184,7 +183,7 @@ export function CreateChurchForm() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Endereço (Opcional)</FormLabel>
+                    <FormLabel>Endereço (Opcional)</Label>
                     <FormControl>
                       <Input placeholder="Rua, número, complemento" {...field} />
                     </FormControl>

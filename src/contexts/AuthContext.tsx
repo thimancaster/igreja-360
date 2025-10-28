@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react"; // Adicionado useCallback
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
+import { queryClient } from "@/lib/queryClient"; // Importar queryClient
 
 interface Profile extends Tables<'profiles'> {}
 
@@ -15,6 +16,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refetchProfile: () => Promise<void>; // Adicionado para permitir refetch manual
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,7 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string) => {
     console.log("AuthContext: fetchProfile - Iniciando busca do perfil para user_id:", userId);
     const { data, error } = await supabase
       .from("profiles")
@@ -36,13 +38,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error) {
       console.error("AuthContext: fetchProfile - Erro ao buscar perfil:", error);
       setProfile(null);
-      throw error; // Propagar o erro para o chamador
+      throw error;
     } else {
       console.log("AuthContext: fetchProfile - Perfil encontrado:", data);
       setProfile(data as Profile);
-      return data as Profile; // Retornar o perfil para uso imediato
+      return data as Profile;
     }
-  };
+  }, []);
+
+  const refetchProfile = useCallback(async () => {
+    if (user?.id) {
+      console.log("AuthContext: refetchProfile - Forçando atualização do perfil.");
+      await fetchProfile(user.id);
+    }
+  }, [user?.id, fetchProfile]);
 
   useEffect(() => {
     console.log("AuthContext: useEffect - Iniciando monitoramento de estado de autenticação.");
@@ -89,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("AuthContext: useEffect - Desinscrevendo do monitoramento de estado de autenticação.");
       subscription.unsubscribe();
     };
-  }, []);
+  }, [fetchProfile]); // Adicionado fetchProfile como dependência
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -168,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, refetchProfile }}>
       {children}
     </AuthContext.Provider>
   );
