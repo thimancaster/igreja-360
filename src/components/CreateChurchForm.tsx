@@ -44,6 +44,10 @@ export function CreateChurchForm() {
 
   const createChurchMutation = useMutation({
     mutationFn: async (data: ChurchFormValues) => {
+      console.log("CreateChurchForm: Attempting to create church.");
+      console.log("CreateChurchForm: User ID:", user?.id);
+      console.log("CreateChurchForm: Profile church_id before mutation:", profile?.church_id);
+
       if (!user?.id) throw new Error("Usuário não autenticado.");
 
       // 1. Create the church
@@ -62,10 +66,11 @@ export function CreateChurchForm() {
         .single();
 
       if (churchError) {
-        console.error("Supabase error creating church:", churchError); // Log detalhado
+        console.error("CreateChurchForm: Supabase error creating church:", churchError); // Log detalhado
         throw new Error(churchError.message || "Falha ao criar a igreja.");
       }
-      if (!newChurch) throw new Error("Falha ao criar a igreja: resposta vazia.");
+      if (!newChurch) throw new Error("CreateChurchForm: Falha ao criar a igreja: resposta vazia.");
+      console.log("CreateChurchForm: Church created successfully:", newChurch.id);
 
       // 2. Update the user's profile with the new church_id
       const { error: profileUpdateError } = await supabase
@@ -74,9 +79,10 @@ export function CreateChurchForm() {
         .eq("id", user.id);
 
       if (profileUpdateError) {
-        console.error("Supabase error updating profile with church_id:", profileUpdateError); // Log detalhado
+        console.error("CreateChurchForm: Supabase error updating profile with church_id:", profileUpdateError); // Log detalhado
         throw new Error(profileUpdateError.message || "Falha ao associar igreja ao perfil.");
       }
+      console.log("CreateChurchForm: Profile updated with church_id:", newChurch.id);
 
       return newChurch;
     },
@@ -87,10 +93,11 @@ export function CreateChurchForm() {
       });
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] }); // Invalidate profile to refetch church_id
       queryClient.invalidateQueries({ queryKey: ["church", user?.id] }); // Invalidate church data
+      console.log("CreateChurchForm: Mutation successful, navigating to dashboard.");
       navigate("/app/dashboard"); // Redirect to dashboard
     },
     onError: (error: Error) => { // Tipagem do erro para melhor segurança
-      console.error("Erro ao criar igreja (mutation):", error); // Log do objeto de erro completo
+      console.error("CreateChurchForm: Erro ao criar igreja (mutation):", error); // Log do objeto de erro completo
       toast({
         title: "Erro ao criar igreja",
         description: error.message, // Usar a mensagem do erro lançado
@@ -104,6 +111,7 @@ export function CreateChurchForm() {
   };
 
   if (authLoading) {
+    console.log("CreateChurchForm: Auth loading...");
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -113,10 +121,12 @@ export function CreateChurchForm() {
 
   // If user already has a church_id, redirect them
   if (profile?.church_id) {
+    console.log("CreateChurchForm: User already has a church_id, redirecting to dashboard:", profile.church_id); // Added log
     navigate("/app/dashboard", { replace: true });
     return null;
   }
 
+  console.log("CreateChurchForm: Rendering form. Current profile church_id:", profile?.church_id);
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="w-full max-w-md border-border/50 shadow-xl">
