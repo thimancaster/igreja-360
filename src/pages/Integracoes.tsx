@@ -116,7 +116,8 @@ export default function Integracoes() {
   };
 
   const handleSaveIntegration = async () => {
-    if (!selectedSheet || !churchId || !sheetUrl) { // selectedSheet agora é apenas um placeholder para o nome
+    // Alterado selectedSheet para sheetName e adicionado verificação de sheetId
+    if (!sheetName || !sheetId || !churchId || !sheetUrl) {
       toast({
         title: "Erro",
         description: "Dados insuficientes para criar a integração. Tente novamente.",
