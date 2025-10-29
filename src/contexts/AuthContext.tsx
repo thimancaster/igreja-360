@@ -1,10 +1,10 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react"; // Adicionado useCallback
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
-import { queryClient } from "@/lib/queryClient"; // Importar queryClient
+import { queryClient } from "@/lib/queryClient";
 
 interface Profile extends Tables<'profiles'> {}
 
@@ -16,7 +16,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
-  refetchProfile: () => Promise<void>; // Adicionado para permitir refetch manual
+  refetchProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -98,7 +98,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("AuthContext: useEffect - Desinscrevendo do monitoramento de estado de autenticação.");
       subscription.unsubscribe();
     };
-  }, [fetchProfile]); // Adicionado fetchProfile como dependência
+  }, [fetchProfile]);
+
+  // Novo useEffect para logar o perfil sempre que ele mudar
+  useEffect(() => {
+    console.log("AuthContext: Profile state updated:", profile);
+  }, [profile]);
 
   const signIn = async (email: string, password: string) => {
     try {

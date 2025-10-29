@@ -16,10 +16,16 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect } from "react"; // Importar useEffect
 
 export function AppHeader() {
   const { user, profile, signOut } = useAuth(); // Obter profile do AuthContext
   const { notifications, unreadCount, isLoading, markAsRead, markAllAsRead, isMarkingAsRead } = useNotifications();
+
+  // Novo useEffect para logar o perfil sempre que ele mudar
+  useEffect(() => {
+    console.log("AppHeader: Profile state updated:", profile);
+  }, [profile]);
 
   const getInitials = (name: string) => {
     return name.substring(0, 2).toUpperCase();

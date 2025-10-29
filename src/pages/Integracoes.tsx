@@ -26,7 +26,7 @@ const REQUIRED_FIELDS = [
 
 export default function Integracoes() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, profile } = useAuth(); // Obter profile do AuthContext
+  const { user, profile } = useAuth(); // Obter profile diretamente do AuthContext
   const {
     integrations,
     isLoading,
@@ -41,40 +41,14 @@ export default function Integracoes() {
   const [sheetName, setSheetName] = useState<string>("");
   const [sheetHeaders, setSheetHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  const [churchId, setChurchId] = useState<string | null>(null);
+  // Removido o estado local churchId, usaremos profile?.church_id diretamente
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
 
-  // Fetch user's church_id from profile
+  // Log do perfil e church_id sempre que o componente renderizar
   useEffect(() => {
-    console.log("Integracoes: useEffect - user.id changed:", user?.id);
-    const fetchChurchId = async () => {
-      if (!user?.id) {
-        console.log("Integracoes: No user ID, cannot fetch church_id.");
-        setChurchId(null);
-        return;
-      }
-      
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("church_id")
-        .eq("id", user.id)
-        .single();
+    console.log("Integracoes: Componente renderizado. Profile:", profile, "Church ID:", profile?.church_id);
+  }, [profile]);
 
-      if (!error && data) {
-        console.log("Integracoes: Fetched church_id:", data.church_id);
-        setChurchId(data.church_id);
-      } else {
-        console.error("Integracoes: Error fetching church_id or no church_id found:", error);
-        setChurchId(null);
-      }
-    };
-
-    fetchChurchId();
-  }, [user?.id, profile?.church_id]); // Adicionado profile?.church_id como dependência para reagir a mudanças no perfil
-
-  useEffect(() => {
-    console.log("Integracoes: Current churchId state:", churchId);
-  }, [churchId]);
 
   const extractSheetIdFromUrl = (url: string): string | null => {
     const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -97,8 +71,6 @@ export default function Integracoes() {
     }
     setIsProcessingSheet(true);
     try {
-      // Simulação de carregamento de cabeçalhos. Em um cenário real,
-      // você faria uma chamada para uma Edge Function que buscaria os cabeçalhos reais.
       const dummyHeaders = ["Descrição", "Valor", "Tipo", "Status", "Data de Vencimento", "Data de Pagamento", "Categoria", "Ministério", "Notas"];
       setSheetHeaders(dummyHeaders);
       toast({ title: "Cabeçalhos Carregados", description: "Cabeçalhos da planilha carregados com sucesso. Prossiga para o mapeamento.", variant: "success" });
@@ -112,9 +84,9 @@ export default function Integracoes() {
   };
 
   const handleSaveIntegration = async () => {
-    console.log("handleSaveIntegration: sheetName:", sheetName, "sheetId:", sheetId, "churchId:", churchId, "sheetUrl:", sheetUrl);
+    console.log("handleSaveIntegration: sheetName:", sheetName, "sheetId:", sheetId, "profile?.church_id:", profile?.church_id, "sheetUrl:", sheetUrl);
 
-    if (!sheetName || !sheetId || !churchId || !sheetUrl) {
+    if (!sheetName || !sheetId || !profile?.church_id || !sheetUrl) { // Usar profile?.church_id diretamente
       toast({
         title: "Erro",
         description: "Dados insuficientes para criar a integração. Certifique-se de que a URL da planilha é válida e que sua igreja está associada ao seu perfil.",
@@ -134,7 +106,7 @@ export default function Integracoes() {
     }
 
     await createIntegration.mutateAsync({
-      churchId,
+      churchId: profile.church_id, // Passar profile.church_id
       sheetId: sheetId,
       sheetName: sheetName,
       columnMapping,
@@ -149,7 +121,7 @@ export default function Integracoes() {
     setSheetHeaders([]);
   };
 
-  const isAddSheetButtonDisabled = !churchId;
+  const isAddSheetButtonDisabled = !profile?.church_id; // Desabilitar se profile.church_id for nulo
 
   return (
     <div className="container mx-auto p-6 space-y-6">
