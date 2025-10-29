@@ -100,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [fetchProfile]);
 
-  // Novo useEffect para logar o perfil sempre que ele mudar
   useEffect(() => {
     console.log("AuthContext: Profile state updated:", profile);
   }, [profile]);
@@ -130,10 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
+    console.log("AuthContext: signUp - Iniciando cadastro para email:", email, "fullName:", fullName);
     try {
       const redirectUrl = `${window.location.origin}/app/dashboard`;
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -144,17 +144,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("AuthContext: signUp - Erro do Supabase ao cadastrar:", error);
+        throw error;
+      }
+
+      console.log("AuthContext: signUp - Usuário Supabase criado com sucesso:", data.user?.id);
+      // Após o signup, o onAuthStateChange deve ser acionado e buscar o perfil.
+      // Não precisamos criar o perfil aqui manualmente se houver um trigger.
+      // Se não houver trigger, esta é a próxima etapa a ser investigada.
 
       toast({
         title: "Cadastro realizado!",
-        description: "Bem-vindo ao Igreja360.",
+        description: "Bem-vindo ao Igreja360. Verifique seu email para confirmar a conta.",
       });
       
     } catch (error: any) {
+      console.error("AuthContext: signUp - Erro geral no cadastro:", error);
       toast({
         title: "Erro no cadastro",
-        description: error.message || "Não foi possível criar sua conta.",
+        description: error.message || "Não foi possível criar sua conta. Tente novamente.",
         variant: "destructive",
       });
       throw error;
