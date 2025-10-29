@@ -24,7 +24,7 @@ type ChurchUpdateData = Pick<ChurchRow, 'name' | 'cnpj' | 'address' | 'city' | '
 
 export default function Configuracoes() {
   const { user, profile } = useAuth(); // Obter profile do AuthContext
-  const { isPrivileged, isLoading: roleLoading } = useRole();
+  const { isLoading: roleLoading } = useRole(); // isPrivileged não é mais usado para gating de UI aqui
   const queryClient = useQueryClient();
 
   // Fetch church data
@@ -41,7 +41,7 @@ export default function Configuracoes() {
       if (error) throw error;
       return data as ChurchRow;
     },
-    enabled: !!profile?.church_id && isPrivileged,
+    enabled: !!profile?.church_id && !!user?.id, // Habilitar se houver usuário e church_id
   });
 
   const [profileData, setProfileData] = useState<ProfileUpdateData>({
@@ -168,7 +168,7 @@ export default function Configuracoes() {
     updateNotificationSettingsMutation.mutate(notificationSettings);
   };
 
-  if (roleLoading) { // profileLoading não é mais necessário aqui, pois o profile já vem do AuthContext
+  if (roleLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -189,12 +189,11 @@ export default function Configuracoes() {
             <User className="h-4 w-4" />
             Perfil
           </TabsTrigger>
-          {isPrivileged && (
-            <TabsTrigger value="igreja" className="gap-2">
-              <Building2 className="h-4 w-4" />
-              Igreja
-            </TabsTrigger>
-          )}
+          {/* Removida a condição isPrivileged para a aba Igreja */}
+          <TabsTrigger value="igreja" className="gap-2">
+            <Building2 className="h-4 w-4" />
+            Igreja
+          </TabsTrigger>
           <TabsTrigger value="notificacoes" className="gap-2">
             <Bell className="h-4 w-4" />
             Notificações
@@ -265,102 +264,101 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
 
-        {isPrivileged && (
-          <TabsContent value="igreja">
-            <Card>
-              <CardHeader>
-                <CardTitle>Dados da Igreja</CardTitle>
-                <CardDescription>
-                  Gerencie as informações da sua igreja
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {churchLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        {/* Removida a condição isPrivileged para o conteúdo da aba Igreja */}
+        <TabsContent value="igreja">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados da Igreja</CardTitle>
+              <CardDescription>
+                Gerencie as informações da sua igreja
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {churchLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <form onSubmit={handleChurchSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="church_name">Nome da Igreja</Label>
+                    <Input
+                      id="church_name"
+                      value={churchData.name}
+                      onChange={(e) =>
+                        setChurchData({ ...churchData, name: e.target.value })
+                      }
+                      placeholder="Nome da igreja"
+                    />
                   </div>
-                ) : (
-                  <form onSubmit={handleChurchSubmit} className="space-y-4">
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cnpj">CNPJ</Label>
+                    <Input
+                      id="cnpj"
+                      value={churchData.cnpj}
+                      onChange={(e) =>
+                        setChurchData({ ...churchData, cnpj: e.target.value })
+                      }
+                      placeholder="00.000.000/0000-00"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="address">Endereço</Label>
+                    <Input
+                      id="address"
+                      value={churchData.address}
+                      onChange={(e) =>
+                        setChurchData({ ...churchData, address: e.target.value })
+                      }
+                      placeholder="Rua, número, complemento"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="church_name">Nome da Igreja</Label>
+                      <Label htmlFor="city">Cidade</Label>
                       <Input
-                        id="church_name"
-                        value={churchData.name}
+                        id="city"
+                        value={churchData.city}
                         onChange={(e) =>
-                          setChurchData({ ...churchData, name: e.target.value })
+                          setChurchData({ ...churchData, city: e.target.value })
                         }
-                        placeholder="Nome da igreja"
+                        placeholder="Cidade"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="cnpj">CNPJ</Label>
+                      <Label htmlFor="state">Estado</Label>
                       <Input
-                        id="cnpj"
-                        value={churchData.cnpj}
+                        id="state"
+                        value={churchData.state}
                         onChange={(e) =>
-                          setChurchData({ ...churchData, cnpj: e.target.value })
+                          setChurchData({ ...churchData, state: e.target.value })
                         }
-                        placeholder="00.000.000/0000-00"
+                        placeholder="UF"
+                        maxLength={2}
                       />
                     </div>
+                  </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="address">Endereço</Label>
-                      <Input
-                        id="address"
-                        value={churchData.address}
-                        onChange={(e) =>
-                          setChurchData({ ...churchData, address: e.target.value })
-                        }
-                        placeholder="Rua, número, complemento"
-                      />
-                    </div>
+                  <Separator />
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="city">Cidade</Label>
-                        <Input
-                          id="city"
-                          value={churchData.city}
-                          onChange={(e) =>
-                            setChurchData({ ...churchData, city: e.target.value })
-                          }
-                          placeholder="Cidade"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="state">Estado</Label>
-                        <Input
-                          id="state"
-                          value={churchData.state}
-                          onChange={(e) =>
-                            setChurchData({ ...churchData, state: e.target.value })
-                          }
-                          placeholder="UF"
-                          maxLength={2}
-                        />
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    <Button
-                      type="submit"
-                      disabled={updateChurchMutation.isPending}
-                    >
-                      {updateChurchMutation.isPending && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      Salvar Alterações
-                    </Button>
-                  </form>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+                  <Button
+                    type="submit"
+                    disabled={updateChurchMutation.isPending}
+                  >
+                    {updateChurchMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Salvar Alterações
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="notificacoes">
           <Card>

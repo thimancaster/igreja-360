@@ -176,7 +176,7 @@ export default function GerenciarMinisterios() {
     setDeleteDialogOpen(true);
   };
 
-  if (authLoading || ministriesLoading) { // Check authLoading as well
+  if (authLoading || ministriesLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -184,19 +184,8 @@ export default function GerenciarMinisterios() {
     );
   }
 
-  // No longer blocking based on isPrivileged, only if user is not logged in
-  if (!user) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-6">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle>Acesso Negado</CardTitle>
-            <CardDescription>Você precisa estar logado para gerenciar ministérios.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
+  // Removido o bloco `if (!user)` que exibia "Acesso Negado"
+  // A query já é desabilitada se não houver usuário.
 
   if (!profile?.church_id) {
     return (

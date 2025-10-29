@@ -8,7 +8,7 @@ import { Loader2, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "@/integrations/supabase/types";
-import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
+import { useAuth } from "@/contexts/AuthContext";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -24,7 +24,7 @@ const ROLES: AppRole[] = ["admin", "tesoureiro", "pastor", "lider"];
 
 export default function GerenciarUsuarios() {
   const queryClient = useQueryClient();
-  const { user, loading: authLoading } = useAuth(); // Get user from AuthContext
+  const { user, loading: authLoading } = useAuth();
 
   const { data: profiles, isLoading } = useQuery({
     queryKey: ["admin-profiles"],
@@ -97,7 +97,7 @@ export default function GerenciarUsuarios() {
     return name.substring(0, 2).toUpperCase();
   };
 
-  if (authLoading || isLoading) { // Check authLoading as well
+  if (authLoading || isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -105,19 +105,8 @@ export default function GerenciarUsuarios() {
     );
   }
 
-  // No longer blocking based on isPrivileged, only if user is not logged in
-  if (!user) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-6">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle>Acesso Negado</CardTitle>
-            <CardDescription>Você precisa estar logado para gerenciar usuários.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
-  }
+  // Removido o bloco `if (!user)` que exibia "Acesso Negado"
+  // A query já é desabilitada se não houver usuário, então a UI ficará vazia ou carregando.
 
   return (
     <div className="flex-1 space-y-6 p-6">
