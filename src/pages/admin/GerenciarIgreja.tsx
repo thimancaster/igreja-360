@@ -47,18 +47,35 @@ export default function GerenciarIgreja() {
     },
   });
 
+  // Adicionado log para depuração do estado do AuthContext
+  useEffect(() => {
+    console.log("GerenciarIgreja: useEffect - AuthContext state changed.");
+    console.log("  User:", user);
+    console.log("  Profile:", profile);
+    console.log("  Auth Loading:", authLoading);
+    console.log("  Church ID from Profile:", profile?.church_id);
+  }, [user, profile, authLoading]);
+
   // Fetch church data
   const { data: church, isLoading: churchLoading } = useQuery({
     queryKey: ["church", profile?.church_id],
     queryFn: async () => {
-      if (!profile?.church_id) return null;
+      console.log("GerenciarIgreja: useQuery - Fetching church data for church_id:", profile?.church_id);
+      if (!profile?.church_id) {
+        console.log("GerenciarIgreja: useQuery - No church_id in profile, skipping fetch.");
+        return null;
+      }
       const { data, error } = await supabase
         .from("churches")
         .select("*")
         .eq("id", profile.church_id)
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("GerenciarIgreja: useQuery - Error fetching church:", error);
+        throw error;
+      }
+      console.log("GerenciarIgreja: useQuery - Church data fetched:", data);
       return data as ChurchRow;
     },
     enabled: !!profile?.church_id && !!user?.id, // Enable query only if user is logged in and has a church
@@ -67,6 +84,7 @@ export default function GerenciarIgreja() {
   // Update form with fetched church data
   useEffect(() => {
     if (church) {
+      console.log("GerenciarIgreja: useEffect - Updating form with church data:", church);
       form.reset({
         name: church.name || "",
         cnpj: church.cnpj || "",
@@ -74,12 +92,22 @@ export default function GerenciarIgreja() {
         city: church.city || "",
         state: church.state || "",
       });
+    } else {
+      console.log("GerenciarIgreja: useEffect - No church data to update form, resetting form.");
+      form.reset({
+        name: "",
+        cnpj: "",
+        address: "",
+        city: "",
+        state: "",
+      });
     }
   }, [church, form]);
 
   // Update church mutation
   const updateChurchMutation = useMutation({
     mutationFn: async (data: ChurchFormValues) => {
+      console.log("GerenciarIgreja: updateChurchMutation - Attempting to update church for church_id:", profile?.church_id);
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
       
       const { error } = await supabase
@@ -93,7 +121,11 @@ export default function GerenciarIgreja() {
         })
         .eq("id", profile.church_id);
       
-      if (error) throw error;
+      if (error) {
+        console.error("GerenciarIgreja: updateChurchMutation - Error updating church:", error);
+        throw error;
+      }
+      console.log("GerenciarIgreja: updateChurchMutation - Church updated successfully.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["church", profile?.church_id] });
@@ -109,6 +141,7 @@ export default function GerenciarIgreja() {
   };
 
   if (authLoading || churchLoading) {
+    console.log("GerenciarIgreja: Displaying loading spinner (authLoading:", authLoading, "churchLoading:", churchLoading, ")");
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -116,10 +149,8 @@ export default function GerenciarIgreja() {
     );
   }
 
-  // Removido o bloco `if (!user)` que exibia "Acesso Negado"
-  // A query já é desabilitada se não houver usuário.
-
   if (!profile?.church_id) {
+    console.log("GerenciarIgreja: Displaying 'Nenhuma Igreja Associada' message. Profile:", profile);
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Card className="w-full max-w-md text-center">
@@ -132,6 +163,7 @@ export default function GerenciarIgreja() {
     );
   }
 
+  console.log("GerenciarIgreja: Rendering form with church data.");
   return (
     <div className="flex-1 space-y-6 p-6">
       <Card>
