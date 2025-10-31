@@ -42,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } else {
       console.log("AuthContext: fetchProfile - Perfil encontrado:", data);
       setProfile(data as Profile);
+      console.log("AuthContext: fetchProfile - Profile state set to:", data); // NOVO LOG AQUI
       return data as Profile;
     }
   }, []);
