@@ -10,8 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, User, Building2, Bell } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { Loader2, User, Building2 } from "lucide-react";
 import { Database, Tables, TablesUpdate } from "@/integrations/supabase/types";
 
 // Definir tipos para as linhas das tabelas e para os dados de atualização
@@ -19,7 +18,6 @@ type ProfileRow = Tables<'profiles'>;
 type ChurchRow = Tables<'churches'>;
 
 type ProfileUpdateData = Pick<ProfileRow, 'full_name' | 'avatar_url'>;
-type NotificationSettingsUpdateData = Pick<ProfileRow, 'email_transactions' | 'email_reports' | 'email_integrations'>;
 type ChurchUpdateData = Pick<ChurchRow, 'name' | 'cnpj' | 'address' | 'city' | 'state'>;
 
 export default function Configuracoes() {
@@ -57,23 +55,12 @@ export default function Configuracoes() {
     state: "",
   });
 
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettingsUpdateData>({
-    email_transactions: true,
-    email_reports: true,
-    email_integrations: true,
-  });
-
   // Update profile data when loaded
   useEffect(() => {
     if (profile) {
       setProfileData({
         full_name: profile.full_name || "",
         avatar_url: profile.avatar_url || "",
-      });
-      setNotificationSettings({
-        email_transactions: profile.email_transactions ?? true,
-        email_reports: profile.email_reports ?? true,
-        email_integrations: profile.email_integrations ?? true,
       });
     }
   }, [profile]);
@@ -133,26 +120,6 @@ export default function Configuracoes() {
     },
   });
 
-  // Update notification settings mutation
-  const updateNotificationSettingsMutation = useMutation({
-    mutationFn: async (data: NotificationSettingsUpdateData) => {
-      if (!user?.id) throw new Error("Usuário não autenticado");
-      
-      const { error } = await supabase
-        .from("profiles")
-        .update(data)
-        .eq("id", user.id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
-      toast.success("Preferências de notificação salvas!");
-    },
-    onError: (error) => {
-      toast.error("Erro ao salvar preferências de notificação: " + error.message);
-    },
-  });
 
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,10 +129,6 @@ export default function Configuracoes() {
   const handleChurchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateChurchMutation.mutate(churchData);
-  };
-
-  const handleNotificationSettingsSubmit = () => {
-    updateNotificationSettingsMutation.mutate(notificationSettings);
   };
 
   if (roleLoading) {
@@ -193,10 +156,6 @@ export default function Configuracoes() {
           <TabsTrigger value="igreja" className="gap-2">
             <Building2 className="h-4 w-4" />
             Igreja
-          </TabsTrigger>
-          <TabsTrigger value="notificacoes" className="gap-2">
-            <Bell className="h-4 w-4" />
-            Notificações
           </TabsTrigger>
         </TabsList>
 
@@ -356,88 +315,6 @@ export default function Configuracoes() {
                   </Button>
                 </form>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="notificacoes">
-          <Card>
-            <CardHeader>
-              <CardTitle>Preferências de Notificações</CardTitle>
-              <CardDescription>
-                Configure como deseja receber notificações
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email_transactions">Transações</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receber notificações sobre novas transações
-                  </p>
-                </div>
-                <Switch
-                  id="email_transactions"
-                  checked={notificationSettings.email_transactions}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings({
-                      ...notificationSettings,
-                      email_transactions: checked,
-                    })
-                  }
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email_reports">Relatórios</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receber relatórios periódicos por email
-                  </p>
-                </div>
-                <Switch
-                  id="email_reports"
-                  checked={notificationSettings.email_reports}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings({
-                      ...notificationSettings,
-                      email_reports: checked,
-                    })
-                  }
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="email_integrations">Integrações</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Notificações sobre sincronização de dados
-                  </p>
-                </div>
-                <Switch
-                  id="email_integrations"
-                  checked={notificationSettings.email_integrations}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings({
-                      ...notificationSettings,
-                      email_integrations: checked,
-                    })
-                  }
-                />
-              </div>
-
-              <Separator />
-
-              <Button onClick={handleNotificationSettingsSubmit} disabled={updateNotificationSettingsMutation.isPending}>
-                {updateNotificationSettingsMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Salvar Preferências
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>

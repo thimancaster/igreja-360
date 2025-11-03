@@ -4,17 +4,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Database } from "@/integrations/supabase/types";
 
-// Atualizando a interface para refletir o novo esquema do banco de dados
+// Interface alinhada com o schema do banco de dados google_integrations
 export interface GoogleIntegration {
   id: string;
-  sheet_id: string;
-  sheet_name: string;
+  church_id: string;
+  user_id: string;
   column_mapping: Record<string, string>;
   last_sync_at: string | null;
   created_at: string;
-  sheet_url: string | null; // Adicionando a nova coluna
-  user_id: string; // Adicionando user_id para consistência
-  church_id: string; // Adicionando church_id para consistência
+  updated_at: string;
+  refresh_token: string;
+  access_token: string;
+  sheet_id: string;
+  sheet_name: string;
 }
 
 // Removendo a interface GoogleSheet, pois não listaremos mais planilhas via API do Drive
@@ -54,7 +56,8 @@ export const useIntegrations = () => {
       sheetId: string;
       sheetName: string;
       columnMapping: Record<string, string>;
-      sheetUrl: string; // Agora aceita a URL da planilha
+      refreshToken: string;
+      accessToken: string;
     }) => {
       const { error } = await supabase.from("google_integrations").insert({
         user_id: user?.id,
@@ -62,7 +65,8 @@ export const useIntegrations = () => {
         sheet_id: params.sheetId,
         sheet_name: params.sheetName,
         column_mapping: params.columnMapping,
-        sheet_url: params.sheetUrl, // Usando a URL da planilha
+        refresh_token: params.refreshToken,
+        access_token: params.accessToken,
       });
 
       if (error) throw error;
