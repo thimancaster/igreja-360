@@ -63,10 +63,10 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
-          state: string | null
-          updated_at: string | null
           owner_user_id: string | null
+          state: string | null
           status: string | null
+          updated_at: string | null
         }
         Insert: {
           address?: string | null
@@ -75,10 +75,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           name: string
-          state?: string | null
-          updated_at?: string | null
           owner_user_id?: string | null
+          state?: string | null
           status?: string | null
+          updated_at?: string | null
         }
         Update: {
           address?: string | null
@@ -87,10 +87,10 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
-          state?: string | null
-          updated_at?: string | null
           owner_user_id?: string | null
+          state?: string | null
           status?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -137,40 +137,43 @@ export type Database = {
       }
       google_integrations: {
         Row: {
+          access_token: string
           church_id: string
           column_mapping: Json
           created_at: string | null
           id: string
           last_sync_at: string | null
+          refresh_token: string
           sheet_id: string
           sheet_name: string
           updated_at: string | null
           user_id: string
-          sheet_url: string | null
         }
         Insert: {
+          access_token: string
           church_id: string
           column_mapping: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
+          refresh_token: string
           sheet_id: string
           sheet_name: string
           updated_at?: string | null
           user_id: string
-          sheet_url?: string | null
         }
         Update: {
+          access_token?: string
           church_id?: string
           column_mapping?: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
+          refresh_token?: string
           sheet_id?: string
           sheet_name?: string
           updated_at?: string | null
           user_id?: string
-          sheet_url?: string | null
         }
         Relationships: [
           {
@@ -260,34 +263,25 @@ export type Database = {
           avatar_url: string | null
           church_id: string | null
           created_at: string | null
-          full_name: string | null /* Renomeado de first_name e last_name removido */
+          full_name: string | null
           id: string
           updated_at: string | null
-          email_transactions: boolean | null
-          email_reports: boolean | null
-          email_integrations: boolean | null
         }
         Insert: {
           avatar_url?: string | null
           church_id?: string | null
           created_at?: string | null
-          full_name?: string | null /* Renomeado de first_name e last_name removido */
+          full_name?: string | null
           id: string
           updated_at?: string | null
-          email_transactions?: boolean | null
-          email_reports?: boolean | null
-          email_integrations?: boolean | null
         }
         Update: {
           avatar_url?: string | null
           church_id?: string | null
           created_at?: string | null
-          full_name?: string | null /* Renomeado de first_name e last_name removido */
+          full_name?: string | null
           id?: string
           updated_at?: string | null
-          email_transactions?: boolean | null
-          email_reports?: boolean | null
-          email_integrations?: boolean | null
         }
         Relationships: [
           {
@@ -425,38 +419,6 @@ export type Database = {
           },
         ]
       }
-      user_credentials: {
-        Row: {
-          user_id: string;
-          provider: string;
-          access_token: string;
-          refresh_token: string | null;
-          updated_at: string | null;
-        };
-        Insert: {
-          user_id: string;
-          provider?: string;
-          access_token: string;
-          refresh_token?: string | null;
-          updated_at?: string | null;
-        };
-        Update: {
-          user_id?: string;
-          provider?: string;
-          access_token?: string;
-          refresh_token?: string | null;
-          updated_at?: string | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "user_credentials_user_id_fkey";
-            columns: ["user_id"];
-            isOneToOne: true;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       user_roles: {
         Row: {
           created_at: string | null
@@ -483,10 +445,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      get_user_church_id: {
-        Args: { _user_id: string }
-        Returns: string
-      }
+      get_user_church_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
