@@ -137,38 +137,41 @@ export type Database = {
       }
       google_integrations: {
         Row: {
+          access_token: string | null
           church_id: string
           column_mapping: Json
           created_at: string | null
           id: string
           last_sync_at: string | null
+          refresh_token: string | null
           sheet_id: string
           sheet_name: string
-          sheet_url: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          access_token?: string | null
           church_id: string
           column_mapping: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
+          refresh_token?: string | null
           sheet_id: string
           sheet_name: string
-          sheet_url?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          access_token?: string | null
           church_id?: string
           column_mapping?: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
+          refresh_token?: string | null
           sheet_id?: string
           sheet_name?: string
-          sheet_url?: string | null
           updated_at?: string | null
           user_id?: string
         }
