@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
-import { Database } from "@/integrations/supabase/types";
 
+// Interface that matches the current database schema after migration
 export interface GoogleIntegration {
   id: string;
   church_id: string;
@@ -38,7 +38,7 @@ export const useIntegrations = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as GoogleIntegration[];
+      return data as unknown as GoogleIntegration[];
     },
     enabled: !!user?.id,
   });
@@ -56,14 +56,16 @@ export const useIntegrations = () => {
       columnMapping: Record<string, string>;
       sheetUrl: string;
     }) => {
-      const { error } = await supabase.from("google_integrations").insert({
+      const insertData: any = {
         user_id: user?.id,
         church_id: params.churchId,
         sheet_id: params.sheetId,
         sheet_name: params.sheetName,
         column_mapping: params.columnMapping,
         sheet_url: params.sheetUrl,
-      });
+      };
+      
+      const { error } = await supabase.from("google_integrations").insert(insertData);
 
       if (error) throw error;
     },
