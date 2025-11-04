@@ -44,10 +44,6 @@ export default function Integracoes() {
   // Removido o estado local churchId, usaremos profile?.church_id diretamente
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
 
-  // Log do perfil e church_id sempre que o componente renderizar
-  useEffect(() => {
-    console.log("Integracoes: Componente renderizado. Profile:", profile, "Church ID:", profile?.church_id);
-  }, [profile]);
 
 
   const extractSheetIdFromUrl = (url: string): string | null => {
@@ -76,7 +72,6 @@ export default function Integracoes() {
       toast({ title: "Cabeçalhos Carregados", description: "Cabeçalhos da planilha carregados com sucesso. Prossiga para o mapeamento.", variant: "success" });
 
     } catch (error) {
-      console.error("Erro ao carregar cabeçalhos da planilha:", error);
       toast({ title: "Erro", description: "Não foi possível carregar os cabeçalhos da planilha. Verifique a URL e as permissões de acesso público.", variant: "destructive" });
     } finally {
       setIsProcessingSheet(false);
@@ -84,9 +79,7 @@ export default function Integracoes() {
   };
 
   const handleSaveIntegration = async () => {
-    console.log("handleSaveIntegration: sheetName:", sheetName, "sheetId:", sheetId, "profile?.church_id:", profile?.church_id, "sheetUrl:", sheetUrl);
-
-    if (!sheetName || !sheetId || !profile?.church_id || !sheetUrl) { // Usar profile?.church_id diretamente
+    if (!sheetName || !sheetId || !profile?.church_id || !sheetUrl) {
       toast({
         title: "Erro",
         description: "Dados insuficientes para criar a integração. Certifique-se de que a URL da planilha é válida e que sua igreja está associada ao seu perfil.",

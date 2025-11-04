@@ -29,81 +29,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
 
   const fetchProfile = useCallback(async (userId: string) => {
-    console.log("AuthContext: fetchProfile - Iniciando busca do perfil para user_id:", userId);
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
     if (error) {
-      console.error("AuthContext: fetchProfile - Erro ao buscar perfil:", error);
       setProfile(null);
       throw error;
     } else {
-      console.log("AuthContext: fetchProfile - Perfil encontrado:", data);
       setProfile(data as Profile);
-      console.log("AuthContext: fetchProfile - Profile state set to:", data); // NOVO LOG AQUI
       return data as Profile;
     }
   }, []);
 
   const refetchProfile = useCallback(async () => {
     if (user?.id) {
-      console.log("AuthContext: refetchProfile - Forçando atualização do perfil.");
       await fetchProfile(user.id);
     }
   }, [user?.id, fetchProfile]);
 
   useEffect(() => {
-    console.log("AuthContext: useEffect - Iniciando monitoramento de estado de autenticação.");
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, currentSession) => {
-        console.log("AuthContext: onAuthStateChange - Evento:", _event, "Sessão:", currentSession);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         if (currentSession?.user) {
           try {
             await fetchProfile(currentSession.user.id);
           } catch (error) {
-            console.error("AuthContext: onAuthStateChange - Erro ao buscar perfil após mudança de estado:", error);
             setProfile(null);
           }
         } else {
           setProfile(null);
         }
         setLoading(false);
-        console.log("AuthContext: onAuthStateChange - Finalizado, loading setado para false.");
       }
     );
 
     supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      console.log("AuthContext: getSession - Sessão inicial resolvida:", initialSession);
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       if (initialSession?.user) {
         try {
           await fetchProfile(initialSession.user.id);
         } catch (error) {
-          console.error("AuthContext: getSession - Erro ao buscar perfil na sessão inicial:", error);
           setProfile(null);
         }
       }
       setLoading(false);
-      console.log("AuthContext: getSession - Finalizado, loading setado para false.");
-    }).catch(error => {
-      console.error("AuthContext: getSession - Erro ao obter sessão:", error);
+    }).catch(() => {
       setLoading(false);
     });
 
     return () => {
-      console.log("AuthContext: useEffect - Desinscrevendo do monitoramento de estado de autenticação.");
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
 
-  useEffect(() => {
-    console.log("AuthContext: Profile state updated:", profile);
-  }, [profile]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -130,7 +113,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
-    console.log("AuthContext: signUp - Iniciando cadastro para email:", email, "fullName:", fullName);
     try {
       const redirectUrl = `${window.location.origin}/app/dashboard`;
       
@@ -146,14 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (error) {
-        console.error("AuthContext: signUp - Erro do Supabase ao cadastrar:", error);
         throw error;
       }
-
-      console.log("AuthContext: signUp - Usuário Supabase criado com sucesso:", data.user?.id);
-      // Após o signup, o onAuthStateChange deve ser acionado e buscar o perfil.
-      // Não precisamos criar o perfil aqui manualmente se houver um trigger.
-      // Se não houver trigger, esta é a próxima etapa a ser investigada.
 
       toast({
         title: "Cadastro realizado!",
@@ -161,7 +137,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
     } catch (error: any) {
-      console.error("AuthContext: signUp - Erro geral no cadastro:", error);
       toast({
         title: "Erro no cadastro",
         description: error.message || "Não foi possível criar sua conta. Tente novamente.",

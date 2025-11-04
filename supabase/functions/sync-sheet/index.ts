@@ -1,10 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Validation schema for transaction data
+const transactionSchema = z.object({
+  church_id: z.string().uuid(),
+  created_by: z.string().uuid(),
+  origin: z.string().max(100),
+  description: z.string().max(500).trim(),
+  amount: z.number().finite().safe(),
+  type: z.enum(['Receita', 'Despesa']),
+  status: z.enum(['Pendente', 'Pago', 'Vencido']),
+  due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+  category_id: z.string().uuid().nullable().optional(),
+  ministry_id: z.string().uuid().nullable().optional(),
+});
+
+const RATE_LIMIT_MINUTES = 5;
+const MAX_ROWS_PER_SYNC = 1000;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -27,13 +47,14 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const googleApiKey = Deno.env.get('GOOGLE_SHEETS_API_KEY')!; // Obter a chave de API do Google Sheets
+    const googleApiKey = Deno.env.get('GOOGLE_SHEETS_API_KEY');
 
     if (!googleApiKey) {
+      console.error('GOOGLE_SHEETS_API_KEY not configured');
       return new Response(
-        JSON.stringify({ error: 'Google Sheets API Key is not configured.' }),
+        JSON.stringify({ error: 'Service temporarily unavailable' }),
         {
-          status: 500,
+          status: 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
@@ -55,7 +76,7 @@ serve(async (req) => {
       );
     }
 
-    // Get integration details, including sheet_url and column_mapping
+    // Get integration details
     const { data: integration, error: integrationError } = await supabase
       .from('google_integrations')
       .select('*')
@@ -74,7 +95,7 @@ serve(async (req) => {
 
     // SECURITY: Verify user owns this integration
     if (integration.user_id !== user.id) {
-      console.warn(`Unauthorized sync attempt: user ${user.id} tried to sync integration ${integrationId} owned by ${integration.user_id}`);
+      console.warn(`Unauthorized sync attempt: user ${user.id} tried to sync integration ${integrationId}`);
       return new Response(
         JSON.stringify({ error: 'Forbidden: You do not own this integration' }),
         {
@@ -82,6 +103,31 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+
+    // RATE LIMITING: Check last sync time
+    if (integration.last_sync_at) {
+      const lastSync = new Date(integration.last_sync_at);
+      const now = new Date();
+      const minutesSinceLastSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
+      
+      if (minutesSinceLastSync < RATE_LIMIT_MINUTES) {
+        const retryAfter = Math.ceil(RATE_LIMIT_MINUTES - minutesSinceLastSync);
+        return new Response(
+          JSON.stringify({ 
+            error: `Rate limit exceeded. Please wait ${retryAfter} minutes before syncing again.`,
+            retryAfter: retryAfter * 60
+          }),
+          {
+            status: 429,
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'Retry-After': String(retryAfter * 60)
+            },
+          }
+        );
+      }
     }
 
     if (!integration.sheet_url) {
@@ -94,7 +140,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Starting sync for sheet: ${integration.sheet_name} from URL: ${integration.sheet_url}`);
+    console.log(`Starting sync for integration ${integrationId} by user ${user.id}`);
 
     // Extract sheet_id from sheet_url
     const sheetIdMatch = integration.sheet_url.match(/\/d\/([a-zA-Z0-9_-]+)/);
@@ -122,7 +168,8 @@ serve(async (req) => {
 
     if (!sheetResponse.ok) {
       const errorData = await sheetResponse.text();
-      throw new Error(`Failed to fetch sheet data: ${errorData}`);
+      console.error('Google Sheets API error:', errorData);
+      throw new Error('Failed to fetch sheet data from Google Sheets API');
     }
 
     const sheetData = await sheetResponse.json();
@@ -132,15 +179,31 @@ serve(async (req) => {
       throw new Error('Sheet is empty or no data found.');
     }
 
+    // Enforce max rows limit
+    if (rows.length > MAX_ROWS_PER_SYNC + 1) {
+      return new Response(
+        JSON.stringify({ 
+          error: `Sheet exceeds maximum of ${MAX_ROWS_PER_SYNC} rows. Please reduce sheet size or split into multiple sheets.`
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // First row contains headers
     const headers = rows[0];
     const dataRows = rows.slice(1);
 
-    const mapping = integration.column_mapping as Record<string, string>; // Cast to specific type
+    const mapping = integration.column_mapping as Record<string, string>;
 
-    // Transform data rows to transactions
+    // Transform and validate data rows
     const transactions = [];
-    for (const row of dataRows) {
+    const validationErrors = [];
+    
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i];
       const transaction: any = {
         church_id: integration.church_id,
         created_by: integration.user_id,
@@ -155,13 +218,16 @@ serve(async (req) => {
 
           // Special handling for specific fields
           if (field === 'amount') {
-            // Remove currency symbols and convert to number
-            value = parseFloat(String(value).replace(/[^\d.-]/g, ''));
+            const cleanValue = String(value).replace(/[^\d.-]/g, '');
+            value = parseFloat(cleanValue);
+            if (isNaN(value)) {
+              validationErrors.push(`Row ${i + 2}: Invalid amount value`);
+              continue;
+            }
           } else if (field === 'due_date' || field === 'payment_date') {
-            // Convert date formats (assuming DD/MM/YYYY)
             const parts = String(value).split('/');
             if (parts.length === 3) {
-              value = `${parts[2]}-${parts[1]}-${parts[0]}`; // Convert to YYYY-MM-DD
+              value = `${parts[2]}-${parts[1]}-${parts[0]}`;
             }
           }
 
@@ -177,17 +243,41 @@ serve(async (req) => {
         transaction.type = transaction.amount > 0 ? 'Receita' : 'Despesa';
       }
 
-      transactions.push(transaction);
+      // Validate transaction
+      try {
+        const validated = transactionSchema.parse(transaction);
+        transactions.push(validated);
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          validationErrors.push(`Row ${i + 2}: ${error.errors.map(e => e.message).join(', ')}`);
+        }
+      }
     }
 
-    console.log(`Prepared ${transactions.length} transactions for import`);
+    if (validationErrors.length > 0) {
+      console.warn('Validation errors:', validationErrors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Validation failed for some rows',
+          validationErrors: validationErrors.slice(0, 10),
+          totalErrors: validationErrors.length
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
-    // Insert transactions (using upsert if needed)
+    console.log(`Validated ${transactions.length} transactions for import`);
+
+    // Insert transactions
     const { error: insertError } = await supabase
       .from('transactions')
       .insert(transactions);
 
     if (insertError) {
+      console.error('Insert error:', insertError);
       throw new Error(`Failed to insert transactions: ${insertError.message}`);
     }
 
@@ -197,7 +287,7 @@ serve(async (req) => {
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', integrationId);
 
-    console.log('Sync completed successfully');
+    console.log(`Sync completed: ${transactions.length} records imported`);
 
     return new Response(
       JSON.stringify({ 
@@ -212,7 +302,7 @@ serve(async (req) => {
     console.error('Error in sync-sheet:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'Sync operation failed' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
