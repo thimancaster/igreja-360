@@ -97,7 +97,7 @@ export function CreateChurchForm() {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["church", user?.id] });
 
-      navigate("/app/dashboard");
+      navigate("/app/church-confirmation");
     },
     onError: (error: Error) => {
       toast({

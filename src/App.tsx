@@ -22,6 +22,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import CreateChurchPage from "./pages/CreateChurch";
+import ChurchConfirmation from "./pages/ChurchConfirmation";
 import { queryClient } from "./lib/queryClient";
 
 const App = () => (
@@ -60,6 +61,7 @@ const App = () => (
                           <Route path="admin/igreja" element={<GerenciarIgreja />} /> {/* Nova rota */}
                           <Route path="configuracoes" element={<Configuracoes />} />
                           <Route path="create-church" element={<CreateChurchPage />} />
+                          <Route path="church-confirmation" element={<ChurchConfirmation />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
                       </div>
