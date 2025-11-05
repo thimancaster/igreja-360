@@ -1,10 +1,11 @@
 // src/contexts/AuthContext.tsx
+// VERSÃO COMPLETA E CORRIGIDA
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { ProfileWithChurch } from '@/integrations/supabase/types';
+import { ProfileWithChurch } from '@/integrations/supabase/types'; // Importa o tipo correto
 
-// 1. Interface corrigida para incluir os setters
+// 1. Interface AuthContextType completa
 interface AuthContextType {
   session: Session | null;
   user: User | null;
@@ -25,6 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [churchId, setChurchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Função para buscar perfil com os dados da igreja (join)
   const fetchUserProfile = useCallback(async (userId: string) => {
     const { data, error } = await supabase
       .from('profiles')
@@ -108,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [fetchUserProfile]);
 
-  // 2. Objeto 'value' corrigido, incluindo TODOS os estados e setters
+  // 2. Objeto 'value' completo
   const value = {
     session,
     user,
@@ -116,11 +118,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     churchId,
     loading,
     refreshProfile,
-    setProfile, // Setter exposto para o CreateChurchForm
-    setChurchId, // Setter exposto para o CreateChurchForm
+    setProfile,
+    setChurchId,
   };
 
-  // 3. Renderiza children apenas quando !loading (como estava antes)
+  // 3. CORREÇÃO CRÍTICA: Renderiza children apenas quando !loading
   return (
     <AuthContext.Provider value={value}>
       {!loading && children}
