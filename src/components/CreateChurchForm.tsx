@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Tables } from "@/integrations/supabase/types";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Building2 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+type Profile = Tables<'profiles'>;
 
 const churchSchema = z.object({
   name: z.string().min(1, "Nome da igreja é obrigatório").max(100, "Nome muito longo"),
@@ -26,7 +29,7 @@ const churchSchema = z.object({
 type ChurchFormValues = z.infer<typeof churchSchema>;
 
 export function CreateChurchForm() {
-  const { user, profile, loading: authLoading, refetchProfile } = useAuth();
+  const { user, profile, loading: authLoading, setProfile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -67,28 +70,32 @@ export function CreateChurchForm() {
       if (!newChurch) throw new Error("Falha ao criar a igreja: resposta vazia.");
 
       // 2. Update the user's profile with the new church_id
-      const { error: profileUpdateError } = await supabase
+      const { data: updatedProfile, error: profileUpdateError } = await supabase
         .from("profiles")
         .update({ church_id: newChurch.id })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .select()
+        .single();
 
       if (profileUpdateError) {
         throw new Error(profileUpdateError.message || "Falha ao associar igreja ao perfil.");
       }
 
-      return newChurch;
+      return { church: newChurch, profile: updatedProfile };
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      // Update profile state immediately to trigger redirect
+      if (data.profile) {
+        setProfile(data.profile as Profile);
+      }
+      
       toast({
         title: "Sucesso!",
         description: "Igreja criada e associada ao seu perfil.",
       });
+      
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["church", user?.id] });
-      
-      if (user?.id) {
-        await refetchProfile();
-      }
 
       navigate("/app/dashboard");
     },
