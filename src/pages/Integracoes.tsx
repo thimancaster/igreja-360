@@ -98,12 +98,27 @@ export default function Integracoes() {
       return;
     }
 
+    // OAuth tokens will be received from URL params after OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const accessToken = urlParams.get('access_token');
+    const refreshToken = urlParams.get('refresh_token');
+
+    if (!accessToken) {
+      toast({
+        title: "Erro de OAuth",
+        description: "Tokens de acesso não encontrados. Por favor, autentique novamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     await createIntegration.mutateAsync({
-      churchId: profile.church_id, // Passar profile.church_id
+      churchId: profile.church_id,
       sheetId: sheetId,
       sheetName: sheetName,
       columnMapping,
-      sheetUrl,
+      accessToken: accessToken,
+      refreshToken: refreshToken || '',
     });
 
     setShowMappingDialog(false);
@@ -173,7 +188,12 @@ export default function Integracoes() {
                     <TableRow key={integration.id}>
                       <TableCell className="font-medium">{integration.sheet_name}</TableCell>
                       <TableCell>
-                        <a href={integration.sheet_url || "#"} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                        <a 
+                          href={`https://docs.google.com/spreadsheets/d/${integration.sheet_id}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-primary hover:underline flex items-center gap-1"
+                        >
                           <LinkIcon className="h-4 w-4" />
                           Abrir Planilha
                         </a>

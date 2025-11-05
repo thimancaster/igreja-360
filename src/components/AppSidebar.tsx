@@ -12,20 +12,28 @@ import {
   SidebarHeader,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { useRole } from "@/hooks/useRole";
 
-const menuItems = [
+const baseMenuItems = [
   { title: "Dashboard", url: "/app/dashboard", icon: LayoutDashboard },
   { title: "Transações", url: "/app/transacoes", icon: ArrowLeftRight },
   { title: "Importação", url: "/app/importacao", icon: Upload },
   { title: "Integrações", url: "/app/integracoes", icon: Sheet },
   { title: "Relatórios", url: "/app/relatorios", icon: FileText },
-  { title: "Administração", url: "/app/admin", icon: Users },
   { title: "Configurações", url: "/app/configuracoes", icon: Settings },
 ];
+
+const adminMenuItem = { title: "Administração", url: "/app/admin", icon: Users };
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const { isAdmin, isLoading } = useRole();
+
+  // Add admin menu item only if user is admin
+  const menuItems = isAdmin 
+    ? [...baseMenuItems.slice(0, 5), adminMenuItem, baseMenuItems[5]]
+    : baseMenuItems;
 
   return (
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">

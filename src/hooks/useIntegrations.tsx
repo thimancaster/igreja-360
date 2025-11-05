@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
-// Interface that matches the current database schema after migration
+// Interface that matches the current database schema with OAuth 2.0
 export interface GoogleIntegration {
   id: string;
   church_id: string;
@@ -14,7 +14,8 @@ export interface GoogleIntegration {
   updated_at: string;
   sheet_id: string;
   sheet_name: string;
-  sheet_url: string | null;
+  access_token: string | null;
+  refresh_token: string | null;
 }
 
 // Removendo a interface GoogleSheet, pois não listaremos mais planilhas via API do Drive
@@ -54,7 +55,8 @@ export const useIntegrations = () => {
       sheetId: string;
       sheetName: string;
       columnMapping: Record<string, string>;
-      sheetUrl: string;
+      accessToken: string;
+      refreshToken: string;
     }) => {
       const insertData: any = {
         user_id: user?.id,
@@ -62,7 +64,8 @@ export const useIntegrations = () => {
         sheet_id: params.sheetId,
         sheet_name: params.sheetName,
         column_mapping: params.columnMapping,
-        sheet_url: params.sheetUrl,
+        access_token: params.accessToken,
+        refresh_token: params.refreshToken,
       };
       
       const { error } = await supabase.from("google_integrations").insert(insertData);

@@ -99,8 +99,9 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in google-auth-callback:', error);
     
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const appUrl = Deno.env.get('APP_BASE_URL') || Deno.env.get('SUPABASE_URL');
-    const errorUrl = `${appUrl}/app/integracoes?oauth_error=${encodeURIComponent(error.message)}`;
+    const errorUrl = `${appUrl}/app/integracoes?oauth_error=${encodeURIComponent(errorMessage)}`;
 
     return new Response(null, {
       status: 302,

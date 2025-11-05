@@ -7,6 +7,7 @@ type AppRole = 'admin' | 'tesoureiro' | 'pastor' | 'lider' | 'user';
 export function useRole() {
   const { user } = useAuth();
 
+  // Fetch all roles for the user
   const { data: roles, isLoading } = useQuery({
     queryKey: ["user-roles", user?.id],
     queryFn: async () => {
@@ -18,6 +19,7 @@ export function useRole() {
         .eq("user_id", user.id);
 
       if (error) {
+        console.error('Error fetching user roles:', error);
         return [];
       }
 
