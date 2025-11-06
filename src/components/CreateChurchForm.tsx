@@ -20,7 +20,8 @@ type Profile = Tables<'profiles'>;
 
 const churchSchema = z.object({
   name: z.string().min(1, "Nome da igreja é obrigatório").max(100, "Nome muito longo"),
-  cnpj: z.string().optional(), // CNPJ can be optional
+  // Transforma string vazia em null para evitar violação de unicidade em CNPJs vazios
+  cnpj: z.string().optional().transform(e => e === "" ? null : e),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
@@ -54,7 +55,7 @@ export function CreateChurchForm() {
         .from("churches")
         .insert({
           name: data.name,
-          cnpj: data.cnpj || null,
+          cnpj: data.cnpj, // Agora o schema já garante que será string ou null
           address: data.address || null,
           city: data.city || null,
           state: data.state || null,
@@ -65,7 +66,7 @@ export function CreateChurchForm() {
         .single();
 
       if (churchError) {
-        throw new Error(churchError.message || "Falha ao criar a igreja.");
+        throw churchError; // Lança o erro para ser capturado no onError
       }
       if (!newChurch) throw new Error("Falha ao criar a igreja: resposta vazia.");
 
@@ -99,10 +100,14 @@ export function CreateChurchForm() {
 
       navigate("/app/church-confirmation");
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+      let errorMessage = error.message || "Ocorreu um erro inesperado.";
+      if (error.code === '23505' && error.constraint === 'churches_cnpj_key') {
+        errorMessage = "Já existe uma igreja cadastrada com este CNPJ. Por favor, verifique os dados ou entre em contato com o suporte.";
+      }
       toast({
         title: "Erro ao criar igreja",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -172,7 +177,7 @@ export function CreateChurchForm() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Endereço (Opcional)</FormLabel> {/* Corrigido aqui */}
+                    <FormLabel>Endereço (Opcional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Rua, número, complemento" {...field} />
                     </FormControl>
