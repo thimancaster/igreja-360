@@ -25,14 +25,14 @@ type ProfileWithChurch = {
 interface AuthContextType {
   session: Session | null;
   user: User | null;
-  profile: ProfileWithChurch | null;
+  profile: ProfileWithChurch | null | undefined; // Pode ser null (sem perfil) ou undefined (carregando)
   churchId: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  setProfile: (profile: ProfileWithChurch | null) => void;
+  setProfile: (profile: ProfileWithChurch | null | undefined) => void; // Permitir undefined
   setChurchId: (churchId: string | null) => void;
 }
 
@@ -41,16 +41,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<ProfileWithChurch | null>(null);
+  const [profile, setProfile] = useState<ProfileWithChurch | null | undefined>(undefined); // Inicia como undefined
   const [churchId, setChurchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // Função para buscar perfil com os dados da igreja (join)
   // Agora recebe o objeto User para acessar user_metadata
-  const fetchUserProfile = useCallback(async (currentUser: User) => {
+  const fetchUserProfile = useCallback(async (currentUser: User): Promise<ProfileWithChurch | null> => {
     try {
-      // Primeiro, tenta buscar o perfil existente
+      // 1. Primeiro, tenta buscar o perfil existente
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select(
@@ -66,15 +66,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle(); // Usa maybeSingle para lidar com a ausência de perfil existente
 
       if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 é "No rows found"
-        console.warn('Erro ao buscar perfil:', fetchError.message);
-        // Não lança erro, apenas retorna null para indicar que o perfil não foi encontrado ou houve um erro real
+        console.error('Erro ao buscar perfil existente:', fetchError.message);
+        throw new Error(`Erro ao buscar perfil: ${fetchError.message}`); // Lança erros reais
       }
 
       if (existingProfile) {
         return existingProfile as ProfileWithChurch;
       }
 
-      // Se não houver perfil existente, cria um
+      // 2. Se não houver perfil existente, cria um
       console.log(`Criando novo perfil para o usuário ${currentUser.id}`);
       
       const userMetadata = currentUser.user_metadata;
@@ -100,26 +100,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (createError) {
         console.error('Erro ao criar perfil:', createError.message);
-        return null;
+        throw new Error(`Erro ao criar perfil: ${createError.message}`); // Lança erros de criação
       }
 
       return newProfile as ProfileWithChurch;
 
     } catch (error) {
-      console.error('Erro catastrófico em fetchUserProfile:', error);
-      return null;
+      console.error('Erro em fetchUserProfile:', error);
+      // Propaga o erro para cima
+      throw error;
     }
   }, []);
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    setProfile(undefined); // Define como undefined enquanto atualiza
     try {
-      const userProfile = await fetchUserProfile(user); // Passa o objeto user
+      const userProfile = await fetchUserProfile(user);
       setProfile(userProfile);
       setChurchId(userProfile?.church_id || null);
     } catch (error) {
       console.error('Falha ao atualizar perfil:', error);
+      setProfile(null); // Define como null se a atualização falhar
+      setChurchId(null);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar seu perfil. Por favor, tente novamente.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -128,6 +137,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const getSessionAndProfile = async () => {
       setLoading(true);
+      setProfile(undefined); // Define como undefined enquanto carrega
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError) {
@@ -138,9 +148,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        const userProfile = await fetchUserProfile(session.user); // Passa session.user
-        setProfile(userProfile);
-        setChurchId(userProfile?.church_id || null);
+        try {
+          const userProfile = await fetchUserProfile(session.user);
+          setProfile(userProfile);
+          setChurchId(userProfile?.church_id || null);
+        } catch (error) {
+          console.error('Erro ao carregar perfil após sessão:', error);
+          setProfile(null); // Define como null se o fetch/criação do perfil falhar
+          setChurchId(null);
+          toast({
+            title: "Erro crítico",
+            description: "Não foi possível carregar ou criar seu perfil. Por favor, tente novamente.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        setProfile(null);
+        setChurchId(null);
       }
 
       setLoading(false);
@@ -151,13 +175,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setLoading(true);
+        setProfile(undefined); // Define como undefined na mudança de estado de autenticação
         setSession(session);
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const userProfile = await fetchUserProfile(session.user); // Passa session.user
-          setProfile(userProfile);
-          setChurchId(userProfile?.church_id || null);
+          try {
+            const userProfile = await fetchUserProfile(session.user);
+            setProfile(userProfile);
+            setChurchId(userProfile?.church_id || null);
+          } catch (error) {
+            console.error('Erro ao carregar perfil após mudança de auth state:', error);
+            setProfile(null); // Define como null se o fetch/criação do perfil falhar
+            setChurchId(null);
+            toast({
+              title: "Erro crítico",
+              description: "Não foi possível carregar ou criar seu perfil. Por favor, tente novamente.",
+              variant: "destructive",
+            });
+          }
         } else {
           setProfile(null);
           setChurchId(null);
@@ -275,10 +311,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setChurchId,
   };
 
-  // CORREÇÃO CRÍTICA: Renderiza children apenas quando !loading
+  // Renderiza children sempre, os componentes devem lidar com o estado de carregamento/perfil
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
