@@ -47,9 +47,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const navigate = useNavigate();
 
   // Função para buscar perfil com os dados da igreja (join)
-  const fetchUserProfile = useCallback(async (userId: string) => {
+  // Agora recebe o objeto User para acessar user_metadata
+  const fetchUserProfile = useCallback(async (currentUser: User) => {
     try {
-      const { data, error } = await supabase
+      // Primeiro, tenta buscar o perfil existente
+      const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select(
           `
@@ -60,14 +62,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           churches (id, name, owner_user_id)
         `
         )
-        .eq('id', userId)
-        .single();
+        .eq('id', currentUser.id)
+        .maybeSingle(); // Usa maybeSingle para lidar com a ausência de perfil existente
 
-      if (error) {
-        console.warn('Erro ao buscar perfil (pode ser um novo usuário):', error.message);
+      if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 é "No rows found"
+        console.warn('Erro ao buscar perfil:', fetchError.message);
+        // Não lança erro, apenas retorna null para indicar que o perfil não foi encontrado ou houve um erro real
+      }
+
+      if (existingProfile) {
+        return existingProfile as ProfileWithChurch;
+      }
+
+      // Se não houver perfil existente, cria um
+      console.log(`Criando novo perfil para o usuário ${currentUser.id}`);
+      
+      const userMetadata = currentUser.user_metadata;
+      const fullName = userMetadata?.full_name || `${userMetadata?.first_name || ''} ${userMetadata?.last_name || ''}`.trim() || currentUser.email;
+
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: currentUser.id,
+          full_name: fullName,
+          avatar_url: userMetadata?.avatar_url || null,
+        })
+        .select(
+          `
+          id,
+          full_name,
+          avatar_url,
+          church_id,
+          churches (id, name, owner_user_id)
+        `
+        )
+        .single(); // Usa single aqui, pois esperamos que um seja criado
+
+      if (createError) {
+        console.error('Erro ao criar perfil:', createError.message);
         return null;
       }
-      return data as ProfileWithChurch;
+
+      return newProfile as ProfileWithChurch;
+
     } catch (error) {
       console.error('Erro catastrófico em fetchUserProfile:', error);
       return null;
@@ -78,7 +115,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     setLoading(true);
     try {
-      const userProfile = await fetchUserProfile(user.id);
+      const userProfile = await fetchUserProfile(user); // Passa o objeto user
       setProfile(userProfile);
       setChurchId(userProfile?.church_id || null);
     } catch (error) {
@@ -101,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(session?.user ?? null);
 
       if (session?.user) {
-        const userProfile = await fetchUserProfile(session.user.id);
+        const userProfile = await fetchUserProfile(session.user); // Passa session.user
         setProfile(userProfile);
         setChurchId(userProfile?.church_id || null);
       }
@@ -118,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          const userProfile = await fetchUserProfile(session.user.id);
+          const userProfile = await fetchUserProfile(session.user); // Passa session.user
           setProfile(userProfile);
           setChurchId(userProfile?.church_id || null);
         } else {
@@ -170,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: {
           emailRedirectTo: redirectUrl,
           data: {
+            full_name: fullName, // Garante que full_name seja passado
             first_name: fullName.split(' ')[0] || '',
             last_name: fullName.split(' ').slice(1).join(' ') || '',
           },
