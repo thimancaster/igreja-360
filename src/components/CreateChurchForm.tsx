@@ -63,12 +63,14 @@ export function CreateChurchForm() {
           status: 'active', // Default status
         })
         .select()
-        .single();
+        .maybeSingle(); // Alterado para maybeSingle()
 
       if (churchError) {
         throw churchError; // Lança o erro para ser capturado no onError
       }
-      if (!newChurch) throw new Error("Falha ao criar a igreja: resposta vazia.");
+      if (!newChurch) { // Verifica explicitamente se newChurch é null
+        throw new Error("Falha ao criar a igreja: nenhuma igreja foi retornada após a criação.");
+      }
 
       // 2. Update the user's profile with the new church_id
       const { data: updatedProfile, error: profileUpdateError } = await supabase
@@ -76,10 +78,13 @@ export function CreateChurchForm() {
         .update({ church_id: newChurch.id })
         .eq("id", user.id)
         .select()
-        .single();
+        .maybeSingle(); // Alterado para maybeSingle()
 
       if (profileUpdateError) {
         throw new Error(profileUpdateError.message || "Falha ao associar igreja ao perfil.");
+      }
+      if (!updatedProfile) { // Verifica explicitamente se updatedProfile é null
+        throw new Error("Falha ao associar igreja ao perfil: perfil não encontrado ou não atualizado.");
       }
 
       return { church: newChurch, profile: updatedProfile };
