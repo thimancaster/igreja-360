@@ -16,9 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 type ChurchRow = Tables<'churches'>;
 
@@ -144,7 +145,7 @@ export default function GerenciarIgreja() {
     console.log("GerenciarIgreja: Displaying loading spinner (authLoading:", authLoading, "churchLoading:", churchLoading, ")");
     return (
       <div className="flex-1 flex items-center justify-center p-6">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -256,7 +257,7 @@ export default function GerenciarIgreja() {
                 disabled={updateChurchMutation.isPending}
               >
                 {updateChurchMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <LoadingSpinner size="sm" className="mr-2" />
                 )}
                 Salvar Alterações
               </Button>

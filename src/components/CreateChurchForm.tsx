@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 type Profile = Tables<'profiles'>;
 
@@ -125,7 +126,7 @@ export function CreateChurchForm() {
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <LoadingSpinner size="xl" />
       </div>
     );
   }
@@ -219,7 +220,7 @@ export function CreateChurchForm() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={createChurchMutation.isPending}>
-                {createChurchMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {createChurchMutation.isPending && <LoadingSpinner size="sm" className="mr-2" />}
                 Criar Igreja
               </Button>
             </form>

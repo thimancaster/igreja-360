@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import LandingPage from "@/pages/LandingPage";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 export function AuthRedirect() {
   const { user, profile, loading } = useAuth();
@@ -12,9 +13,6 @@ export function AuthRedirect() {
     if (!loading) {
       if (user) {
         console.log("AuthRedirect: User is authenticated.");
-        // Se o perfil ainda não foi carregado (é null ou undefined), esperamos.
-        // O `profile` pode ser `null` se o usuário não tiver um perfil ou igreja,
-        // mas `undefined` significa que a requisição ainda não retornou.
         if (profile === undefined) { 
           console.log("AuthRedirect: Profile is undefined, waiting for profile data.");
           return; // Espera o perfil ser carregado
@@ -37,7 +35,7 @@ export function AuthRedirect() {
     console.log("AuthRedirect: Showing loading spinner (loading:", loading, "profile undefined:", profile === undefined, ").");
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <LoadingSpinner size="xl" />
       </div>
     );
   }

@@ -10,10 +10,11 @@ import { useFinancialSummary, useReportFiltersData, useExpensesByCategory, useRe
 import { ExpensesByCategoryChart } from "@/components/reports/ExpensesByCategoryChart";
 import { RevenueByMinistryChart } from "@/components/reports/RevenueByMinistryChart";
 import { CashFlowReport } from "@/components/reports/CashFlowReport";
-import { Loader2, TrendingUp, TrendingDown, Scale, FileDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Scale, FileDown } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/utils/exportHelpers";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("pt-BR", {
@@ -218,7 +219,7 @@ export default function Relatorios() {
             />
           </div>
           <Button onClick={handleGenerateReport} disabled={isFetching} className="w-full">
-            {isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isFetching && <LoadingSpinner size="sm" className="mr-2" />}
             Gerar Relatório
           </Button>
         </CardContent>
@@ -226,7 +227,7 @@ export default function Relatorios() {
 
       {isFetching && (
         <div className="flex justify-center items-center p-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <LoadingSpinner size="lg" />
         </div>
       )}
 

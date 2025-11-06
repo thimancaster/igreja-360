@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from 'xlsx';
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 const REQUIRED_FIELDS = [
   { key: "amount", label: "Valor da Transação" },
@@ -246,7 +247,9 @@ export default function Integracoes() {
           )}
 
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Carregando...</div>
+            <div className="text-center py-8 text-muted-foreground flex justify-center items-center">
+              <LoadingSpinner size="md" />
+            </div>
           ) : integrations && integrations.length > 0 ? (
             <div className="border rounded-lg">
               <Table>
@@ -288,7 +291,7 @@ export default function Integracoes() {
                             onClick={() => syncIntegration.mutate(integration.id)}
                             disabled={syncIntegration.isPending}
                           >
-                            <RefreshCw className="h-4 w-4" />
+                            {syncIntegration.isPending ? <LoadingSpinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
                           </Button>
                           <Button
                             variant="outline"
@@ -296,7 +299,7 @@ export default function Integracoes() {
                             onClick={() => deleteIntegration.mutate(integration.id)}
                             disabled={deleteIntegration.isPending}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {deleteIntegration.isPending ? <LoadingSpinner size="sm" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
                         </div>
                       </TableCell>
@@ -333,6 +336,7 @@ export default function Integracoes() {
                 onChange={handleSheetUrlChange}
               />
               <Button onClick={handleLoadSheetHeaders} disabled={!sheetId || isProcessingSheet}>
+                {isProcessingSheet ? <LoadingSpinner size="sm" className="mr-2" /> : null}
                 {isProcessingSheet ? "Carregando..." : "Carregar Cabeçalhos"}
               </Button>
             </div>
@@ -366,13 +370,14 @@ export default function Integracoes() {
             )}
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowMappingDialog(false)} disabled={createIntegration.isPending}>
+              <Button type="button" variant="outline" onClick={() => setShowMappingDialog(false)} disabled={createIntegration.isPending}>
                 Cancelar
               </Button>
               <Button
                 onClick={handleSaveIntegration}
                 disabled={!sheetId || sheetHeaders.length === 0 || createIntegration.isPending}
               >
+                {createIntegration.isPending ? <LoadingSpinner size="sm" className="mr-2" /> : null}
                 Salvar e Sincronizar
               </Button>
             </DialogFooter>

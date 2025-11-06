@@ -42,9 +42,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Loader2, Building2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Building2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 type Ministry = Tables<'ministries'>;
 
@@ -179,7 +180,7 @@ export default function GerenciarMinisterios() {
   if (authLoading || ministriesLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -242,7 +243,7 @@ export default function GerenciarMinisterios() {
                             onClick={() => handleEditMinistry(ministry)}
                             disabled={saveMinistryMutation.isPending}
                           >
-                            <Pencil className="h-4 w-4" />
+                            {saveMinistryMutation.isPending ? <LoadingSpinner size="sm" /> : <Pencil className="h-4 w-4" />}
                           </Button>
                           <Button
                             variant="outline"
@@ -250,7 +251,7 @@ export default function GerenciarMinisterios() {
                             onClick={() => handleDeleteMinistry(ministry.id)}
                             disabled={deleteMinistryMutation.isPending}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {deleteMinistryMutation.isPending ? <LoadingSpinner size="sm" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
                         </div>
                       </TableCell>
@@ -308,7 +309,7 @@ export default function GerenciarMinisterios() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={saveMinistryMutation.isPending}>
-                  {saveMinistryMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {saveMinistryMutation.isPending && <LoadingSpinner size="sm" className="mr-2" />}
                   {selectedMinistry ? "Salvar Alterações" : "Criar Ministério"}
                 </Button>
               </DialogFooter>

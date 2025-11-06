@@ -10,8 +10,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Loader2, User, Building2 } from "lucide-react";
+import { User, Building2 } from "lucide-react";
 import { Database, Tables, TablesUpdate } from "@/integrations/supabase/types";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 // Definir tipos para as linhas das tabelas e para os dados de atualização
 type ProfileRow = Tables<'profiles'>;
@@ -134,7 +135,7 @@ export default function Configuracoes() {
   if (roleLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -214,7 +215,7 @@ export default function Configuracoes() {
                   disabled={updateProfileMutation.isPending}
                 >
                   {updateProfileMutation.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <LoadingSpinner size="sm" className="mr-2" />
                   )}
                   Salvar Alterações
                 </Button>
@@ -235,7 +236,7 @@ export default function Configuracoes() {
             <CardContent>
               {churchLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <LoadingSpinner size="md" />
                 </div>
               ) : (
                 <form onSubmit={handleChurchSubmit} className="space-y-4">
@@ -309,7 +310,7 @@ export default function Configuracoes() {
                     disabled={updateChurchMutation.isPending}
                   >
                     {updateChurchMutation.isPending && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <LoadingSpinner size="sm" className="mr-2" />
                     )}
                     Salvar Alterações
                   </Button>

@@ -4,8 +4,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Building2, CheckCircle2, MapPin, FileText } from "lucide-react";
+import { Building2, CheckCircle2, MapPin, FileText } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 type Church = Tables<'churches'>;
 
@@ -45,7 +46,7 @@ export default function ChurchConfirmation() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <LoadingSpinner size="xl" />
       </div>
     );
   }
