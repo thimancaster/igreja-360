@@ -44,6 +44,78 @@ export default function Integracoes() {
   // Removido o estado local churchId, usaremos profile?.church_id diretamente
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
 
+  // Handle OAuth callback with secure session
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const sessionId = searchParams.get('oauth_session');
+      const oauthError = searchParams.get('oauth_error');
+
+      if (oauthError) {
+        toast({
+          title: "Erro na autenticação",
+          description: decodeURIComponent(oauthError),
+          variant: "destructive",
+        });
+        setSearchParams({});
+        return;
+      }
+
+      if (sessionId && user) {
+        // Fetch tokens from secure session
+        const { data: session, error: fetchError } = await supabase
+          .from('oauth_sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .single();
+
+        if (fetchError || !session) {
+          toast({
+            title: "Erro",
+            description: "Não foi possível recuperar a sessão OAuth. Tente novamente.",
+            variant: "destructive",
+          });
+          setSearchParams({});
+          return;
+        }
+
+        // Check if session expired
+        if (new Date(session.expires_at) < new Date()) {
+          toast({
+            title: "Sessão expirada",
+            description: "A sessão OAuth expirou. Por favor, tente novamente.",
+            variant: "destructive",
+          });
+          // Clean up expired session
+          await supabase.from('oauth_sessions').delete().eq('id', sessionId);
+          setSearchParams({});
+          return;
+        }
+
+        // Store tokens temporarily for integration creation
+        sessionStorage.setItem('oauth_access_token', session.access_token);
+        if (session.refresh_token) {
+          sessionStorage.setItem('oauth_refresh_token', session.refresh_token);
+        }
+
+        // Delete session after retrieving tokens
+        await supabase.from('oauth_sessions').delete().eq('id', sessionId);
+
+        // Clear URL params
+        setSearchParams({});
+        
+        // Show the mapping dialog
+        setShowMappingDialog(true);
+        
+        toast({
+          title: "Autenticação concluída",
+          description: "Agora você pode configurar a integração com o Google Sheets.",
+        });
+      }
+    };
+
+    handleOAuthCallback();
+  }, [searchParams, user, setSearchParams]);
+
 
 
   const extractSheetIdFromUrl = (url: string): string | null => {
@@ -98,10 +170,9 @@ export default function Integracoes() {
       return;
     }
 
-    // OAuth tokens will be received from URL params after OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
-    const accessToken = urlParams.get('access_token');
-    const refreshToken = urlParams.get('refresh_token');
+    // Get OAuth tokens from sessionStorage (not URL!)
+    const accessToken = sessionStorage.getItem('oauth_access_token');
+    const refreshToken = sessionStorage.getItem('oauth_refresh_token');
 
     if (!accessToken) {
       toast({
@@ -120,6 +191,10 @@ export default function Integracoes() {
       accessToken: accessToken,
       refreshToken: refreshToken || '',
     });
+
+    // Clear tokens after successful integration creation
+    sessionStorage.removeItem('oauth_access_token');
+    sessionStorage.removeItem('oauth_refresh_token');
 
     setShowMappingDialog(false);
     setSheetUrl("");

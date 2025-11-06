@@ -33,12 +33,9 @@ serve(async (req) => {
       throw new Error('Missing required environment variables');
     }
 
-    // Construir redirect_uri FIXO (mesmo da função start)
     const redirectUri = `${supabaseUrl}/functions/v1/google-auth-callback`;
 
-    console.log('Google OAuth Callback - Redirect URI:', redirectUri);
-
-    // Trocar o código pelo access_token e refresh_token
+    // Exchange code for tokens
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -63,12 +60,10 @@ serve(async (req) => {
       throw new Error('No access token received from Google');
     }
 
-    console.log('OAuth tokens received successfully');
-
-    // Criar cliente Supabase com service role
+    // Create Supabase client with service role
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Obter o usuário autenticado do header Authorization
+    // Get authenticated user
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
       throw new Error('No authorization header');
@@ -82,11 +77,25 @@ serve(async (req) => {
       throw new Error('Invalid user token');
     }
 
-    console.log('User authenticated:', user.id);
+    // Store tokens in secure session (expires in 5 minutes)
+    const { data: session, error: sessionError } = await supabase
+      .from('oauth_sessions')
+      .insert({
+        user_id: user.id,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token || null,
+      })
+      .select()
+      .single();
 
-    // Redirecionar de volta para a aplicação com sucesso
+    if (sessionError || !session) {
+      console.error('Failed to create OAuth session:', sessionError);
+      throw new Error('Failed to create secure session');
+    }
+
+    // Redirect with only session ID (not the tokens!)
     const appUrl = Deno.env.get('APP_BASE_URL') || supabaseUrl;
-    const redirectUrl = `${appUrl}/app/integracoes?oauth_success=true&access_token=${tokens.access_token}&refresh_token=${tokens.refresh_token || ''}`;
+    const redirectUrl = `${appUrl}/app/integracoes?oauth_session=${session.id}`;
 
     return new Response(null, {
       status: 302,

@@ -258,6 +258,33 @@ export type Database = {
           },
         ]
       }
+      oauth_sessions: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          refresh_token: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -445,6 +472,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_oauth_sessions: { Args: never; Returns: undefined }
       get_user_church_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
