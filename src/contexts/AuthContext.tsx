@@ -4,10 +4,22 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { ProfileWithChurch } from '@/integrations/supabase/types'; // Importa o tipo correto
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { queryClient } from '@/lib/queryClient';
+
+// Define ProfileWithChurch type inline
+type ProfileWithChurch = {
+  id: string;
+  full_name: string | null;
+  avatar_url: string | null;
+  church_id: string | null;
+  churches?: {
+    id: string;
+    name: string;
+    owner_user_id: string;
+  } | null;
+};
 
 // 1. Interface AuthContextType completa
 interface AuthContextType {
@@ -42,8 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .select(
           `
           id,
-          first_name,
-          last_name,
+          full_name,
+          avatar_url,
           church_id,
           churches (id, name, owner_user_id)
         `

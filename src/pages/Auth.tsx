@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 import { Church } from "lucide-react";
 import { Navigate } from "react-router-dom";
 import { z } from "zod";
@@ -41,7 +42,13 @@ export default function Auth() {
       await signIn(validated.email, validated.password);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        // Show validation errors
+        const firstError = error.errors[0];
+        toast({
+          title: "Erro de validação",
+          description: firstError.message,
+          variant: "destructive",
+        });
+        return;
       }
     } finally {
       setLoading(false);
@@ -71,7 +78,13 @@ export default function Auth() {
       await signUp(validated.email, validated.password, validated.name);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        // Show validation errors
+        const firstError = error.errors[0];
+        toast({
+          title: "Erro de validação",
+          description: firstError.message,
+          variant: "destructive",
+        });
+        return;
       }
     } finally {
       setLoading(false);
