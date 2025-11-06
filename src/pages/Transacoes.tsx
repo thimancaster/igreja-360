@@ -28,6 +28,7 @@ import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { TransactionDialog } from "@/components/transactions/TransactionDialog";
 import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
 import { useRole } from "@/hooks/useRole"; // Importar useRole
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 export default function Transacoes() {
   const { data: transactions, isLoading } = useTransactions();
