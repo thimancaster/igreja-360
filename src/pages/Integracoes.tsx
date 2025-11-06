@@ -15,7 +15,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import * as XLSX from 'xlsx';
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useRole } from "@/hooks/useRole"; // Importar useRole
 
 const REQUIRED_FIELDS = [
   { key: "amount", label: "Valor da Transação" },
@@ -27,7 +28,8 @@ const REQUIRED_FIELDS = [
 
 export default function Integracoes() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, profile } = useAuth(); // Obter profile diretamente do AuthContext
+  const { user, profile } = useAuth();
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
   const {
     integrations,
     isLoading,
@@ -42,8 +44,9 @@ export default function Integracoes() {
   const [sheetName, setSheetName] = useState<string>("");
   const [sheetHeaders, setSheetHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
-  // Removido o estado local churchId, usaremos profile?.church_id diretamente
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
+
+  const canManageIntegrations = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem gerenciar integrações
 
   // Handle OAuth callback with secure session
   useEffect(() => {
@@ -117,8 +120,6 @@ export default function Integracoes() {
     handleOAuthCallback();
   }, [searchParams, user, setSearchParams]);
 
-
-
   const extractSheetIdFromUrl = (url: string): string | null => {
     const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     return match ? match[1] : null;
@@ -134,6 +135,7 @@ export default function Integracoes() {
   };
 
   const handleLoadSheetHeaders = async () => {
+    if (!canManageIntegrations) return;
     if (!sheetId) {
       toast({ title: "URL Inválida", description: "Por favor, insira uma URL válida do Google Sheets.", variant: "destructive" });
       return;
@@ -152,6 +154,7 @@ export default function Integracoes() {
   };
 
   const handleSaveIntegration = async () => {
+    if (!canManageIntegrations) return;
     if (!sheetName || !sheetId || !profile?.church_id || !sheetUrl) {
       toast({
         title: "Erro",
@@ -205,7 +208,15 @@ export default function Integracoes() {
     setSheetHeaders([]);
   };
 
-  const isAddSheetButtonDisabled = !profile?.church_id; // Desabilitar se profile.church_id for nulo
+  const isAddSheetButtonDisabled = !profile?.church_id || !canManageIntegrations; // Desabilitar se profile.church_id for nulo ou sem permissão
+
+  if (isLoading || roleLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -240,17 +251,18 @@ export default function Integracoes() {
               Adicionar Planilha
             </Button>
           </div>
-          {isAddSheetButtonDisabled && (
+          {isAddSheetButtonDisabled && !canManageIntegrations && (
+            <p className="text-sm text-destructive text-center">
+              Você não tem permissão para adicionar planilhas.
+            </p>
+          )}
+          {isAddSheetButtonDisabled && canManageIntegrations && !profile?.church_id && (
             <p className="text-sm text-destructive text-center">
               Você precisa ter uma igreja associada ao seu perfil para adicionar planilhas. Por favor, crie uma igreja primeiro.
             </p>
           )}
 
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground flex justify-center items-center">
-              <LoadingSpinner size="md" />
-            </div>
-          ) : integrations && integrations.length > 0 ? (
+          {integrations && integrations.length > 0 ? (
             <div className="border rounded-lg">
               <Table>
                 <TableHeader>
@@ -289,7 +301,7 @@ export default function Integracoes() {
                             variant="outline"
                             size="sm"
                             onClick={() => syncIntegration.mutate(integration.id)}
-                            disabled={syncIntegration.isPending}
+                            disabled={syncIntegration.isPending || !canManageIntegrations}
                           >
                             {syncIntegration.isPending ? <LoadingSpinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
                           </Button>
@@ -297,7 +309,7 @@ export default function Integracoes() {
                             variant="outline"
                             size="sm"
                             onClick={() => deleteIntegration.mutate(integration.id)}
-                            disabled={deleteIntegration.isPending}
+                            disabled={deleteIntegration.isPending || !canManageIntegrations}
                           >
                             {deleteIntegration.isPending ? <LoadingSpinner size="sm" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
@@ -334,8 +346,9 @@ export default function Integracoes() {
                 placeholder="Ex: https://docs.google.com/spreadsheets/d/SEU_ID_DA_PLANILHA/edit#gid=0"
                 value={sheetUrl}
                 onChange={handleSheetUrlChange}
+                disabled={!canManageIntegrations}
               />
-              <Button onClick={handleLoadSheetHeaders} disabled={!sheetId || isProcessingSheet}>
+              <Button onClick={handleLoadSheetHeaders} disabled={!sheetId || isProcessingSheet || !canManageIntegrations}>
                 {isProcessingSheet ? <LoadingSpinner size="sm" className="mr-2" /> : null}
                 {isProcessingSheet ? "Carregando..." : "Carregar Cabeçalhos"}
               </Button>
@@ -352,6 +365,7 @@ export default function Integracoes() {
                       onValueChange={(value) =>
                         setColumnMapping((prev) => ({ ...prev, [field.key]: value }))
                       }
+                      disabled={!canManageIntegrations}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a coluna" />
@@ -375,7 +389,7 @@ export default function Integracoes() {
               </Button>
               <Button
                 onClick={handleSaveIntegration}
-                disabled={!sheetId || sheetHeaders.length === 0 || createIntegration.isPending}
+                disabled={!sheetId || sheetHeaders.length === 0 || createIntegration.isPending || !canManageIntegrations}
               >
                 {createIntegration.isPending ? <LoadingSpinner size="sm" className="mr-2" /> : null}
                 Salvar e Sincronizar

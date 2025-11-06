@@ -45,7 +45,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Building2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useRole } from "@/hooks/useRole"; // Importar useRole
 
 type Ministry = Tables<'ministries'>;
 
@@ -58,6 +59,7 @@ type MinistryFormValues = z.infer<typeof ministrySchema>;
 
 export default function GerenciarMinisterios() {
   const { user, profile, loading: authLoading } = useAuth();
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
   const queryClient = useQueryClient();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -87,7 +89,7 @@ export default function GerenciarMinisterios() {
       if (error) throw error;
       return data as Ministry[];
     },
-    enabled: !!profile?.church_id && !!user?.id, // Enable query only if user is logged in and has a church
+    enabled: !!profile?.church_id && !!user?.id,
   });
 
   // Create/Update ministry mutation
@@ -116,7 +118,7 @@ export default function GerenciarMinisterios() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ministries", profile?.church_id] });
-      queryClient.invalidateQueries({ queryKey: ["report-filters-data"] }); // Invalidate for reports
+      queryClient.invalidateQueries({ queryKey: ["report-filters-data"] });
       toast.success(`Ministério ${selectedMinistry ? "atualizado" : "criado"} com sucesso!`);
       setDialogOpen(false);
       setSelectedMinistry(null);
@@ -138,7 +140,7 @@ export default function GerenciarMinisterios() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ministries", profile?.church_id] });
-      queryClient.invalidateQueries({ queryKey: ["report-filters-data"] }); // Invalidate for reports
+      queryClient.invalidateQueries({ queryKey: ["report-filters-data"] });
       toast.success("Ministério excluído com sucesso!");
       setDeleteDialogOpen(false);
       setMinistryToDelete(null);
@@ -177,16 +179,15 @@ export default function GerenciarMinisterios() {
     setDeleteDialogOpen(true);
   };
 
-  if (authLoading || ministriesLoading) {
+  const canManageMinistries = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem gerenciar
+
+  if (authLoading || ministriesLoading || roleLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <LoadingSpinner size="lg" />
       </div>
     );
   }
-
-  // Removido o bloco `if (!user)` que exibia "Acesso Negado"
-  // A query já é desabilitada se não houver usuário.
 
   if (!profile?.church_id) {
     return (
@@ -208,7 +209,7 @@ export default function GerenciarMinisterios() {
           <h1 className="text-3xl font-bold">Gerenciar Ministérios</h1>
           <p className="text-muted-foreground mt-1">Adicione, edite e remova os ministérios da sua igreja.</p>
         </div>
-        <Button onClick={handleAddMinistry} className="gap-2">
+        <Button onClick={handleAddMinistry} className="gap-2" disabled={!canManageMinistries}>
           <Plus className="h-4 w-4" />
           Novo Ministério
         </Button>
@@ -241,7 +242,7 @@ export default function GerenciarMinisterios() {
                             variant="outline"
                             size="icon"
                             onClick={() => handleEditMinistry(ministry)}
-                            disabled={saveMinistryMutation.isPending}
+                            disabled={saveMinistryMutation.isPending || !canManageMinistries}
                           >
                             {saveMinistryMutation.isPending ? <LoadingSpinner size="sm" /> : <Pencil className="h-4 w-4" />}
                           </Button>
@@ -249,7 +250,7 @@ export default function GerenciarMinisterios() {
                             variant="outline"
                             size="icon"
                             onClick={() => handleDeleteMinistry(ministry.id)}
-                            disabled={deleteMinistryMutation.isPending}
+                            disabled={deleteMinistryMutation.isPending || !canManageMinistries}
                           >
                             {deleteMinistryMutation.isPending ? <LoadingSpinner size="sm" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
@@ -264,6 +265,11 @@ export default function GerenciarMinisterios() {
             <div className="text-center py-12 text-muted-foreground">
               <p>Nenhum ministério cadastrado ainda. Clique em "Novo Ministério" para começar.</p>
             </div>
+          )}
+          {!canManageMinistries && (
+            <p className="text-sm text-muted-foreground mt-4 text-center">
+              Você não tem permissão para gerenciar ministérios.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -285,7 +291,7 @@ export default function GerenciarMinisterios() {
                   <FormItem>
                     <FormLabel>Nome do Ministério</FormLabel>
                     <FormControl>
-                      <Input placeholder="Ex: Louvor, Missões, Jovens" {...field} />
+                      <Input placeholder="Ex: Louvor, Missões, Jovens" {...field} disabled={!canManageMinistries} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -298,7 +304,7 @@ export default function GerenciarMinisterios() {
                   <FormItem>
                     <FormLabel>Descrição (Opcional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Breve descrição do ministério" {...field} />
+                      <Input placeholder="Breve descrição do ministério" {...field} disabled={!canManageMinistries} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -308,7 +314,7 @@ export default function GerenciarMinisterios() {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={saveMinistryMutation.isPending}>
+                <Button type="submit" disabled={saveMinistryMutation.isPending || !canManageMinistries}>
                   {saveMinistryMutation.isPending && <LoadingSpinner size="sm" className="mr-2" />}
                   {selectedMinistry ? "Salvar Alterações" : "Criar Ministério"}
                 </Button>
@@ -328,7 +334,7 @@ export default function GerenciarMinisterios() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => ministryToDelete && deleteMinistryMutation.mutate(ministryToDelete)}>
+            <AlertDialogAction onClick={() => ministryToDelete && deleteMinistryMutation.mutate(ministryToDelete)} disabled={!canManageMinistries}>
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>

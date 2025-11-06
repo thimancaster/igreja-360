@@ -15,6 +15,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ColumnMapping, ImportPreviewRow, ProcessedTransaction } from "@/types/import";
 import { readSpreadsheet, parseAmount, parseDate, normalizeType, normalizeStatus, validateTransaction } from "@/utils/importHelpers";
+import { useRole } from "@/hooks/useRole"; // Importar useRole
+import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
 
 const REQUIRED_FIELDS: (keyof ColumnMapping)[] = ["description", "amount", "type", "status"];
 const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
@@ -45,9 +47,16 @@ export default function Importacao() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
   const queryClient = useQueryClient();
 
+  const canImport = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem importar
+
   const onDrop = (acceptedFiles: File[]) => {
+    if (!canImport) {
+      toast({ title: "Permissão Negada", description: "Você não tem permissão para importar arquivos.", variant: "destructive" });
+      return;
+    }
     if (acceptedFiles.length > 0) {
       const selectedFile = acceptedFiles[0];
       if (selectedFile.size > 5 * 1024 * 1024) { // 5MB limit
@@ -66,9 +75,11 @@ export default function Importacao() {
       "text/csv": [".csv"],
     },
     maxFiles: 1,
+    disabled: !canImport, // Desabilitar dropzone se não puder importar
   });
 
   const handleFileStep = async () => {
+    if (!canImport) return;
     if (!file) return;
     try {
       const { headers, rows } = await readSpreadsheet(file);
@@ -85,6 +96,7 @@ export default function Importacao() {
   };
 
   const handleMappingStep = () => {
+    if (!canImport) return;
     const missingMappings = REQUIRED_FIELDS.filter(field => !columnMapping[field]);
     if (missingMappings.length > 0) {
       toast({ title: "Mapeamento Incompleto", description: `Os seguintes campos obrigatórios não foram mapeados: ${missingMappings.map(f => FIELD_LABELS[f]).join(', ')}`, variant: "destructive" });
@@ -108,6 +120,7 @@ export default function Importacao() {
   };
 
   const handleImport = async () => {
+    if (!canImport) return;
     if (!user) {
       toast({ title: "Erro de Autenticação", description: "Usuário não encontrado.", variant: "destructive" });
       return;
@@ -132,17 +145,17 @@ export default function Importacao() {
 
         const processed: Partial<ProcessedTransaction> = {
           description: mappedRow.description || "",
-          amount: parseAmount(mappedRow.amount) || 0, // Ensure amount is a number
-          type: normalizeType(mappedRow.type) || "Despesa", // Default type if not provided
-          status: normalizeStatus(mappedRow.status) || "Pendente", // Default status if not provided
+          amount: parseAmount(mappedRow.amount) || 0,
+          type: normalizeType(mappedRow.type) || "Despesa",
+          status: normalizeStatus(mappedRow.status) || "Pendente",
           due_date: parseDate(mappedRow.due_date),
           payment_date: parseDate(mappedRow.payment_date),
           notes: mappedRow.notes || null,
-          category_id: null, // Future: Implement lookup
-          ministry_id: null, // Future: Implement lookup
+          category_id: null,
+          ministry_id: null,
           church_id: profile.church_id,
           created_by: user.id,
-          origin: 'Importação de Planilha', // Add origin field
+          origin: 'Importação de Planilha',
         };
 
         const validation = validateTransaction(processed);
@@ -177,6 +190,14 @@ export default function Importacao() {
     }
   };
 
+  if (roleLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6">
       <Card className="max-w-4xl mx-auto">
@@ -187,7 +208,7 @@ export default function Importacao() {
               <CardDescription>Selecione ou arraste um arquivo .xlsx, .xls ou .csv para importar.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div {...getRootProps()} className={`p-10 border-2 border-dashed rounded-lg text-center cursor-pointer ${isDragActive ? 'border-primary' : 'border-border'}`}>
+              <div {...getRootProps()} className={`p-10 border-2 border-dashed rounded-lg text-center cursor-pointer ${isDragActive ? 'border-primary' : 'border-border'} ${!canImport ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <input {...getInputProps()} />
                 <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                 <p className="mt-4 text-muted-foreground">
@@ -200,9 +221,14 @@ export default function Importacao() {
                   <span className="font-medium">{file.name}</span>
                 </div>
               )}
+              {!canImport && (
+                <p className="text-sm text-destructive mt-4 text-center">
+                  Você não tem permissão para importar arquivos.
+                </p>
+              )}
             </CardContent>
             <CardFooter>
-              <Button onClick={handleFileStep} disabled={!file} className="ml-auto">
+              <Button onClick={handleFileStep} disabled={!file || !canImport} className="ml-auto">
                 Próximo <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </CardFooter>
@@ -222,7 +248,7 @@ export default function Importacao() {
                     {FIELD_LABELS[field]}
                     {REQUIRED_FIELDS.includes(field) && <span className="text-destructive">*</span>}
                   </Label>
-                  <Select value={columnMapping[field]} onValueChange={value => setColumnMapping(prev => ({ ...prev, [field]: value }))}>
+                  <Select value={columnMapping[field]} onValueChange={value => setColumnMapping(prev => ({ ...prev, [field]: value }))} disabled={!canImport}>
                     <SelectTrigger id={field}>
                       <SelectValue placeholder="Selecione uma coluna" />
                     </SelectTrigger>
@@ -236,10 +262,10 @@ export default function Importacao() {
               ))}
             </CardContent>
             <CardFooter className="justify-between">
-              <Button variant="outline" onClick={() => setStep(1)}>
+              <Button variant="outline" onClick={() => setStep(1)} disabled={!canImport}>
                 <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
               </Button>
-              <Button onClick={handleMappingStep}>
+              <Button onClick={handleMappingStep} disabled={!canImport}>
                 Pré-visualizar Dados <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             </CardFooter>
@@ -283,10 +309,10 @@ export default function Importacao() {
               )}
             </CardContent>
             <CardFooter className="justify-between">
-              <Button variant="outline" onClick={() => setStep(2)} disabled={importing}>
+              <Button variant="outline" onClick={() => setStep(2)} disabled={importing || !canImport}>
                 <ChevronLeft className="mr-2 h-4 w-4" /> Voltar
               </Button>
-              <Button onClick={handleImport} disabled={importing}>
+              <Button onClick={handleImport} disabled={importing || !canImport}>
                 {importing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                 Importar {dataRows.length} Transações
               </Button>

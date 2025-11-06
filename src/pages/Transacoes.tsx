@@ -26,11 +26,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { TransactionDialog } from "@/components/transactions/TransactionDialog";
-import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries"; // Importar o novo hook
+import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
+import { useRole } from "@/hooks/useRole"; // Importar useRole
 
 export default function Transacoes() {
   const { data: transactions, isLoading } = useTransactions();
-  const { data: categoriesAndMinistries, isLoading: filtersLoading } = useCategoriesAndMinistries(); // Usar o novo hook
+  const { data: categoriesAndMinistries, isLoading: filtersLoading } = useCategoriesAndMinistries();
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -106,6 +108,16 @@ export default function Transacoes() {
     setSelectedTransaction(null);
   };
 
+  const canManageTransactions = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem gerenciar
+
+  if (isLoading || filtersLoading || roleLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -113,7 +125,7 @@ export default function Transacoes() {
           <h1 className="text-3xl font-bold">Transações</h1>
           <p className="text-muted-foreground mt-1">Gerencie todas as transações financeiras</p>
         </div>
-        <Button className="gap-2" onClick={() => setDialogOpen(true)}>
+        <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={!canManageTransactions}>
           <Plus className="h-4 w-4" />
           Nova Transação
         </Button>
@@ -182,6 +194,7 @@ export default function Transacoes() {
                           variant="outline"
                           size="icon"
                           onClick={() => handleEdit(transaction)}
+                          disabled={!canManageTransactions}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -192,6 +205,7 @@ export default function Transacoes() {
                             setTransactionToDelete(transaction.id);
                             setDeleteDialogOpen(true);
                           }}
+                          disabled={!canManageTransactions}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -215,8 +229,9 @@ export default function Transacoes() {
         open={dialogOpen}
         onOpenChange={handleDialogClose}
         transaction={selectedTransaction}
-        categories={categoriesAndMinistries?.categories || []} // Passar categorias
-        ministries={categoriesAndMinistries?.ministries || []} // Passar ministérios
+        categories={categoriesAndMinistries?.categories || []}
+        ministries={categoriesAndMinistries?.ministries || []}
+        canEdit={canManageTransactions} // Passar a permissão para o dialog
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -229,7 +244,9 @@ export default function Transacoes() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Excluir</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} disabled={!canManageTransactions}>
+              Excluir
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

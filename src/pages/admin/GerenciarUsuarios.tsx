@@ -9,7 +9,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useRole } from "@/hooks/useRole"; // Importar useRole
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
@@ -25,11 +26,13 @@ const ROLES: AppRole[] = ["admin", "tesoureiro", "pastor", "lider"];
 
 export default function GerenciarUsuarios() {
   const queryClient = useQueryClient();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth(); // Obter profile
+  const { isAdmin, isLoading: roleLoading } = useRole(); // Usar isAdmin
 
   const { data: profiles, isLoading } = useQuery({
-    queryKey: ["admin-profiles"],
+    queryKey: ["admin-profiles", profile?.church_id], // Adicionar church_id ao queryKey
     queryFn: async () => {
+      if (!profile?.church_id) return []; // Retornar vazio se não houver church_id
       // Fetch profiles
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
@@ -38,7 +41,8 @@ export default function GerenciarUsuarios() {
           full_name,
           avatar_url,
           user:users(email)
-        `);
+        `)
+        .eq("church_id", profile.church_id); // Filtrar perfis pela church_id
 
       if (profilesError) throw profilesError;
 
@@ -66,11 +70,13 @@ export default function GerenciarUsuarios() {
         roles: rolesMap.get(p.id) || [],
       })) as ProfileWithRoles[];
     },
-    enabled: !!user?.id, // Enable query only if user is logged in
+    enabled: !!user?.id && !!profile?.church_id, // Habilitar query apenas se user e church_id existirem
   });
 
   const updateUserRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
+      if (!isAdmin) throw new Error("Você não tem permissão para alterar cargos.");
+
       // Remove existing roles for the user
       const { error: deleteError } = await supabase
         .from("user_roles")
@@ -87,7 +93,7 @@ export default function GerenciarUsuarios() {
     onSuccess: () => {
       toast.success("Cargo do usuário atualizado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
-      queryClient.invalidateQueries({ queryKey: ["user-roles", user?.id] }); // Invalidate current user's roles
+      queryClient.invalidateQueries({ queryKey: ["user-roles", user?.id] });
     },
     onError: (error) => {
       toast.error(`Erro ao atualizar cargo: ${error.message}`);
@@ -98,7 +104,7 @@ export default function GerenciarUsuarios() {
     return name.substring(0, 2).toUpperCase();
   };
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || roleLoading || profile === undefined) { // Adicionar roleLoading e profile === undefined
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <LoadingSpinner size="lg" />
@@ -106,8 +112,18 @@ export default function GerenciarUsuarios() {
     );
   }
 
-  // Removido o bloco `if (!user)` que exibia "Acesso Negado"
-  // A query já é desabilitada se não houver usuário, então a UI ficará vazia ou carregando.
+  if (!profile?.church_id) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle>Nenhuma Igreja Associada</CardTitle>
+            <CardDescription>Seu perfil não está associado a nenhuma igreja. Por favor, crie uma igreja primeiro.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 space-y-6 p-6">
@@ -158,7 +174,7 @@ export default function GerenciarUsuarios() {
                         <Select
                           defaultValue={profile.roles[0]}
                           onValueChange={(role: AppRole) => updateUserRoleMutation.mutate({ userId: profile.id, role })}
-                          disabled={updateUserRoleMutation.isPending}
+                          disabled={updateUserRoleMutation.isPending || !isAdmin} // Desabilitar se não for admin
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione um cargo" />
@@ -181,6 +197,11 @@ export default function GerenciarUsuarios() {
             <div className="text-center py-12 text-muted-foreground">
               <p>Nenhum usuário encontrado.</p>
             </div>
+          )}
+          {!isAdmin && (
+            <p className="text-sm text-muted-foreground mt-4 text-center">
+              Você não tem permissão para alterar cargos de usuários.
+            </p>
           )}
         </CardContent>
       </Card>

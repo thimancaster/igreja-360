@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Tables } from "@/integrations/supabase/types";
+import { Tables, Database } from "@/integrations/supabase/types"; // Importar Database para AppRole
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2 } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 type Profile = Tables<'profiles'>;
+type AppRole = Database["public"]["Enums"]["app_role"];
 
 const churchSchema = z.object({
   name: z.string().min(1, "Nome da igreja é obrigatório").max(100, "Nome muito longo"),
@@ -49,7 +50,7 @@ export function CreateChurchForm() {
 
   const createChurchMutation = useMutation({
     mutationFn: async (data: ChurchFormValues) => {
-      console.log("CreateChurchForm: MutationFn called. User:", user, "Profile:", profile); // LOG DE DEPURACAO
+      console.log("CreateChurchForm: MutationFn called. User:", user, "Profile:", profile);
       if (!user?.id) throw new Error("Usuário não autenticado.");
 
       // 1. Create the church
@@ -57,20 +58,20 @@ export function CreateChurchForm() {
         .from("churches")
         .insert({
           name: data.name,
-          cnpj: data.cnpj, // Agora o schema já garante que será string ou null
+          cnpj: data.cnpj,
           address: data.address || null,
           city: data.city || null,
           state: data.state || null,
-          owner_user_id: user.id, // Link the current user as the owner
-          status: 'active', // Default status
+          owner_user_id: user.id,
+          status: 'active',
         })
         .select()
-        .maybeSingle(); // Alterado para maybeSingle()
+        .maybeSingle();
 
       if (churchError) {
-        throw churchError; // Lança o erro para ser capturado no onError
+        throw churchError;
       }
-      if (!newChurch) { // Verifica explicitamente se newChurch é null
+      if (!newChurch) {
         throw new Error("Falha ao criar a igreja: nenhuma igreja foi retornada após a criação.");
       }
 
@@ -80,19 +81,28 @@ export function CreateChurchForm() {
         .update({ church_id: newChurch.id })
         .eq("id", user.id)
         .select()
-        .maybeSingle(); // Alterado para maybeSingle()
+        .maybeSingle();
 
       if (profileUpdateError) {
         throw new Error(profileUpdateError.message || "Falha ao associar igreja ao perfil.");
       }
-      if (!updatedProfile) { // Verifica explicitamente se updatedProfile é null
+      if (!updatedProfile) {
         throw new Error("Falha ao associar igreja ao perfil: perfil não encontrado ou não atualizado.");
+      }
+
+      // 3. Assign 'admin' role to the user for this church
+      const { error: roleError } = await supabase
+        .from("user_roles")
+        .insert({ user_id: user.id, role: 'admin' as AppRole }); // Cast para AppRole
+
+      if (roleError) {
+        console.warn("Erro ao atribuir papel de admin ao criador da igreja:", roleError.message);
+        // Não lançar erro fatal aqui, pois a igreja e o perfil já foram criados/atualizados
       }
 
       return { church: newChurch, profile: updatedProfile };
     },
     onSuccess: async (data) => {
-      // Update profile state immediately to trigger redirect
       if (data.profile) {
         setProfile(data.profile as Profile);
       }
@@ -104,6 +114,7 @@ export function CreateChurchForm() {
       
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       queryClient.invalidateQueries({ queryKey: ["church", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["user-roles", user?.id] }); // Invalidar papéis para refletir o novo admin
 
       navigate("/app/church-confirmation");
     },

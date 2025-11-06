@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRole } from "@/hooks/useRole";
+import { useRole } from "@/hooks/useRole"; // Importar useRole
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { User, Building2 } from "lucide-react";
 import { Database, Tables, TablesUpdate } from "@/integrations/supabase/types";
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 // Definir tipos para as linhas das tabelas e para os dados de atualização
 type ProfileRow = Tables<'profiles'>;
@@ -22,8 +22,8 @@ type ProfileUpdateData = Pick<ProfileRow, 'full_name' | 'avatar_url'>;
 type ChurchUpdateData = Pick<ChurchRow, 'name' | 'cnpj' | 'address' | 'city' | 'state'>;
 
 export default function Configuracoes() {
-  const { user, profile } = useAuth(); // Obter profile do AuthContext
-  const { isLoading: roleLoading } = useRole(); // isPrivileged não é mais usado para gating de UI aqui
+  const { user, profile } = useAuth();
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
   const queryClient = useQueryClient();
 
   // Fetch church data
@@ -40,7 +40,7 @@ export default function Configuracoes() {
       if (error) throw error;
       return data as ChurchRow;
     },
-    enabled: !!profile?.church_id && !!user?.id, // Habilitar se houver usuário e church_id
+    enabled: !!profile?.church_id && !!user?.id,
   });
 
   const [profileData, setProfileData] = useState<ProfileUpdateData>({
@@ -121,7 +121,6 @@ export default function Configuracoes() {
     },
   });
 
-
   const handleProfileSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateProfileMutation.mutate(profileData);
@@ -131,6 +130,8 @@ export default function Configuracoes() {
     e.preventDefault();
     updateChurchMutation.mutate(churchData);
   };
+
+  const canEditChurch = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem editar
 
   if (roleLoading) {
     return (
@@ -153,7 +154,6 @@ export default function Configuracoes() {
             <User className="h-4 w-4" />
             Perfil
           </TabsTrigger>
-          {/* Removida a condição isPrivileged para a aba Igreja */}
           <TabsTrigger value="igreja" className="gap-2">
             <Building2 className="h-4 w-4" />
             Igreja
@@ -224,7 +224,6 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
 
-        {/* Removida a condição isPrivileged para o conteúdo da aba Igreja */}
         <TabsContent value="igreja">
           <Card>
             <CardHeader>
@@ -249,6 +248,7 @@ export default function Configuracoes() {
                         setChurchData({ ...churchData, name: e.target.value })
                       }
                       placeholder="Nome da igreja"
+                      disabled={!canEditChurch} // Desabilitar se não puder editar
                     />
                   </div>
 
@@ -261,6 +261,7 @@ export default function Configuracoes() {
                         setChurchData({ ...churchData, cnpj: e.target.value })
                       }
                       placeholder="00.000.000/0000-00"
+                      disabled={!canEditChurch} // Desabilitar se não puder editar
                     />
                   </div>
 
@@ -273,6 +274,7 @@ export default function Configuracoes() {
                         setChurchData({ ...churchData, address: e.target.value })
                       }
                       placeholder="Rua, número, complemento"
+                      disabled={!canEditChurch} // Desabilitar se não puder editar
                     />
                   </div>
 
@@ -286,6 +288,7 @@ export default function Configuracoes() {
                           setChurchData({ ...churchData, city: e.target.value })
                         }
                         placeholder="Cidade"
+                        disabled={!canEditChurch} // Desabilitar se não puder editar
                       />
                     </div>
 
@@ -299,6 +302,7 @@ export default function Configuracoes() {
                         }
                         placeholder="UF"
                         maxLength={2}
+                        disabled={!canEditChurch} // Desabilitar se não puder editar
                       />
                     </div>
                   </div>
@@ -307,13 +311,18 @@ export default function Configuracoes() {
 
                   <Button
                     type="submit"
-                    disabled={updateChurchMutation.isPending}
+                    disabled={updateChurchMutation.isPending || !canEditChurch} // Desabilitar se não puder editar
                   >
                     {updateChurchMutation.isPending && (
                       <LoadingSpinner size="sm" className="mr-2" />
                     )}
                     Salvar Alterações
                   </Button>
+                  {!canEditChurch && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Você não tem permissão para editar os dados da igreja.
+                    </p>
+                  )}
                 </form>
               )}
             </CardContent>

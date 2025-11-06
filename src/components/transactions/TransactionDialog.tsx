@@ -23,17 +23,18 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Transaction } from "@/hooks/useTransactions";
-import { Tables } from "@/integrations/supabase/types"; // Importar Tables para tipos
+import { Tables } from "@/integrations/supabase/types";
 
 interface TransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction?: Transaction | null;
-  categories: Tables<'categories'>[]; // Receber categorias via props
-  ministries: Tables<'ministries'>[]; // Receber ministérios via props
+  categories: Tables<'categories'>[];
+  ministries: Tables<'ministries'>[];
+  canEdit: boolean; // Nova prop para controlar a edição
 }
 
-export function TransactionDialog({ open, onOpenChange, transaction, categories, ministries }: TransactionDialogProps) {
+export function TransactionDialog({ open, onOpenChange, transaction, categories, ministries, canEdit }: TransactionDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,6 +82,14 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEdit) { // Impedir submissão se não puder editar
+      toast({
+        title: "Permissão Negada",
+        description: "Você não tem permissão para criar ou editar transações.",
+        variant: "destructive",
+      });
+      return;
+    }
     setLoading(true);
 
     try {
@@ -201,6 +210,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.type}
                 onValueChange={(value) => setFormData({ ...formData, type: value, category_id: "" })}
+                disabled={!canEdit} // Desabilitar se não puder editar
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -217,6 +227,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value })}
+                disabled={!canEdit} // Desabilitar se não puder editar
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -237,6 +248,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               required
+              disabled={!canEdit} // Desabilitar se não puder editar
             />
           </div>
 
@@ -246,6 +258,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.category_id}
                 onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                disabled={!canEdit} // Desabilitar se não puder editar
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma categoria" />
@@ -265,6 +278,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.ministry_id}
                 onValueChange={(value) => setFormData({ ...formData, ministry_id: value })}
+                disabled={!canEdit} // Desabilitar se não puder editar
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um ministério" />
@@ -290,6 +304,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 required
+                disabled={!canEdit} // Desabilitar se não puder editar
               />
             </div>
 
@@ -300,6 +315,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
                 type="date"
                 value={formData.due_date}
                 onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                disabled={!canEdit} // Desabilitar se não puder editar
               />
             </div>
           </div>
@@ -312,6 +328,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
                 type="date"
                 value={formData.payment_date}
                 onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
+                disabled={!canEdit} // Desabilitar se não puder editar
               />
             </div>
           )}
@@ -323,6 +340,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
+              disabled={!canEdit} // Desabilitar se não puder editar
             />
           </div>
 
@@ -330,7 +348,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !canEdit}>
               {loading ? "Salvando..." : transaction ? "Atualizar" : "Criar"}
             </Button>
           </DialogFooter>
