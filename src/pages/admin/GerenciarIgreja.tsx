@@ -51,7 +51,7 @@ export default function GerenciarIgreja() {
   // Adicionado log para depuração do estado do AuthContext
   useEffect(() => {
     console.log("GerenciarIgreja: useEffect - AuthContext state changed.");
-    console.log("  User:", user);
+    console.log("  User:", user?.id);
     console.log("  Profile:", profile);
     console.log("  Auth Loading:", authLoading);
     console.log("  Church ID from Profile:", profile?.church_id);
@@ -141,8 +141,8 @@ export default function GerenciarIgreja() {
     updateChurchMutation.mutate(values);
   };
 
-  if (authLoading || churchLoading) {
-    console.log("GerenciarIgreja: Displaying loading spinner (authLoading:", authLoading, "churchLoading:", churchLoading, ")");
+  if (authLoading || churchLoading || profile === undefined) { // Adicionado profile === undefined
+    console.log("GerenciarIgreja: Exibindo spinner de carregamento (authLoading:", authLoading, "churchLoading:", churchLoading, "profile undefined:", profile === undefined, ")");
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <LoadingSpinner size="lg" />
@@ -151,7 +151,7 @@ export default function GerenciarIgreja() {
   }
 
   if (!profile?.church_id) {
-    console.log("GerenciarIgreja: Displaying 'Nenhuma Igreja Associada' message. Profile:", profile);
+    console.log("GerenciarIgreja: Exibindo mensagem 'Nenhuma Igreja Associada'. Perfil:", profile);
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Card className="w-full max-w-md text-center">
@@ -164,7 +164,7 @@ export default function GerenciarIgreja() {
     );
   }
 
-  console.log("GerenciarIgreja: Rendering form with church data.");
+  console.log("GerenciarIgreja: Renderizando formulário com dados da igreja. Igreja:", church);
   return (
     <div className="flex-1 space-y-6 p-6">
       <Card>

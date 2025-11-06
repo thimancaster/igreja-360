@@ -49,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Função para buscar perfil com os dados da igreja (join)
   // Agora recebe o objeto User para acessar user_metadata
   const fetchUserProfile = useCallback(async (currentUser: User): Promise<ProfileWithChurch | null> => {
+    console.log("AuthContext: fetchUserProfile called for user:", currentUser.id);
     try {
       // 1. Primeiro, tenta buscar o perfil existente
       const { data: existingProfile, error: fetchError } = await supabase
@@ -66,16 +67,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle(); // Usa maybeSingle para lidar com a ausência de perfil existente
 
       if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 é "No rows found"
-        console.error('Erro ao buscar perfil existente:', fetchError.message);
+        console.error('AuthContext: Erro ao buscar perfil existente:', fetchError.message);
         throw new Error(`Erro ao buscar perfil: ${fetchError.message}`); // Lança erros reais
       }
 
       if (existingProfile) {
+        console.log('AuthContext: Perfil existente encontrado:', existingProfile);
         return existingProfile as ProfileWithChurch;
       }
 
       // 2. Se não houver perfil existente, cria um
-      console.log(`Criando novo perfil para o usuário ${currentUser.id}`);
+      console.log(`AuthContext: Nenhum perfil existente encontrado, criando novo para o usuário ${currentUser.id}`);
       
       const userMetadata = currentUser.user_metadata;
       const fullName = userMetadata?.full_name || `${userMetadata?.first_name || ''} ${userMetadata?.last_name || ''}`.trim() || currentUser.email;
@@ -99,29 +101,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single(); // Usa single aqui, pois esperamos que um seja criado
 
       if (createError) {
-        console.error('Erro ao criar perfil:', createError.message);
+        console.error('AuthContext: Erro ao criar perfil:', createError.message);
         throw new Error(`Erro ao criar perfil: ${createError.message}`); // Lança erros de criação
       }
 
+      console.log('AuthContext: Novo perfil criado:', newProfile);
       return newProfile as ProfileWithChurch;
 
     } catch (error) {
-      console.error('Erro em fetchUserProfile:', error);
+      console.error('AuthContext: Erro em fetchUserProfile:', error);
       // Propaga o erro para cima
       throw error;
     }
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log("AuthContext: refreshProfile chamado, mas sem usuário.");
+      return;
+    }
+    console.log("AuthContext: refreshProfile iniciado.");
     setLoading(true);
     setProfile(undefined); // Define como undefined enquanto atualiza
     try {
       const userProfile = await fetchUserProfile(user);
       setProfile(userProfile);
       setChurchId(userProfile?.church_id || null);
+      console.log("AuthContext: refreshProfile bem-sucedido. Novo perfil:", userProfile, "churchId:", userProfile?.church_id);
     } catch (error) {
-      console.error('Falha ao atualizar perfil:', error);
+      console.error('AuthContext: refreshProfile falhou:', error);
       setProfile(null); // Define como null se a atualização falhar
       setChurchId(null);
       toast({
@@ -131,29 +139,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } finally {
       setLoading(false);
+      console.log("AuthContext: refreshProfile finalizado. Loading:", false);
     }
   }, [user, fetchUserProfile]);
 
   useEffect(() => {
     const getSessionAndProfile = async () => {
+      console.log("AuthContext: getSessionAndProfile iniciado.");
       setLoading(true);
       setProfile(undefined); // Define como undefined enquanto carrega
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError) {
-        console.error('Erro ao obter sessão:', sessionError.message);
+        console.error('AuthContext: Erro ao obter sessão:', sessionError.message);
       }
 
       setSession(session);
       setUser(session?.user ?? null);
+      console.log("AuthContext: Sessão inicial definida. Usuário:", session?.user?.id);
 
       if (session?.user) {
         try {
           const userProfile = await fetchUserProfile(session.user);
           setProfile(userProfile);
           setChurchId(userProfile?.church_id || null);
+          console.log("AuthContext: Perfil inicial carregado. Perfil:", userProfile, "churchId:", userProfile?.church_id);
         } catch (error) {
-          console.error('Erro ao carregar perfil após sessão:', error);
+          console.error('AuthContext: Erro ao carregar perfil após sessão:', error);
           setProfile(null); // Define como null se o fetch/criação do perfil falhar
           setChurchId(null);
           toast({
@@ -165,15 +177,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setProfile(null);
         setChurchId(null);
+        console.log("AuthContext: Nenhum usuário na sessão, perfil definido como null.");
       }
 
       setLoading(false);
+      console.log("AuthContext: getSessionAndProfile finalizado. Loading:", false);
     };
 
     getSessionAndProfile();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        console.log("AuthContext: onAuthStateChange acionado. Evento:", _event, "Usuário da sessão:", session?.user?.id);
         setLoading(true);
         setProfile(undefined); // Define como undefined na mudança de estado de autenticação
         setSession(session);
@@ -184,8 +199,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const userProfile = await fetchUserProfile(session.user);
             setProfile(userProfile);
             setChurchId(userProfile?.church_id || null);
+            console.log("AuthContext: Perfil carregado após mudança de estado de autenticação. Perfil:", userProfile, "churchId:", userProfile?.church_id);
           } catch (error) {
-            console.error('Erro ao carregar perfil após mudança de auth state:', error);
+            console.error('AuthContext: Erro ao carregar perfil após mudança de estado de autenticação:', error);
             setProfile(null); // Define como null se o fetch/criação do perfil falhar
             setChurchId(null);
             toast({
@@ -197,9 +213,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setProfile(null);
           setChurchId(null);
+          console.log("AuthContext: Nenhum usuário após mudança de estado de autenticação, perfil definido como null.");
         }
 
         setLoading(false);
+        console.log("AuthContext: onAuthStateChange finalizado. Loading:", false);
       }
     );
 
@@ -311,7 +329,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setChurchId,
   };
 
-  // Renderiza children sempre, os componentes devem lidar com o estado de carregamento/perfil
   return (
     <AuthContext.Provider value={value}>
       {children}
