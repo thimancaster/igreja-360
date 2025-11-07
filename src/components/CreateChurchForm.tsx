@@ -50,7 +50,6 @@ export function CreateChurchForm() {
 
   const createChurchMutation = useMutation({
     mutationFn: async (data: ChurchFormValues) => {
-      console.log("CreateChurchForm: MutationFn called. User:", user, "Profile:", profile);
       if (!user?.id) throw new Error("Usuário não autenticado.");
 
       // 1. Create the church
