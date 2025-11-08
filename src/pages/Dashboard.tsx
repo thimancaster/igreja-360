@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { DollarSign, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import {
@@ -16,12 +17,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useTransactions, useTransactionStats } from "@/hooks/useTransactions";
+import { useTransactionStats } from "@/hooks/useTransactions";
+import { useFilteredTransactions } from "@/hooks/useFilteredTransactions";
+import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
-  const { data: transactions, isLoading: transactionsLoading } = useTransactions();
+  const [filters, setFilters] = useState({
+    period: "mes-atual",
+    ministryId: "todos",
+    status: "todos-status"
+  });
+
+  const { data: transactions, isLoading: transactionsLoading } = useFilteredTransactions(filters);
   const { data: stats, isLoading: statsLoading } = useTransactionStats();
+  const { data: categoriesAndMinistries } = useCategoriesAndMinistries();
+  const ministries = categoriesAndMinistries?.ministries || [];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -94,7 +105,7 @@ export default function Dashboard() {
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-4">
-        <Select defaultValue="mes-atual">
+        <Select value={filters.period} onValueChange={(value) => setFilters({ ...filters, period: value })}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Período" />
           </SelectTrigger>
@@ -102,23 +113,24 @@ export default function Dashboard() {
             <SelectItem value="mes-atual">Mês Atual</SelectItem>
             <SelectItem value="trimestre">Último Trimestre</SelectItem>
             <SelectItem value="ano">Ano Atual</SelectItem>
-            <SelectItem value="customizado">Customizado</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select defaultValue="todos">
+        <Select value={filters.ministryId} onValueChange={(value) => setFilters({ ...filters, ministryId: value })}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Ministério" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os Ministérios</SelectItem>
-            <SelectItem value="louvor">Louvor</SelectItem>
-            <SelectItem value="missoes">Missões</SelectItem>
-            <SelectItem value="jovens">Jovens</SelectItem>
+            {ministries?.map((ministry) => (
+              <SelectItem key={ministry.id} value={ministry.id}>
+                {ministry.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 
-        <Select defaultValue="todos-status">
+        <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>

@@ -130,9 +130,9 @@ serve(async (req) => {
       }
     }
 
-    if (!integration.sheet_url) {
+    if (!integration.sheet_id) {
       return new Response(
-        JSON.stringify({ error: 'Sheet URL not found for this integration.' }),
+        JSON.stringify({ error: 'Sheet ID not found for this integration.' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -142,19 +142,8 @@ serve(async (req) => {
 
     console.log(`Starting sync for integration ${integrationId} by user ${user.id}`);
 
-    // Extract sheet_id from sheet_url
-    const sheetIdMatch = integration.sheet_url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    const sheetId = sheetIdMatch ? sheetIdMatch[1] : null;
-
-    if (!sheetId) {
-      return new Response(
-        JSON.stringify({ error: 'Could not extract Sheet ID from the provided URL.' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
+    // Use sheet_id directly from the integration
+    const sheetId = integration.sheet_id;
 
     // Get spreadsheet data using Google Sheets API Key
     const sheetResponse = await fetch(

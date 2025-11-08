@@ -112,7 +112,15 @@ export default function GerenciarIgreja() {
   });
 
   const onSubmit = (values: ChurchFormValues) => {
-    updateChurchMutation.mutate(values);
+    // Transform empty strings to null to avoid unique constraint issues
+    const cleanedValues = {
+      ...values,
+      cnpj: values.cnpj?.trim() === "" ? null : values.cnpj,
+      address: values.address?.trim() === "" ? null : values.address,
+      city: values.city?.trim() === "" ? null : values.city,
+      state: values.state?.trim() === "" ? null : values.state,
+    };
+    updateChurchMutation.mutate(cleanedValues);
   };
 
   if (authLoading || churchLoading || profile === undefined) {

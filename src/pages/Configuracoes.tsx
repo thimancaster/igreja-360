@@ -19,7 +19,13 @@ type ProfileRow = Tables<'profiles'>;
 type ChurchRow = Tables<'churches'>;
 
 type ProfileUpdateData = Pick<ProfileRow, 'full_name' | 'avatar_url'>;
-type ChurchUpdateData = Pick<ChurchRow, 'name' | 'cnpj' | 'address' | 'city' | 'state'>;
+type ChurchUpdateData = {
+  name: string;
+  cnpj: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+};
 
 export default function Configuracoes() {
   const { user, profile } = useAuth();
@@ -128,7 +134,15 @@ export default function Configuracoes() {
 
   const handleChurchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateChurchMutation.mutate(churchData);
+    // Transform empty strings to null to avoid unique constraint issues
+    const cleanedData: ChurchUpdateData = {
+      name: churchData.name,
+      cnpj: churchData.cnpj.trim() === "" ? null : churchData.cnpj,
+      address: churchData.address.trim() === "" ? null : churchData.address,
+      city: churchData.city.trim() === "" ? null : churchData.city,
+      state: churchData.state.trim() === "" ? null : churchData.state,
+    };
+    updateChurchMutation.mutate(cleanedData);
   };
 
   const canEditChurch = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem editar
