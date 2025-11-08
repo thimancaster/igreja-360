@@ -1,214 +1,119 @@
 // src/contexts/AuthContext.tsx
-// --- VERSÃO COMPLETA E CORRIGIDA ---
+// --- VERSÃO CORRIGIDA E ROBUSTA ---
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
-import { toast } from '@/hooks/use-toast';
-import { queryClient } from '@/lib/queryClient';
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
+import { Tables } from "@/integrations/supabase/types";
 
-// Define ProfileWithChurch type inline
-type ProfileWithChurch = {
-  id: string;
-  full_name: string | null;
-  avatar_url: string | null;
-  church_id: string | null;
-  churches?: {
-    id: string;
-    name: string;
-    owner_user_id: string;
-  } | null;
-};
+interface Profile extends Tables<'profiles'> {}
 
-// 1. Interface AuthContextType completa
+// Interface completa (incluindo o setProfile que precisávamos)
 interface AuthContextType {
-  session: Session | null;
   user: User | null;
-  profile: ProfileWithChurch | null | undefined; // Pode ser null (sem perfil) ou undefined (carregando)
-  churchId: string | null;
+  session: Session | null;
+  profile: Profile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
-  setProfile: (profile: ProfileWithChurch | null | undefined) => void; // Permitir undefined
-  setChurchId: (churchId: string | null) => void;
+  refetchProfile: () => Promise<void>;
+  setProfile: (profile: Profile | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<ProfileWithChurch | null | undefined>(undefined); // Inicia como undefined
-  const [churchId, setChurchId] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  const fetchUserProfile = useCallback(async (currentUser: User): Promise<ProfileWithChurch | null> => {
+  // fetchProfile com try/catch para não quebrar o fluxo
+  const fetchProfile = useCallback(async (userId: string) => {
     try {
-      const { data: existingProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select(
-          `
-          id,
-          full_name,
-          avatar_url,
-          church_id,
-          churches (id, name, owner_user_id)
-        `
-        )
-        .eq('id', currentUser.id)
-        .maybeSingle();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        throw new Error(`Erro ao buscar perfil: ${fetchError.message}`);
-      }
-
-      if (existingProfile) {
-        return existingProfile as ProfileWithChurch;
-      }
-
-      const userMetadata = currentUser.user_metadata;
-      const fullName = userMetadata?.full_name || `${userMetadata?.first_name || ''} ${userMetadata?.last_name || ''}`.trim() || currentUser.email;
-
-      const { data: newProfile, error: createError } = await supabase
-        .from('profiles')
-        .insert({
-          id: currentUser.id,
-          full_name: fullName,
-          avatar_url: userMetadata?.avatar_url || null,
-        })
-        .select(
-          `
-          id,
-          full_name,
-          avatar_url,
-          church_id,
-          churches (id, name, owner_user_id)
-        `
-        )
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
 
-      if (createError) {
-        throw new Error(`Erro ao criar perfil: ${createError.message}`);
+      if (error) {
+        // Se o perfil não for encontrado (comum para novos usuários), apenas define como nulo
+        console.warn("Perfil não encontrado ou erro RLS:", error.message);
+        setProfile(null);
+        return null;
+      } else {
+        setProfile(data as Profile);
+        return data as Profile;
       }
-
-      return newProfile as ProfileWithChurch;
-
-    } catch (error) {
-      throw error;
+    } catch (err) {
+      console.error("Erro crítico em fetchProfile:", err);
+      setProfile(null);
+      return null;
     }
   }, []);
 
-  const refreshProfile = useCallback(async () => {
-    if (!user) return;
-    
-    setLoading(true);
-    setProfile(undefined);
-    try {
-      const userProfile = await fetchUserProfile(user);
-      setProfile(userProfile);
-      setChurchId(userProfile?.church_id || null);
-    } catch (error) {
-      setProfile(null);
-      setChurchId(null);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar seu perfil. Por favor, tente novamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  const refetchProfile = useCallback(async () => {
+    if (user?.id) {
+      await fetchProfile(user.id);
     }
-  }, [user, fetchUserProfile]);
+  }, [user?.id, fetchProfile]);
 
   useEffect(() => {
-    let isMounted = true;
+    // Função para buscar sessão inicial
+    const getInitialSession = async () => {
+      setLoading(true); // Garante que o loading está ativo
+      try {
+        const { data: { session: initialSession }, error: getSessionError } = await supabase.auth.getSession();
 
-    const getSessionAndProfile = async () => {
-      if (!isMounted) return;
-      setLoading(true);
-      setProfile(undefined);
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!isMounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
-        try {
-          const userProfile = await fetchUserProfile(session.user);
-          if (!isMounted) return;
-          setProfile(userProfile);
-          setChurchId(userProfile?.church_id || null);
-        } catch (error) {
-          if (!isMounted) return;
-          setProfile(null);
-          setChurchId(null);
-          toast({
-            title: "Erro crítico",
-            description: "Não foi possível carregar ou criar seu perfil. Por favor, tente novamente.",
-            variant: "destructive",
-          });
+        if (getSessionError) {
+          console.error("Erro ao buscar sessão:", getSessionError.message);
         }
-      } else {
-        if (!isMounted) return;
-        setProfile(null);
-        setChurchId(null);
-      }
 
-      if (isMounted) {
+        setSession(initialSession);
+        setUser(initialSession?.user ?? null);
+
+        if (initialSession?.user) {
+          await fetchProfile(initialSession.user.id);
+        }
+      } catch (error) {
+        console.error("Erro no getInitialSession:", error);
+        setProfile(null);
+      } finally {
+        // CORREÇÃO CRÍTICA: Garante que o loading termina, não importa o que aconteça
         setLoading(false);
       }
     };
 
-    getSessionAndProfile();
+    getInitialSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!isMounted) return;
-        setLoading(true);
-        setProfile(undefined);
-        setSession(session);
-        setUser(session?.user ?? null);
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, currentSession) => {
+        setLoading(true); // Inicia o loading
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
 
-        if (session?.user) {
-          try {
-            const userProfile = await fetchUserProfile(session.user);
-            if (!isMounted) return;
-            setProfile(userProfile);
-            setChurchId(userProfile?.church_id || null);
-          } catch (error) {
-            if (!isMounted) return;
-            setProfile(null);
-            setChurchId(null);
-            toast({
-              title: "Erro crítico",
-              description: "Não foi possível carregar ou criar seu perfil. Por favor, tente novamente.",
-              variant: "destructive",
-            });
-          }
+        if (currentSession?.user) {
+          await fetchProfile(currentSession.user.id);
         } else {
-          if (!isMounted) return;
-          setProfile(null);
-          setChurchId(null);
+          setProfile(null); // Limpa o perfil no logout
         }
 
-        if (isMounted) {
-          setLoading(false);
-        }
+        setLoading(false); // Termina o loading após a mudança
       }
     );
 
     return () => {
-      isMounted = false;
-      authListener?.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
-  }, [fetchUserProfile]);
+  }, [fetchProfile]);
 
-  // --- Funções de Auth do seu código original ---
+
   const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -235,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
-      const redirectUrl = `${window.location.origin}/`; // Redirecionar para a raiz
+      const redirectUrl = `${window.location.origin}/app/dashboard`;
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -243,9 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            full_name: fullName, // Garante que full_name seja passado
-            first_name: fullName.split(' ')[0] || '',
-            last_name: fullName.split(' ').slice(1).join(' ') || '',
+            full_name: fullName, // O seu trigger handle_new_user usará isto
           },
         },
       });
@@ -279,14 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         description: "Você foi desconectado com sucesso.",
       });
 
-      // Limpar estado localmente imediatamente
-      setSession(null);
-      setUser(null);
-      setProfile(null);
-      setChurchId(null);
-      queryClient.clear(); // Limpar cache do react-query
       navigate("/auth");
-
     } catch (error: any) {
       toast({
         title: "Erro ao sair",
@@ -295,33 +191,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     }
   };
-  // --- Fim das funções de Auth ---
-
-  const value = {
-    session,
-    user,
-    profile,
-    churchId,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-    refreshProfile,
-    setProfile,
-    setChurchId,
-  };
 
   return (
-    <AuthContext.Provider value={value}>
-      {children}
+    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut, refetchProfile, setProfile }}>
+      {/* CORREÇÃO CRÍTICA: Só renderiza a aplicação DEPOIS que o loading inicial terminar */}
+      {!loading && children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-};
+}
