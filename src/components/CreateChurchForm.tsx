@@ -1,243 +1,120 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
-import { z } from "zod";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Tables, Database } from "@/integrations/supabase/types"; // Importar Database para AppRole
+// src/components/CreateChurchForm.tsx
+import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRole } from '@/hooks/useRole'; // Importar hook de Role
+import { useNavigate } from 'react-router-dom';
+import { toast } from '@/hooks/use-toast';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2 } from "lucide-react";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
-
-type Profile = Tables<'profiles'>;
-type AppRole = Database["public"]["Enums"]["app_role"];
-
-const churchSchema = z.object({
-  name: z.string().min(1, "Nome da igreja é obrigatório").max(100, "Nome muito longo"),
-  // Transforma string vazia em null para evitar violação de unicidade em CNPJs vazios
-  cnpj: z.string().optional().transform(e => e === "" ? null : e),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
+const formSchema = z.object({
+  churchName: z.string().min(3, { message: 'O nome da igreja deve ter pelo menos 3 caracteres.' }),
 });
 
-type ChurchFormValues = z.infer<typeof churchSchema>;
-
-export function CreateChurchForm() {
-  const { user, profile, loading: authLoading, setProfile } = useAuth();
-  const { toast } = useToast();
+const CreateChurchForm: React.FC = () => {
+  const { user, refetchProfile } = useAuth();
+  const { isAdmin } = useRole(); // Verificar se é admin
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
+  const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<ChurchFormValues>({
-    resolver: zodResolver(churchSchema),
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      cnpj: "",
-      address: "",
-      city: "",
-      state: "",
+      churchName: '',
     },
   });
 
-  const createChurchMutation = useMutation({
-    mutationFn: async (data: ChurchFormValues) => {
-      if (!user?.id) throw new Error("Usuário não autenticado.");
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!user) {
+      toast({ title: 'Erro', description: 'Usuário não autenticado.', variant: 'destructive' });
+      return;
+    }
+    setIsLoading(true);
 
-      // 1. Create the church
-      const { data: newChurch, error: churchError } = await supabase
-        .from("churches")
+    try {
+      // 1. Criar a Igreja (Todos podem fazer isso)
+      const { data: churchData, error: churchError } = await supabase
+        .from('churches')
         .insert({
-          name: data.name,
-          cnpj: data.cnpj,
-          address: data.address || null,
-          city: data.city || null,
-          state: data.state || null,
-          owner_user_id: user.id,
-          status: 'active',
+          name: values.churchName,
+          owner_user_id: user.id, // O ID do criador é sempre o "owner"
         })
         .select()
-        .maybeSingle();
+        .single();
 
-      if (churchError) {
-        throw churchError;
-      }
-      if (!newChurch) {
-        throw new Error("Falha ao criar a igreja: nenhuma igreja foi retornada após a criação.");
-      }
+      if (churchError) throw churchError;
 
-      // 2. Update the user's profile with the new church_id
-      const { data: updatedProfile, error: profileUpdateError } = await supabase
-        .from("profiles")
-        .update({ church_id: newChurch.id })
-        .eq("id", user.id)
-        .select()
-        .maybeSingle();
+      // 2. Associar o perfil, APENAS SE NÃO FOR ADMIN
+      if (!isAdmin && churchData) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ church_id: churchData.id })
+          .eq('id', user.id);
 
-      if (profileUpdateError) {
-        throw new Error(profileUpdateError.message || "Falha ao associar igreja ao perfil.");
-      }
-      if (!updatedProfile) {
-        throw new Error("Falha ao associar igreja ao perfil: perfil não encontrado ou não atualizado.");
+        if (profileError) throw profileError;
+
+        // 3. Atualizar o perfil no AuthContext
+        // (O refetchProfile do AuthContext que corrigimos anteriormente fará isso)
+        await refetchProfile();
       }
 
-      // 3. Assign 'admin' role to the user for this church
-      const { error: roleError } = await supabase
-        .from("user_roles")
-        .insert({ user_id: user.id, role: 'admin' as AppRole }); // Cast para AppRole
+      toast({ title: 'Igreja criada com sucesso!' });
+      navigate('/app/dashboard'); // Redirecionar para o dashboard
 
-      if (roleError) {
-        console.warn("Erro ao atribuir papel de admin ao criador da igreja:", roleError.message);
-        // Não lançar erro fatal aqui, pois a igreja e o perfil já foram criados/atualizados
-      }
-
-      return { church: newChurch, profile: updatedProfile };
-    },
-    onSuccess: async (data) => {
-      if (data.profile) {
-        setProfile(data.profile as Profile);
-      }
-      
+    } catch (error: any) {
+      console.error('Erro ao criar igreja:', error);
       toast({
-        title: "Sucesso!",
-        description: "Igreja criada e associada ao seu perfil.",
+        title: 'Erro ao criar igreja',
+        description: error.message || 'Ocorreu um erro inesperado.',
+        variant: 'destructive',
       });
-      
-      queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["church", user?.id] });
-      queryClient.invalidateQueries({ queryKey: ["user-roles", user?.id] }); // Invalidar papéis para refletir o novo admin
-
-      navigate("/app/church-confirmation");
-    },
-    onError: (error: any) => {
-      let errorMessage = error.message || "Ocorreu um erro inesperado.";
-      if (error.code === '23505' && error.constraint === 'churches_cnpj_key') {
-        errorMessage = "Já existe uma igreja cadastrada com este CNPJ. Por favor, verifique os dados ou entre em contato com o suporte.";
-      }
-      toast({
-        title: "Erro ao criar igreja",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmit = (values: ChurchFormValues) => {
-    createChurchMutation.mutate(values);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoadingSpinner size="xl" />
-      </div>
-    );
-  }
-
-  if (profile?.church_id) {
-    navigate("/app/dashboard", { replace: true });
-    return null;
-  }
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md border-border/50 shadow-xl">
-        <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="p-3 bg-gradient-to-br from-primary to-primary-dark rounded-2xl shadow-lg">
-              <Building2 className="h-10 w-10 text-primary-foreground" />
-            </div>
-          </div>
-          <CardTitle className="text-3xl font-bold">Criar Igreja</CardTitle>
-          <CardDescription className="text-base">
-            Parece que você ainda não tem uma igreja associada. Crie uma para começar!
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome da Igreja</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Nome da sua igreja" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="cnpj"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>CNPJ (Opcional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="00.000.000/0000-00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Endereço (Opcional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Rua, número, complemento" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cidade (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Cidade" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="state"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Estado (Opcional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="UF" maxLength={2} {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={createChurchMutation.isPending}>
-                {createChurchMutation.isPending && <LoadingSpinner size="sm" className="mr-2" />}
-                Criar Igreja
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="w-full max-w-md">
+      <CardHeader>
+        <CardTitle>Crie sua Igreja</CardTitle>
+        <CardDescription>
+          {isAdmin 
+            ? "Como administrador, você pode cadastrar uma nova igreja no sistema." 
+            : "Você ainda não está vinculado a uma igreja. Por favor, crie a sua primeira igreja."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="churchName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome da Igreja</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Igreja Batista da Esperança" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <LoadingSpinner size="sm" className="mr-2" />}
+              {isLoading ? 'Criando...' : 'Criar Igreja e Acessar'}
+            </Button>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
-}
+};
+
+export default CreateChurchForm;
