@@ -125,20 +125,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, fetchUserProfile]);
 
   useEffect(() => {
+    let isMounted = true;
+
     const getSessionAndProfile = async () => {
+      if (!isMounted) return;
       setLoading(true);
       setProfile(undefined);
       const { data: { session } } = await supabase.auth.getSession();
 
+      if (!isMounted) return;
       setSession(session);
       setUser(session?.user ?? null);
 
       if (session?.user) {
         try {
           const userProfile = await fetchUserProfile(session.user);
+          if (!isMounted) return;
           setProfile(userProfile);
           setChurchId(userProfile?.church_id || null);
         } catch (error) {
+          if (!isMounted) return;
           setProfile(null);
           setChurchId(null);
           toast({
@@ -148,17 +154,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } else {
+        if (!isMounted) return;
         setProfile(null);
         setChurchId(null);
       }
 
-      setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+      }
     };
 
     getSessionAndProfile();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        if (!isMounted) return;
         setLoading(true);
         setProfile(undefined);
         setSession(session);
@@ -167,9 +177,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           try {
             const userProfile = await fetchUserProfile(session.user);
+            if (!isMounted) return;
             setProfile(userProfile);
             setChurchId(userProfile?.church_id || null);
           } catch (error) {
+            if (!isMounted) return;
             setProfile(null);
             setChurchId(null);
             toast({
@@ -179,15 +191,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } else {
+          if (!isMounted) return;
           setProfile(null);
           setChurchId(null);
         }
 
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     );
 
     return () => {
+      isMounted = false;
       authListener?.subscription.unsubscribe();
     };
   }, [fetchUserProfile]);

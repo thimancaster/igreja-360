@@ -175,10 +175,37 @@ export default function Importacao() {
         throw new Error("Nenhuma transação válida para importar.");
       }
 
-      const { error: insertError } = await supabase.from("transactions").insert(transactionsToInsert);
+      // Check for duplicates before inserting
+      const descriptions = transactionsToInsert.map(t => t.description);
+      const { data: existingTransactions } = await supabase
+        .from("transactions")
+        .select("description, amount, payment_date, due_date")
+        .eq("church_id", profile.church_id)
+        .in("description", descriptions);
+
+      // Filter out duplicates
+      const nonDuplicates = transactionsToInsert.filter(t => 
+        !existingTransactions?.some(e => 
+          e.description === t.description && 
+          Number(e.amount) === t.amount && 
+          (e.payment_date === t.payment_date || e.due_date === t.due_date)
+        )
+      );
+
+      if (nonDuplicates.length === 0) {
+        throw new Error("Todas as transações já existem no sistema. Nenhuma transação foi importada.");
+      }
+
+      const { error: insertError } = await supabase.from("transactions").insert(nonDuplicates);
       if (insertError) throw insertError;
 
-      toast({ title: "Sucesso!", description: `${transactionsToInsert.length} transações importadas com sucesso.` });
+      const skippedCount = transactionsToInsert.length - nonDuplicates.length;
+      const message = skippedCount > 0 
+        ? `${nonDuplicates.length} transações importadas. ${skippedCount} duplicatas ignoradas.`
+        : `${nonDuplicates.length} transações importadas com sucesso.`;
+      
+      toast({ title: "Sucesso!", description: message });
+
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
       navigate("/dashboard");

@@ -1,4 +1,4 @@
-import { Users, Building2, ChevronRight, Home } from "lucide-react";
+import { Users, Building2, ChevronRight, Home, Tag } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -7,7 +7,7 @@ export default function Admin() {
     <div className="flex-1 space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold">Administração</h1>
-        <p className="text-muted-foreground mt-1">Gerencie usuários, igrejas e ministérios</p>
+        <p className="text-muted-foreground mt-1">Gerencie usuários, igrejas, ministérios e categorias</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
@@ -46,10 +46,25 @@ export default function Admin() {
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <div className="flex items-center gap-3">
-                  <Building2 className="h-6 w-6 text-secondary" />
+                  <Building2 className="h-6 w-6 text-primary" />
                   <CardTitle>Gerenciar Ministérios</CardTitle>
                 </div>
                 <CardDescription className="mt-2">Adicione e configure os ministérios da igreja.</CardDescription>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link to="/app/admin/categorias" className="block hover:shadow-lg transition-shadow rounded-lg">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <Tag className="h-6 w-6 text-primary" />
+                  <CardTitle>Gerenciar Categorias</CardTitle>
+                </div>
+                <CardDescription className="mt-2">Organize as categorias de transações.</CardDescription>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </CardHeader>

@@ -30,6 +30,7 @@ const Admin = lazy(() => import('@/pages/Admin'));
 const GerenciarUsuarios = lazy(() => import('@/pages/admin/GerenciarUsuarios'));
 const GerenciarMinisterios = lazy(() => import('@/pages/admin/GerenciarMinisterios'));
 const GerenciarIgreja = lazy(() => import('@/pages/admin/GerenciarIgreja'));
+const GerenciarCategorias = lazy(() => import('@/pages/admin/GerenciarCategorias'));
 const CreateChurchPage = lazy(() => import('@/pages/CreateChurch'));
 const ChurchConfirmation = lazy(() => import('@/pages/ChurchConfirmation'));
 
@@ -69,6 +70,7 @@ const App: React.FC = () => {
                               <Route path="admin" element={<Admin />} />
                               <Route path="admin/usuarios" element={<GerenciarUsuarios />} />
                               <Route path="admin/ministerios" element={<GerenciarMinisterios />} />
+                              <Route path="admin/categorias" element={<GerenciarCategorias />} />
                               <Route path="admin/igreja" element={<GerenciarIgreja />} />
                               <Route path="configuracoes" element={<Configuracoes />} />
                               <Route path="create-church" element={<CreateChurchPage />} />
