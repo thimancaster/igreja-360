@@ -1,5 +1,5 @@
 // src/App.tsx
-// --- VERSÃO CORRIGIDA E SIMPLIFICADA (SEM LAZY) ---
+// --- VERSÃO COM IMPORT CORRIGIDO DO LOADING SPINNER ---
 
 import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
@@ -12,16 +12,15 @@ import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthRedirect } from '@/components/AuthRedirect';
 
-// Importação CORRETA (default)
-import ProtectedRoute from '@/components/ProtectedRoute'; 
+import ProtectedRoute from '@/components/ProtectedRoute'; // Importação Default
 
 import { AppSidebar } from '@/components/AppSidebar';
 import { AppHeader } from '@/components/AppHeader';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/LoadingSpinner'; // <-- CORREÇÃO: Adicionadas chaves {}
 
 // Importações diretas (sem lazy) para garantir o build
 import Dashboard from '@/pages/Dashboard';
-import AuthPage from '@/pages/Auth'; // Importação CORRETA (componente chama-se AuthPage)
+import AuthPage from '@/pages/Auth'; // Importação Default
 import NotFound from '@/pages/NotFound';
 import Transacoes from '@/pages/Transacoes';
 import Integracoes from '@/pages/Integracoes';
@@ -45,11 +44,10 @@ const App: React.FC = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            {/* O Suspense é mantido caso algum componente interno o use */}
             <Suspense fallback={<div className="flex h-screen w-full items-center justify-center"><LoadingSpinner size="lg" /></div>}>
               <Routes>
                 {/* Rotas Públicas */}
-                <Route path="/auth" element={<AuthPage />} /> {/* Rota CORRETA */}
+                <Route path="/auth" element={<AuthPage />} />
                 <Route path="/landing" element={<LandingPage />} />
 
                 {/* Rota raiz: redireciona dependendo do auth */}
