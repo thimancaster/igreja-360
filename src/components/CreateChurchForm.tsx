@@ -5,14 +5,14 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole } from '@/hooks/useRole'; // Importar hook de Role
+import { useRole } from '@/hooks/useRole';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 const formSchema = z.object({
   churchName: z.string().min(3, { message: 'O nome da igreja deve ter pelo menos 3 caracteres.' }),
@@ -20,7 +20,7 @@ const formSchema = z.object({
 
 const CreateChurchForm: React.FC = () => {
   const { user, refetchProfile } = useAuth();
-  const { isAdmin } = useRole(); // Verificar se é admin
+  const { isAdmin } = useRole();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,19 +39,17 @@ const CreateChurchForm: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Criar a Igreja (Todos podem fazer isso)
       const { data: churchData, error: churchError } = await supabase
         .from('churches')
         .insert({
           name: values.churchName,
-          owner_user_id: user.id, // O ID do criador é sempre o "owner"
+          owner_user_id: user.id,
         })
         .select()
         .single();
 
       if (churchError) throw churchError;
 
-      // 2. Associar o perfil, APENAS SE NÃO FOR ADMIN
       if (!isAdmin && churchData) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -60,13 +58,11 @@ const CreateChurchForm: React.FC = () => {
 
         if (profileError) throw profileError;
 
-        // 3. Atualizar o perfil no AuthContext
-        // (O refetchProfile do AuthContext que corrigimos anteriormente fará isso)
         await refetchProfile();
       }
 
       toast({ title: 'Igreja criada com sucesso!' });
-      navigate('/app/dashboard'); // Redirecionar para o dashboard
+      navigate('/app/dashboard');
 
     } catch (error: any) {
       console.error('Erro ao criar igreja:', error);

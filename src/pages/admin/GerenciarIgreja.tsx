@@ -2,29 +2,29 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole } from '@/hooks/useRole'; // Importar hook de Role
+import { useRole } from '@/hooks/useRole';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import LoadingSpinner from '@/components/LoadingSpinner';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
-import { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { Tables, TablesUpdate } from '@/integrations/supabase/types';
 
 type Church = Tables<'churches'>;
 type ChurchUpdateData = TablesUpdate<'churches'>;
 
 const GerenciarIgreja = () => {
   const { profile } = useAuth();
-  const { isAdmin, isLoading: isRoleLoading } = useRole(); // Usar hook de Role
+  const { isAdmin, isLoading: isRoleLoading } = useRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const [churchData, setChurchData] = useState<Church | null>(null);
 
-  // Lógica de Busca de Dados
   const { data: church, isLoading: isLoadingChurch } = useQuery({
     queryKey: ['church-details', profile?.church_id, isAdmin],
     queryFn: async () => {
@@ -32,16 +32,11 @@ const GerenciarIgreja = () => {
 
       let query;
       if (isAdmin) {
-        // Admin: pode ver todas as igrejas (mas por agora, vamos focar em carregar UMA para editar)
-        // Se o admin também tiver uma church_id, usa ela. Se não, permite-lhe ver a UI
-        // Esta lógica precisa ser melhorada para um admin ver *todas* as igrejas
         if (!profile.church_id) {
-          // Admin sem igreja associada, não carrega dados de uma igreja específica
           return null; 
         }
         query = supabase.from('churches').select('*').eq('id', profile.church_id);
       } else {
-        // Não-Admin: Só pode ver a própria igreja
         if (!profile.church_id) return null;
         query = supabase.from('churches').select('*').eq('id', profile.church_id);
       }
@@ -50,7 +45,7 @@ const GerenciarIgreja = () => {
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!profile && !isRoleLoading, // Só executa se o perfil estiver carregado
+    enabled: !!profile && !isRoleLoading,
   });
 
   useEffect(() => {
@@ -59,7 +54,6 @@ const GerenciarIgreja = () => {
     }
   }, [church]);
 
-  // Lógica de Atualização
   const updateChurchMutation = useMutation({
     mutationFn: async (updatedData: ChurchUpdateData) => {
       if (!churchData?.id) throw new Error('ID da Igreja não encontrado');
@@ -85,7 +79,6 @@ const GerenciarIgreja = () => {
 
     const cleanedData: ChurchUpdateData = {
       name: churchData.name,
-      // Corrigir transformação de strings vazias em null
       cnpj: churchData.cnpj?.trim() === "" ? null : churchData.cnpj,
       address: churchData.address?.trim() === "" ? null : churchData.address,
       city: churchData.city?.trim() === "" ? null : churchData.city,
@@ -94,14 +87,10 @@ const GerenciarIgreja = () => {
     updateChurchMutation.mutate(cleanedData);
   };
 
-  // --- RENDERIZAÇÃO ---
-
   if (isLoadingChurch || isRoleLoading) {
     return <div className="flex h-full items-center justify-center p-6"><LoadingSpinner size="lg" /></div>;
   }
 
-  // CORREÇÃO: Erro "Nenhuma Igreja Associada"
-  // Este erro só deve aparecer para NÃO-ADMINS
   if (!isAdmin && !profile?.church_id) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
@@ -110,16 +99,11 @@ const GerenciarIgreja = () => {
         <p className="text-muted-foreground text-center">
           Seu perfil não está associado a nenhuma igreja. Por favor, crie uma igreja primeiro.
         </p>
-        {/* TODO: Adicionar um botão para navegar para /create-church */}
       </div>
     );
   }
 
-  // Se for Admin e não tiver igreja, ou se for não-admin e tiver igreja
-  // (Esta página ainda precisa de uma UI melhor para admin ver *todas* as igrejas, mas isto corrige o bug de acesso)
-
   if (!churchData && !isAdmin) {
-     // Estado estranho, mas possível se o RLS falhar
      return <div>Carregando dados da igreja...</div>;
   }
 
@@ -130,10 +114,10 @@ const GerenciarIgreja = () => {
       {isAdmin && !churchData && (
          <Alert variant="default" className="mb-6">
             <AlertTriangle className="h-4 w-4" />
-            <p>
+            <AlertDescription>
               Modo Administrador: Você pode gerenciar todas as igrejas. (Funcionalidade de listar/selecionar todas as igrejas ainda em desenvolvimento).
               Para criar uma nova igreja, use a página <a href="/create-church" className="underline">Criar Igreja</a>.
-            </p>
+            </AlertDescription>
          </Alert>
       )}
 
@@ -162,7 +146,6 @@ const GerenciarIgreja = () => {
                   />
                 </div>
               </div>
-              {/* ... (Restante dos campos: address, city, state) ... */}
               <Button type="submit" disabled={updateChurchMutation.isPending}>
                 {updateChurchMutation.isPending && <LoadingSpinner size="sm" className="mr-2" />}
                 Salvar Alterações

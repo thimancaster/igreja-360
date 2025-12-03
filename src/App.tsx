@@ -12,7 +12,7 @@ import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthRedirect } from '@/components/AuthRedirect';
 
-import ProtectedRoute from '@/components/ProtectedRoute'; // Importação Default
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 import { AppSidebar } from '@/components/AppSidebar';
 import { AppHeader } from '@/components/AppHeader';
