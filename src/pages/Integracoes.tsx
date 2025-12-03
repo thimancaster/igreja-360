@@ -45,6 +45,13 @@ export default function Integracoes() {
   const [sheetHeaders, setSheetHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
+  
+  // SECURITY FIX: Store OAuth tokens in React state instead of sessionStorage
+  // This prevents exposure to XSS attacks and browser extensions
+  const [oauthTokens, setOauthTokens] = useState<{
+    accessToken: string;
+    refreshToken: string | null;
+  } | null>(null);
 
   const canManageIntegrations = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem gerenciar integrações
 
@@ -95,13 +102,14 @@ export default function Integracoes() {
           return;
         }
 
-        // Store tokens temporarily for integration creation
-        sessionStorage.setItem('oauth_access_token', session.access_token);
-        if (session.refresh_token) {
-          sessionStorage.setItem('oauth_refresh_token', session.refresh_token);
-        }
+        // SECURITY FIX: Store tokens in React state (memory only) instead of sessionStorage
+        // This prevents exposure to XSS attacks and browser extensions
+        setOauthTokens({
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token || null,
+        });
 
-        // Delete session after retrieving tokens
+        // Delete session from database after retrieving tokens
         await supabase.from('oauth_sessions').delete().eq('id', sessionId);
 
         // Clear URL params
@@ -174,11 +182,8 @@ export default function Integracoes() {
       return;
     }
 
-    // Get OAuth tokens from sessionStorage (not URL!)
-    const accessToken = sessionStorage.getItem('oauth_access_token');
-    const refreshToken = sessionStorage.getItem('oauth_refresh_token');
-
-    if (!accessToken) {
+    // SECURITY FIX: Get OAuth tokens from React state (memory) instead of sessionStorage
+    if (!oauthTokens?.accessToken) {
       toast({
         title: "Erro de OAuth",
         description: "Tokens de acesso não encontrados. Por favor, autentique novamente.",
@@ -192,13 +197,12 @@ export default function Integracoes() {
       sheetId: sheetId,
       sheetName: sheetName,
       columnMapping,
-      accessToken: accessToken,
-      refreshToken: refreshToken || '',
+      accessToken: oauthTokens.accessToken,
+      refreshToken: oauthTokens.refreshToken || '',
     });
 
-    // Clear tokens after successful integration creation
-    sessionStorage.removeItem('oauth_access_token');
-    sessionStorage.removeItem('oauth_refresh_token');
+    // Clear tokens from memory after successful integration creation
+    setOauthTokens(null);
 
     setShowMappingDialog(false);
     setSheetUrl("");
