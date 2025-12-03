@@ -7,18 +7,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Validation schema for transaction data
+// Simple HTML sanitization for Edge Function (no external dependencies)
+function sanitizeString(input: string | null | undefined): string {
+  if (!input || typeof input !== 'string') return '';
+  // Remove HTML tags and decode entities
+  return input
+    .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .trim();
+}
+
+// Validation schema for transaction data with sanitization
 const transactionSchema = z.object({
   church_id: z.string().uuid(),
   created_by: z.string().uuid(),
-  origin: z.string().max(100),
-  description: z.string().max(500).trim(),
+  origin: z.string().max(100).transform(sanitizeString),
+  description: z.string().max(500).transform(sanitizeString).pipe(
+    z.string().min(1, 'Description is required')
+  ),
   amount: z.number().finite().safe(),
   type: z.enum(['Receita', 'Despesa']),
   status: z.enum(['Pendente', 'Pago', 'Vencido']),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  notes: z.string().max(1000).nullable().optional(),
+  notes: z.string().max(1000).transform(sanitizeString).nullable().optional(),
   category_id: z.string().uuid().nullable().optional(),
   ministry_id: z.string().uuid().nullable().optional(),
 });

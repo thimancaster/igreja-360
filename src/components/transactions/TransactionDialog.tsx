@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { sanitizeText } from "@/lib/sanitize";
 import {
   Dialog,
   DialogContent,
@@ -97,9 +98,11 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
         throw new Error("Usuário não autenticado");
       }
 
-      // Validate input data
+      // Validate and sanitize input data
       const transactionSchema = z.object({
-        description: z.string().trim().min(1, "Descrição é obrigatória").max(500, "Descrição muito longa"),
+        description: z.string().trim().transform(sanitizeText).pipe(
+          z.string().min(1, "Descrição é obrigatória").max(500, "Descrição muito longa")
+        ),
         amount: z.string().refine((val) => {
           const num = parseFloat(val);
           return !isNaN(num) && num > 0 && num <= 999999999;
@@ -108,7 +111,9 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
         status: z.enum(["Pendente", "Pago", "Vencido"]),
         due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
         payment_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
-        notes: z.string().max(2000, "Notas muito longas").optional().or(z.literal("")),
+        notes: z.string().transform(sanitizeText).pipe(
+          z.string().max(2000, "Notas muito longas")
+        ).optional().or(z.literal("")),
       });
 
       const validated = transactionSchema.parse({
