@@ -138,12 +138,14 @@ export type Database = {
       google_integrations: {
         Row: {
           access_token: string | null
+          access_token_enc: string | null
           church_id: string
           column_mapping: Json
           created_at: string | null
           id: string
           last_sync_at: string | null
           refresh_token: string | null
+          refresh_token_enc: string | null
           sheet_id: string
           sheet_name: string
           updated_at: string | null
@@ -151,12 +153,14 @@ export type Database = {
         }
         Insert: {
           access_token?: string | null
+          access_token_enc?: string | null
           church_id: string
           column_mapping: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
           refresh_token?: string | null
+          refresh_token_enc?: string | null
           sheet_id: string
           sheet_name: string
           updated_at?: string | null
@@ -164,12 +168,14 @@ export type Database = {
         }
         Update: {
           access_token?: string | null
+          access_token_enc?: string | null
           church_id?: string
           column_mapping?: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
           refresh_token?: string | null
+          refresh_token_enc?: string | null
           sheet_id?: string
           sheet_name?: string
           updated_at?: string | null
@@ -261,26 +267,32 @@ export type Database = {
       oauth_sessions: {
         Row: {
           access_token: string
+          access_token_enc: string | null
           created_at: string | null
           expires_at: string | null
           id: string
           refresh_token: string | null
+          refresh_token_enc: string | null
           user_id: string
         }
         Insert: {
           access_token: string
+          access_token_enc?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
           refresh_token?: string | null
+          refresh_token_enc?: string | null
           user_id: string
         }
         Update: {
           access_token?: string
+          access_token_enc?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
           refresh_token?: string | null
+          refresh_token_enc?: string | null
           user_id?: string
         }
         Relationships: []
@@ -473,6 +485,20 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_oauth_sessions: { Args: never; Returns: undefined }
+      get_decrypted_integration: {
+        Args: { integration_id: string }
+        Returns: {
+          access_token: string
+          refresh_token: string
+        }[]
+      }
+      get_decrypted_oauth_session: {
+        Args: { session_id: string }
+        Returns: {
+          access_token: string
+          refresh_token: string
+        }[]
+      }
       get_user_church_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -480,6 +506,22 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      store_encrypted_integration_tokens: {
+        Args: {
+          p_access_token: string
+          p_integration_id: string
+          p_refresh_token: string
+        }
+        Returns: undefined
+      }
+      store_encrypted_oauth_session: {
+        Args: {
+          p_access_token: string
+          p_refresh_token: string
+          p_user_id: string
+        }
+        Returns: string
       }
     }
     Enums: {

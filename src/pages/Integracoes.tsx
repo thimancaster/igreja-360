@@ -72,14 +72,14 @@ export default function Integracoes() {
       }
 
       if (sessionId && user) {
-        // Fetch tokens from secure session
-        const { data: session, error: fetchError } = await supabase
+        // First check if session exists and is not expired
+        const { data: session, error: sessionCheckError } = await supabase
           .from('oauth_sessions')
-          .select('*')
+          .select('id, expires_at')
           .eq('id', sessionId)
           .single();
 
-        if (fetchError || !session) {
+        if (sessionCheckError || !session) {
           toast({
             title: "Erro",
             description: "Não foi possível recuperar a sessão OAuth. Tente novamente.",
@@ -102,11 +102,28 @@ export default function Integracoes() {
           return;
         }
 
-        // SECURITY FIX: Store tokens in React state (memory only) instead of sessionStorage
-        // This prevents exposure to XSS attacks and browser extensions
+        // Fetch decrypted tokens using secure RPC function
+        const { data: decryptedTokens, error: decryptError } = await supabase.rpc(
+          'get_decrypted_oauth_session',
+          { session_id: sessionId }
+        );
+
+        if (decryptError || !decryptedTokens || decryptedTokens.length === 0) {
+          console.error('Failed to decrypt OAuth tokens:', decryptError);
+          toast({
+            title: "Erro",
+            description: "Não foi possível recuperar os tokens OAuth. Tente novamente.",
+            variant: "destructive",
+          });
+          setSearchParams({});
+          return;
+        }
+
+        // SECURITY: Store tokens in React state (memory only)
+        // Tokens are encrypted at rest in database and decrypted only when needed
         setOauthTokens({
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token || null,
+          accessToken: decryptedTokens[0].access_token,
+          refreshToken: decryptedTokens[0].refresh_token || null,
         });
 
         // Delete session from database after retrieving tokens

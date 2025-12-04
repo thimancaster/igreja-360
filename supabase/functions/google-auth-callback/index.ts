@@ -77,25 +77,26 @@ serve(async (req) => {
       throw new Error('Invalid user token');
     }
 
-    // Store tokens in secure session (expires in 5 minutes)
-    const { data: session, error: sessionError } = await supabase
-      .from('oauth_sessions')
-      .insert({
-        user_id: user.id,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token || null,
-      })
-      .select()
-      .single();
+    // Store tokens securely using encrypted storage function
+    const { data: sessionId, error: sessionError } = await supabase.rpc(
+      'store_encrypted_oauth_session',
+      {
+        p_user_id: user.id,
+        p_access_token: tokens.access_token,
+        p_refresh_token: tokens.refresh_token || null,
+      }
+    );
 
-    if (sessionError || !session) {
-      console.error('Failed to create OAuth session:', sessionError);
+    if (sessionError || !sessionId) {
+      console.error('Failed to create encrypted OAuth session:', sessionError);
       throw new Error('Failed to create secure session');
     }
 
+    console.log('Created encrypted OAuth session:', sessionId);
+
     // Redirect with only session ID (not the tokens!)
     const appUrl = Deno.env.get('APP_BASE_URL') || supabaseUrl;
-    const redirectUrl = `${appUrl}/app/integracoes?oauth_session=${session.id}`;
+    const redirectUrl = `${appUrl}/app/integracoes?oauth_session=${sessionId}`;
 
     return new Response(null, {
       status: 302,
