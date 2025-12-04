@@ -48,7 +48,7 @@ export const useIntegrations = () => {
   // Removendo disconnectGoogle mutation
   // Removendo listSheets mutation
 
-  // Create integration
+  // Create integration with encrypted token storage
   const createIntegration = useMutation({
     mutationFn: async (params: {
       churchId: string;
@@ -58,25 +58,47 @@ export const useIntegrations = () => {
       accessToken: string;
       refreshToken: string;
     }) => {
-      const insertData: any = {
+      // First, create the integration without tokens
+      const insertData = {
         user_id: user?.id,
         church_id: params.churchId,
         sheet_id: params.sheetId,
         sheet_name: params.sheetName,
         column_mapping: params.columnMapping,
-        access_token: params.accessToken,
-        refresh_token: params.refreshToken,
+        // Don't store plaintext tokens - they'll be encrypted via RPC
+        access_token: null,
+        refresh_token: null,
       };
       
-      const { error } = await supabase.from("google_integrations").insert(insertData);
+      const { data: newIntegration, error: insertError } = await supabase
+        .from("google_integrations")
+        .insert(insertData)
+        .select('id')
+        .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      // Now store tokens encrypted using the secure RPC function
+      const { error: encryptError } = await supabase.rpc(
+        'store_encrypted_integration_tokens',
+        {
+          p_integration_id: newIntegration.id,
+          p_access_token: params.accessToken,
+          p_refresh_token: params.refreshToken || null,
+        }
+      );
+
+      if (encryptError) {
+        // Rollback: delete the integration if token encryption fails
+        await supabase.from("google_integrations").delete().eq('id', newIntegration.id);
+        throw new Error('Falha ao criptografar tokens OAuth');
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["google-integrations"] });
       toast({
         title: "Integração criada",
-        description: "A planilha foi conectada com sucesso.",
+        description: "A planilha foi conectada com sucesso. Tokens armazenados de forma segura.",
       });
     },
     onError: (error: Error) => {
