@@ -21,6 +21,8 @@ import { useTransactionStats } from "@/hooks/useTransactions";
 import { useFilteredTransactions } from "@/hooks/useFilteredTransactions";
 import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePagination } from "@/hooks/usePagination";
+import { TablePagination } from "@/components/TablePagination";
 
 export default function Dashboard() {
   const [filters, setFilters] = useState({
@@ -33,6 +35,8 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useTransactionStats();
   const { data: categoriesAndMinistries } = useCategoriesAndMinistries();
   const ministries = categoriesAndMinistries?.ministries || [];
+
+  const pagination = usePagination(transactions, { initialPageSize: 10 });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -172,8 +176,8 @@ export default function Dashboard() {
                     </TableRow>
                   ))}
                 </>
-              ) : transactions && transactions.length > 0 ? (
-                transactions.slice(0, 10).map((transaction) => (
+              ) : pagination.paginatedData.length > 0 ? (
+                pagination.paginatedData.map((transaction) => (
                   <TableRow key={transaction.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">{transaction.description}</TableCell>
                     <TableCell>{transaction.categories?.name || "Sem categoria"}</TableCell>
@@ -208,6 +212,18 @@ export default function Dashboard() {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            pageSize={pagination.pageSize}
+            canGoNext={pagination.canGoNext}
+            canGoPrevious={pagination.canGoPrevious}
+            onPageChange={pagination.goToPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </div>
       </div>
     </div>
