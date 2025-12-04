@@ -208,7 +208,7 @@ export default function Importacao() {
 
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
-      navigate("/dashboard");
+      navigate("/app/dashboard");
 
     } catch (error: any) {
       toast({ title: "Erro na Importação", description: error.message, variant: "destructive" });

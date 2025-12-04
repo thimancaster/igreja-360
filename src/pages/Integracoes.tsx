@@ -14,7 +14,6 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from 'xlsx';
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useRole } from "@/hooks/useRole"; // Importar useRole
 
