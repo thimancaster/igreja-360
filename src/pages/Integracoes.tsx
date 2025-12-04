@@ -164,14 +164,60 @@ export default function Integracoes() {
       toast({ title: "URL Inválida", description: "Por favor, insira uma URL válida do Google Sheets.", variant: "destructive" });
       return;
     }
+    
+    if (!oauthTokens?.accessToken) {
+      toast({ 
+        title: "Autenticação necessária", 
+        description: "Por favor, autentique-se com o Google primeiro clicando em 'Adicionar Planilha'.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setIsProcessingSheet(true);
     try {
-      const dummyHeaders = ["Descrição", "Valor", "Tipo", "Status", "Data de Vencimento", "Data de Pagamento", "Categoria", "Ministério", "Notas"];
-      setSheetHeaders(dummyHeaders);
-      toast({ title: "Cabeçalhos Carregados", description: "Cabeçalhos da planilha carregados com sucesso. Prossiga para o mapeamento.", variant: "success" });
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke('get-sheet-headers', {
+        body: {
+          sheetId,
+          accessToken: oauthTokens.accessToken,
+          refreshToken: oauthTokens.refreshToken,
+        },
+      });
 
-    } catch (error) {
-      toast({ title: "Erro", description: "Não foi possível carregar os cabeçalhos da planilha. Verifique a URL e as permissões de acesso público.", variant: "destructive" });
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao carregar cabeçalhos');
+      }
+
+      const data = response.data;
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro desconhecido');
+      }
+
+      setSheetHeaders(data.headers);
+      if (data.sheetName) {
+        setSheetName(data.sheetName);
+      }
+
+      // Update access token if it was refreshed
+      if (data.newAccessToken) {
+        setOauthTokens(prev => prev ? { ...prev, accessToken: data.newAccessToken } : null);
+      }
+
+      toast({ 
+        title: "Cabeçalhos Carregados", 
+        description: `${data.headers.length} colunas encontradas na planilha "${data.sheetName}".`
+      });
+
+    } catch (error: any) {
+      console.error('Error loading sheet headers:', error);
+      toast({ 
+        title: "Erro", 
+        description: error.message || "Não foi possível carregar os cabeçalhos da planilha.", 
+        variant: "destructive" 
+      });
     } finally {
       setIsProcessingSheet(false);
     }

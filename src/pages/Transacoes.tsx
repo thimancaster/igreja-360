@@ -27,19 +27,23 @@ import {
 import { useTransactions, Transaction } from "@/hooks/useTransactions";
 import { TransactionDialog } from "@/components/transactions/TransactionDialog";
 import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
-import { useRole } from "@/hooks/useRole"; // Importar useRole
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { useRole } from "@/hooks/useRole";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { usePagination } from "@/hooks/usePagination";
+import { TablePagination } from "@/components/TablePagination";
 
 export default function Transacoes() {
   const { data: transactions, isLoading } = useTransactions();
   const { data: categoriesAndMinistries, isLoading: filtersLoading } = useCategoriesAndMinistries();
-  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+
+  const pagination = usePagination(transactions, { initialPageSize: 10 });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -148,8 +152,8 @@ export default function Transacoes() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions && transactions.length > 0 ? (
-                transactions.map((transaction) => (
+              {pagination.paginatedData.length > 0 ? (
+                pagination.paginatedData.map((transaction) => (
                   <TableRow key={transaction.id} className="hover:bg-muted/50">
                     <TableCell className="font-medium">{transaction.description}</TableCell>
                     <TableCell>{transaction.categories?.name || "-"}</TableCell>
@@ -208,6 +212,18 @@ export default function Transacoes() {
               )}
             </TableBody>
           </Table>
+          <TablePagination
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            startIndex={pagination.startIndex}
+            endIndex={pagination.endIndex}
+            pageSize={pagination.pageSize}
+            canGoNext={pagination.canGoNext}
+            canGoPrevious={pagination.canGoPrevious}
+            onPageChange={pagination.goToPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </div>
       </div>
 
