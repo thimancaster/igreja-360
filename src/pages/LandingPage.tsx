@@ -185,7 +185,6 @@ const LandingPage: React.FC = () => {
                 <CardTitle className="text-xl">Integração Google Sheets</CardTitle>
                 <CardDescription className="mt-2">
                   Sincronize automaticamente suas planilhas do Google Sheets.
-                  <Badge variant="secondary" className="ml-2">Em Breve</Badge>
                 </CardDescription>
               </Card>
               <Card className="p-6 text-left hover:shadow-lg transition-shadow duration-300">
@@ -193,8 +192,8 @@ const LandingPage: React.FC = () => {
                 <CardTitle className="text-xl">Relatórios Personalizados</CardTitle>
                 <CardDescription className="mt-2">
                   Gere relatórios detalhados de receitas, despesas, fluxo de caixa e mais.
-                  <Badge variant="secondary" className="ml-2">Em Breve</Badge>
                 </CardDescription>
+                <Badge variant="secondary" className="mt-2">Em Breve</Badge>
               </Card>
               <Card className="p-6 text-left hover:shadow-lg transition-shadow duration-300">
                 <Settings className="h-8 w-8 text-primary mb-4" />
@@ -215,8 +214,8 @@ const LandingPage: React.FC = () => {
                 <CardTitle className="text-xl">Alertas e Notificações</CardTitle>
                 <CardDescription className="mt-2">
                   Receba alertas sobre contas a pagar, vencimentos e outras informações importantes.
-                  <Badge variant="secondary" className="ml-2">Em Breve</Badge>
                 </CardDescription>
+                <Badge variant="secondary" className="mt-2">Em Breve</Badge>
               </Card>
             </div>
           </div>
