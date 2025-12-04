@@ -266,7 +266,7 @@ export type Database = {
       }
       oauth_sessions: {
         Row: {
-          access_token: string
+          access_token: string | null
           access_token_enc: string | null
           created_at: string | null
           expires_at: string | null
@@ -276,7 +276,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          access_token: string
+          access_token?: string | null
           access_token_enc?: string | null
           created_at?: string | null
           expires_at?: string | null
@@ -286,7 +286,7 @@ export type Database = {
           user_id: string
         }
         Update: {
-          access_token?: string
+          access_token?: string | null
           access_token_enc?: string | null
           created_at?: string | null
           expires_at?: string | null

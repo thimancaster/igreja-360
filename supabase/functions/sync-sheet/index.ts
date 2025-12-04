@@ -43,6 +43,33 @@ const transactionSchema = z.object({
 const RATE_LIMIT_MINUTES = 5;
 const MAX_ROWS_PER_SYNC = 1000;
 
+// Function to refresh Google access token using refresh token
+async function refreshGoogleToken(refreshToken: string, clientId: string, clientSecret: string): Promise<string | null> {
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to refresh Google token:', await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('Error refreshing Google token:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -64,12 +91,13 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const googleApiKey = Deno.env.get('GOOGLE_SHEETS_API_KEY');
+    const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const googleClientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
-    if (!googleApiKey) {
-      console.error('GOOGLE_SHEETS_API_KEY not configured');
+    if (!googleClientId || !googleClientSecret) {
+      console.error('Google OAuth credentials not configured');
       return new Response(
-        JSON.stringify({ error: 'Service temporarily unavailable' }),
+        JSON.stringify({ error: 'Google integration not properly configured' }),
         {
           status: 503,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -159,18 +187,73 @@ serve(async (req) => {
 
     console.log(`Starting sync for integration ${integrationId} by user ${user.id}`);
 
+    // Get decrypted OAuth tokens from database
+    const { data: tokenData, error: tokenError } = await supabase
+      .rpc('get_decrypted_integration', { integration_id: integrationId });
+
+    if (tokenError || !tokenData || tokenData.length === 0) {
+      console.error('Failed to get OAuth tokens:', tokenError);
+      return new Response(
+        JSON.stringify({ error: 'OAuth tokens not found. Please reconnect your Google account.' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    let accessToken = tokenData[0].access_token;
+    const refreshToken = tokenData[0].refresh_token;
+
     // Use sheet_id directly from the integration
     const sheetId = integration.sheet_id;
 
-    // Get spreadsheet data using Google Sheets API Key
-    const sheetResponse = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:ZZ?key=${googleApiKey}`,
+    // Try to fetch sheet data with current access token
+    let sheetResponse = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:ZZ`,
       {
         headers: {
+          'Authorization': `Bearer ${accessToken}`,
           'Accept': 'application/json',
         },
       }
     );
+
+    // If token expired, refresh and retry
+    if (sheetResponse.status === 401 && refreshToken) {
+      console.log('Access token expired, refreshing...');
+      const newAccessToken = await refreshGoogleToken(refreshToken, googleClientId, googleClientSecret);
+      
+      if (!newAccessToken) {
+        return new Response(
+          JSON.stringify({ error: 'Failed to refresh Google access token. Please reconnect your Google account.' }),
+          {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Update the encrypted token in database
+      await supabase.rpc('store_encrypted_integration_tokens', {
+        p_integration_id: integrationId,
+        p_access_token: newAccessToken,
+        p_refresh_token: refreshToken,
+      });
+
+      accessToken = newAccessToken;
+      
+      // Retry with new token
+      sheetResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:ZZ`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+    }
 
     if (!sheetResponse.ok) {
       const errorData = await sheetResponse.text();
