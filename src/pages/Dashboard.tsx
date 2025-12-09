@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { DollarSign, TrendingUp, TrendingDown, Wallet } from "lucide-react";
-import { StatsCard } from "@/components/dashboard/StatsCard";
+import { motion } from "framer-motion";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -23,6 +23,12 @@ import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/TablePagination";
+import { AnimatedStatsCard } from "@/components/dashboard/AnimatedStatsCard";
+import { RevenueExpenseChart } from "@/components/dashboard/RevenueExpenseChart";
+import { MonthlyComparisonChart } from "@/components/dashboard/MonthlyComparisonChart";
+import { BalanceAreaChart } from "@/components/dashboard/BalanceAreaChart";
+import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
+import { Card } from "@/components/ui/card";
 
 export default function Dashboard() {
   const [filters, setFilters] = useState({
@@ -34,6 +40,8 @@ export default function Dashboard() {
   const { data: transactions, isLoading: transactionsLoading } = useFilteredTransactions(filters);
   const { data: stats, isLoading: statsLoading } = useTransactionStats();
   const { data: categoriesAndMinistries } = useCategoriesAndMinistries();
+  const { data: evolutionData, isLoading: evolutionLoading } = useEvolutionData(6);
+  const { data: trendData } = useTrendData();
   const ministries = categoriesAndMinistries?.ministries || [];
 
   const pagination = usePagination(transactions, { initialPageSize: 10 });
@@ -64,12 +72,18 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 space-y-6 p-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard Financeiro</h1>
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+          Dashboard Financeiro
+        </h1>
         <p className="text-muted-foreground mt-1">Visão geral das finanças da sua igreja</p>
-      </div>
+      </motion.div>
 
-      {/* Cards de Destaque */}
+      {/* Cards de Destaque com Animação */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statsLoading ? (
           <>
@@ -79,36 +93,56 @@ export default function Dashboard() {
           </>
         ) : (
           <>
-            <StatsCard
+            <AnimatedStatsCard
               title="Contas a Pagar"
-              value={formatCurrency(stats?.totalPayable || 0)}
-              icon={DollarSign}
+              value={stats?.totalPayable || 0}
+              icon={<DollarSign className="h-5 w-5" />}
               variant="warning"
+              delay={0}
             />
-            <StatsCard
+            <AnimatedStatsCard
               title="Contas Pagas"
-              value={formatCurrency(stats?.totalPaid || 0)}
-              icon={TrendingUp}
+              value={stats?.totalPaid || 0}
+              trend={trendData?.revenueTrend}
+              icon={<TrendingUp className="h-5 w-5" />}
               variant="success"
+              delay={1}
             />
-            <StatsCard
+            <AnimatedStatsCard
               title="Contas Vencidas"
-              value={formatCurrency(stats?.totalOverdue || 0)}
-              icon={TrendingDown}
-              variant="destructive"
+              value={stats?.totalOverdue || 0}
+              icon={<TrendingDown className="h-5 w-5" />}
+              variant="danger"
+              delay={2}
             />
-            <StatsCard
+            <AnimatedStatsCard
               title="Saldo Total"
-              value={formatCurrency(stats?.balance || 0)}
-              icon={Wallet}
+              value={stats?.balance || 0}
+              icon={<Wallet className="h-5 w-5" />}
               variant="default"
+              delay={3}
             />
           </>
         )}
       </div>
 
+      {/* Gráficos Interativos */}
+      <div className="grid gap-6 lg:grid-cols-1">
+        <RevenueExpenseChart data={evolutionData || []} isLoading={evolutionLoading} />
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <MonthlyComparisonChart data={evolutionData || []} isLoading={evolutionLoading} />
+        <BalanceAreaChart data={evolutionData || []} isLoading={evolutionLoading} />
+      </div>
+
       {/* Filtros */}
-      <div className="flex flex-wrap gap-4">
+      <motion.div 
+        className="flex flex-wrap gap-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+      >
         <Select value={filters.period} onValueChange={(value) => setFilters({ ...filters, period: value })}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Período" />
@@ -145,87 +179,109 @@ export default function Dashboard() {
             <SelectItem value="vencido">Vencido</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </motion.div>
 
       {/* Tabela de Transações Recentes */}
-      <div className="rounded-lg border border-border bg-card">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Transações Recentes</h2>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {transactionsLoading ? (
-                <>
-                  {[...Array(5)].map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
-                    </TableRow>
-                  ))}
-                </>
-              ) : pagination.paginatedData.length > 0 ? (
-                pagination.paginatedData.map((transaction) => (
-                  <TableRow key={transaction.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{transaction.description}</TableCell>
-                    <TableCell>{transaction.categories?.name || "Sem categoria"}</TableCell>
-                    <TableCell>
-                      <Badge variant={transaction.type === "Receita" ? "default" : "secondary"}>
-                        {transaction.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={transaction.type === "Receita" ? "text-success" : ""}>
-                      {formatCurrency(Number(transaction.amount))}
-                    </TableCell>
-                    <TableCell>
-                      {transaction.payment_date 
-                        ? formatDate(transaction.payment_date)
-                        : transaction.due_date 
-                        ? formatDate(transaction.due_date)
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(transaction.status)}>
-                        {transaction.status}
-                      </Badge>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.7 }}
+      >
+        <Card className="overflow-hidden border-border/50">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.8, type: 'spring' }}
+                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10"
+              >
+                <ArrowUpRight className="h-4 w-4 text-primary" />
+              </motion.span>
+              Transações Recentes
+            </h2>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Valor</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transactionsLoading ? (
+                  <>
+                    {[...Array(5)].map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[90px]" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-[70px]" /></TableCell>
+                      </TableRow>
+                    ))}
+                  </>
+                ) : pagination.paginatedData.length > 0 ? (
+                  pagination.paginatedData.map((transaction, index) => (
+                    <motion.tr
+                      key={transaction.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="border-b transition-colors hover:bg-muted/50"
+                    >
+                      <TableCell className="font-medium">{transaction.description}</TableCell>
+                      <TableCell>{transaction.categories?.name || "Sem categoria"}</TableCell>
+                      <TableCell>
+                        <Badge variant={transaction.type === "Receita" ? "default" : "secondary"}>
+                          {transaction.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={transaction.type === "Receita" ? "text-emerald-600 font-medium" : "text-rose-600 font-medium"}>
+                        {transaction.type === "Receita" ? "+" : "-"}{formatCurrency(Number(transaction.amount))}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.payment_date 
+                          ? formatDate(transaction.payment_date)
+                          : transaction.due_date 
+                          ? formatDate(transaction.due_date)
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(transaction.status)}>
+                          {transaction.status}
+                        </Badge>
+                      </TableCell>
+                    </motion.tr>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      Nenhuma transação encontrada
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    Nenhuma transação encontrada
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-          <TablePagination
-            currentPage={pagination.currentPage}
-            totalPages={pagination.totalPages}
-            totalItems={pagination.totalItems}
-            startIndex={pagination.startIndex}
-            endIndex={pagination.endIndex}
-            pageSize={pagination.pageSize}
-            canGoNext={pagination.canGoNext}
-            canGoPrevious={pagination.canGoPrevious}
-            onPageChange={pagination.goToPage}
-            onPageSizeChange={pagination.setPageSize}
-          />
-        </div>
-      </div>
+                )}
+              </TableBody>
+            </Table>
+            <TablePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              totalItems={pagination.totalItems}
+              startIndex={pagination.startIndex}
+              endIndex={pagination.endIndex}
+              pageSize={pagination.pageSize}
+              canGoNext={pagination.canGoNext}
+              canGoPrevious={pagination.canGoPrevious}
+              onPageChange={pagination.goToPage}
+              onPageSizeChange={pagination.setPageSize}
+            />
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 }
