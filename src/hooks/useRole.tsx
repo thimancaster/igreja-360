@@ -5,10 +5,10 @@ import { useAuth } from "@/contexts/AuthContext";
 type AppRole = 'admin' | 'tesoureiro' | 'pastor' | 'lider' | 'user';
 
 export function useRole() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   // Fetch all roles for the user
-  const { data: roles, isLoading } = useQuery({
+  const { data: roles, isLoading: queryLoading } = useQuery({
     queryKey: ["user-roles", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -27,6 +27,9 @@ export function useRole() {
     },
     enabled: !!user?.id,
   });
+
+  // isLoading deve ser true se auth está carregando OU (tem user E query está carregando)
+  const isLoading = authLoading || (!!user?.id && queryLoading);
 
   const hasRole = (role: AppRole): boolean => {
     return roles?.includes(role) || false;

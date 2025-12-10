@@ -1,18 +1,42 @@
-// src/components/AuthRedirect.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole } from '@/hooks/useRole'; // Importar o hook de Role
+import { useRole } from '@/hooks/useRole';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 export const AuthRedirect: React.FC = () => {
   const { session, loading: authLoading, profile } = useAuth();
-  const { isAdmin, isLoading: roleLoading } = useRole(); // Usar o hook de Role
+  const { isAdmin, isLoading: roleLoading } = useRole();
   const navigate = useNavigate();
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+
+  // Só considerar roleLoading quando já temos um usuário
+  const effectiveRoleLoading = session?.user ? roleLoading : false;
+  
+  // Loading completo = auth loading OU (tem user E role ainda está carregando)
+  const isFullyLoading = authLoading || (session?.user && effectiveRoleLoading);
+
+  // Timeout de segurança para evitar loading infinito
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isFullyLoading) {
+        console.warn('Auth timeout - redirecting to login');
+        setHasTimedOut(true);
+      }
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, [isFullyLoading]);
 
   useEffect(() => {
-    // Aguardar o fim de AMBOS os carregamentos
-    if (authLoading || roleLoading) {
+    // Se deu timeout, redirecionar para auth
+    if (hasTimedOut) {
+      navigate('/auth');
+      return;
+    }
+
+    // Aguardar o fim do carregamento
+    if (isFullyLoading) {
       return;
     }
 
@@ -32,9 +56,8 @@ export const AuthRedirect: React.FC = () => {
         navigate('/app/dashboard');
       }
     }
-  }, [session, authLoading, profile, isAdmin, roleLoading, navigate]);
+  }, [session, isFullyLoading, profile, isAdmin, hasTimedOut, navigate]);
 
-  // Mostrar um spinner de carregamento universal
   return (
     <div className="flex h-screen w-full items-center justify-center">
       <LoadingSpinner size="lg" />
