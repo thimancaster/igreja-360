@@ -7,11 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Church } from "lucide-react";
-import { Navigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 
 export default function Auth() {
   const { user, signIn, signUp } = useAuth();
+  const navigate = useNavigate();
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
@@ -19,9 +20,11 @@ export default function Auth() {
   const [signupName, setSignupName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Redirect if already logged in
+  // Redirecionar se já estiver logado (verificação síncrona)
   if (user) {
-    return <Navigate to="/" replace />;
+    // Usar setTimeout para evitar problemas de renderização
+    setTimeout(() => navigate('/', { replace: true }), 0);
+    return null;
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -40,6 +43,11 @@ export default function Auth() {
       });
 
       await signIn(validated.email, validated.password);
+      
+      // Redirecionar explicitamente após login bem-sucedido
+      console.log('Auth: Login successful, redirecting...');
+      navigate('/', { replace: true });
+      
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
@@ -48,7 +56,12 @@ export default function Auth() {
           description: firstError.message,
           variant: "destructive",
         });
-        return;
+      } else {
+        toast({
+          title: "Erro ao entrar",
+          description: error.message || "Verifique suas credenciais",
+          variant: "destructive",
+        });
       }
     } finally {
       setLoading(false);
@@ -76,6 +89,16 @@ export default function Auth() {
       });
 
       await signUp(validated.email, validated.password, validated.name);
+      
+      toast({
+        title: "Conta criada!",
+        description: "Você já pode fazer login.",
+      });
+      
+      // Redirecionar após cadastro bem-sucedido
+      console.log('Auth: Signup successful, redirecting...');
+      navigate('/', { replace: true });
+      
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
@@ -84,7 +107,12 @@ export default function Auth() {
           description: firstError.message,
           variant: "destructive",
         });
-        return;
+      } else {
+        toast({
+          title: "Erro ao cadastrar",
+          description: error.message || "Tente novamente",
+          variant: "destructive",
+        });
       }
     } finally {
       setLoading(false);
