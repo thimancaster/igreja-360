@@ -5,7 +5,6 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRole } from '@/hooks/useRole';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { Church } from 'lucide-react';
 
 const formSchema = z.object({
   churchName: z.string().min(3, { message: 'O nome da igreja deve ter pelo menos 3 caracteres.' }),
@@ -20,7 +20,6 @@ const formSchema = z.object({
 
 const CreateChurchForm: React.FC = () => {
   const { user, refetchProfile } = useAuth();
-  const { isAdmin } = useRole();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,6 +38,7 @@ const CreateChurchForm: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // 1. Create the church
       const { data: churchData, error: churchError } = await supabase
         .from('churches')
         .insert({
@@ -50,7 +50,8 @@ const CreateChurchForm: React.FC = () => {
 
       if (churchError) throw churchError;
 
-      if (!isAdmin && churchData) {
+      // 2. ALWAYS update user's profile with church_id (removed isAdmin condition)
+      if (churchData) {
         const { error: profileError } = await supabase
           .from('profiles')
           .update({ church_id: churchData.id })
@@ -58,11 +59,14 @@ const CreateChurchForm: React.FC = () => {
 
         if (profileError) throw profileError;
 
+        // 3. Wait for profile refresh to complete before navigating
         await refetchProfile();
       }
 
       toast({ title: 'Igreja criada com sucesso!' });
-      navigate('/app/dashboard');
+      
+      // 4. Navigate to confirmation page
+      navigate('/church-confirmation');
 
     } catch (error: any) {
       console.error('Erro ao criar igreja:', error);
@@ -77,39 +81,42 @@ const CreateChurchForm: React.FC = () => {
   };
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Crie sua Igreja</CardTitle>
-        <CardDescription>
-          {isAdmin 
-            ? "Como administrador, você pode cadastrar uma nova igreja no sistema." 
-            : "Você ainda não está vinculado a uma igreja. Por favor, crie a sua primeira igreja."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="churchName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nome da Igreja</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ex: Igreja Batista da Esperança" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading && <LoadingSpinner size="sm" className="mr-2" />}
-              {isLoading ? 'Criando...' : 'Criar Igreja e Acessar'}
-            </Button>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Church className="h-6 w-6 text-primary" />
+          </div>
+          <CardTitle>Crie sua Igreja</CardTitle>
+          <CardDescription>
+            Você ainda não está vinculado a uma igreja. Crie a sua primeira igreja para continuar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="churchName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Igreja</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Igreja Batista da Esperança" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading && <LoadingSpinner size="sm" className="mr-2" />}
+                {isLoading ? 'Criando...' : 'Criar Igreja'}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

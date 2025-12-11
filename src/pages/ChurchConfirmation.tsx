@@ -20,7 +20,7 @@ export default function ChurchConfirmation() {
   useEffect(() => {
     const fetchChurch = async () => {
       if (!profile?.church_id) {
-        navigate("/app/create-church");
+        navigate("/create-church");
         return;
       }
 

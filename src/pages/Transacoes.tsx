@@ -8,7 +8,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -31,6 +30,9 @@ import { useRole } from "@/hooks/useRole";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { usePagination } from "@/hooks/usePagination";
 import { TablePagination } from "@/components/TablePagination";
+import { useTableFilters } from "@/hooks/useTableFilters";
+import { SearchInput } from "@/components/ui/search-input";
+import { SortableTableHeader } from "@/components/ui/sortable-table-header";
 
 export default function Transacoes() {
   const { data: transactions, isLoading } = useTransactions();
@@ -43,7 +45,28 @@ export default function Transacoes() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
 
-  const pagination = usePagination(transactions, { initialPageSize: 10 });
+  // Preparar dados para filtros (adicionando campos de categoria/ministério como strings)
+  const transactionsWithSearchFields = (transactions || []).map((t) => ({
+    ...t,
+    categoryName: t.categories?.name || "",
+    ministryName: t.ministries?.name || "",
+  }));
+
+  const {
+    searchTerm,
+    setSearchTerm,
+    sortField,
+    sortDirection,
+    handleSort,
+    filteredData,
+  } = useTableFilters({
+    data: transactionsWithSearchFields,
+    searchFields: ["description", "categoryName", "ministryName", "status", "type"],
+    initialSortField: "created_at",
+    initialSortDirection: "desc",
+  });
+
+  const pagination = usePagination(filteredData, { initialPageSize: 10 });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -113,7 +136,7 @@ export default function Transacoes() {
     setSelectedTransaction(null);
   };
 
-  const canManageTransactions = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem gerenciar
+  const canManageTransactions = isAdmin || isTesoureiro;
 
   if (isLoading || filtersLoading || roleLoading) {
     return (
@@ -136,19 +159,83 @@ export default function Transacoes() {
         </Button>
       </div>
 
+      {/* Barra de busca */}
+      <div className="flex items-center gap-4">
+        <SearchInput
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Buscar por descrição, categoria, ministério..."
+          className="max-w-md"
+        />
+        {searchTerm && (
+          <span className="text-sm text-muted-foreground">
+            {filteredData.length} resultado(s) encontrado(s)
+          </span>
+        )}
+      </div>
+
       <div className="rounded-lg border border-border bg-card">
         <div className="p-6">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Ministério</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Valor</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <SortableTableHeader
+                  field="description"
+                  currentSortField={sortField as string}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Descrição
+                </SortableTableHeader>
+                <SortableTableHeader
+                  field="categoryName"
+                  currentSortField={sortField as string}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Categoria
+                </SortableTableHeader>
+                <SortableTableHeader
+                  field="ministryName"
+                  currentSortField={sortField as string}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Ministério
+                </SortableTableHeader>
+                <SortableTableHeader
+                  field="type"
+                  currentSortField={sortField as string}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Tipo
+                </SortableTableHeader>
+                <SortableTableHeader
+                  field="amount"
+                  currentSortField={sortField as string}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Valor
+                </SortableTableHeader>
+                <SortableTableHeader
+                  field="due_date"
+                  currentSortField={sortField as string}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Data
+                </SortableTableHeader>
+                <SortableTableHeader
+                  field="status"
+                  currentSortField={sortField as string}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                >
+                  Status
+                </SortableTableHeader>
+                <th className="text-right p-4 font-medium">Ações</th>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -206,7 +293,9 @@ export default function Transacoes() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
-                    Nenhuma transação encontrada. Clique em "Nova Transação" para começar.
+                    {searchTerm 
+                      ? "Nenhuma transação encontrada para esta busca."
+                      : "Nenhuma transação encontrada. Clique em \"Nova Transação\" para começar."}
                   </TableCell>
                 </TableRow>
               )}
@@ -233,7 +322,7 @@ export default function Transacoes() {
         transaction={selectedTransaction}
         categories={categoriesAndMinistries?.categories || []}
         ministries={categoriesAndMinistries?.ministries || []}
-        canEdit={canManageTransactions} // Passar a permissão para o dialog
+        canEdit={canManageTransactions}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
