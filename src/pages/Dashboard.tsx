@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { DollarSign, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, ArrowUpRight } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -27,8 +27,10 @@ import { AnimatedStatsCard } from "@/components/dashboard/AnimatedStatsCard";
 import { RevenueExpenseChart } from "@/components/dashboard/RevenueExpenseChart";
 import { MonthlyComparisonChart } from "@/components/dashboard/MonthlyComparisonChart";
 import { BalanceAreaChart } from "@/components/dashboard/BalanceAreaChart";
+import { DueTransactionsBanner } from "@/components/dashboard/DueTransactionsBanner";
 import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
 import { Card } from "@/components/ui/card";
+import { SearchInput } from "@/components/ui/search-input";
 
 export default function Dashboard() {
   const [filters, setFilters] = useState({
@@ -36,6 +38,7 @@ export default function Dashboard() {
     ministryId: "todos",
     status: "todos-status"
   });
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: transactions, isLoading: transactionsLoading } = useFilteredTransactions(filters);
   const { data: stats, isLoading: statsLoading } = useTransactionStats();
@@ -44,7 +47,19 @@ export default function Dashboard() {
   const { data: trendData } = useTrendData();
   const ministries = categoriesAndMinistries?.ministries || [];
 
-  const pagination = usePagination(transactions, { initialPageSize: 10 });
+  // Filtrar transações por busca
+  const filteredTransactions = (transactions || []).filter((t) => {
+    if (!searchTerm.trim()) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      t.description.toLowerCase().includes(term) ||
+      t.categories?.name?.toLowerCase().includes(term) ||
+      t.status.toLowerCase().includes(term) ||
+      t.type.toLowerCase().includes(term)
+    );
+  });
+
+  const pagination = usePagination(filteredTransactions, { initialPageSize: 10 });
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -82,6 +97,9 @@ export default function Dashboard() {
         </h1>
         <p className="text-muted-foreground mt-1">Visão geral das finanças da sua igreja</p>
       </motion.div>
+
+      {/* Banner de Vencimentos */}
+      <DueTransactionsBanner />
 
       {/* Cards de Destaque com Animação */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -189,17 +207,25 @@ export default function Dashboard() {
       >
         <Card className="overflow-hidden border-border/50">
           <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.8, type: 'spring' }}
-                className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10"
-              >
-                <ArrowUpRight className="h-4 w-4 text-primary" />
-              </motion.span>
-              Transações Recentes
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.8, type: 'spring' }}
+                  className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10"
+                >
+                  <ArrowUpRight className="h-4 w-4 text-primary" />
+                </motion.span>
+                Transações Recentes
+              </h2>
+              <SearchInput
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Buscar transações..."
+                className="w-64"
+              />
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -261,7 +287,7 @@ export default function Dashboard() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground">
-                      Nenhuma transação encontrada
+                      {searchTerm ? "Nenhuma transação encontrada para esta busca." : "Nenhuma transação encontrada"}
                     </TableCell>
                   </TableRow>
                 )}
