@@ -19,29 +19,53 @@ export default function ChurchConfirmation() {
 
   useEffect(() => {
     const fetchChurch = async () => {
-      if (!profile?.church_id) {
-        navigate("/create-church");
-        return;
+      console.log('[ChurchConfirmation] Iniciando busca, profile.church_id:', profile?.church_id);
+      
+      // Tentar primeiro pelo profile.church_id
+      if (profile?.church_id) {
+        const { data, error } = await supabase
+          .from("churches")
+          .select("*")
+          .eq("id", profile.church_id)
+          .maybeSingle();
+
+        if (data && !error) {
+          console.log('[ChurchConfirmation] Igreja encontrada via profile.church_id:', data.name);
+          setChurch(data);
+          setLoading(false);
+          return;
+        }
       }
 
-      const { data, error } = await supabase
-        .from("churches")
-        .select("*")
-        .eq("id", profile.church_id)
-        .single();
+      // Fallback: buscar pela igreja do owner (caso profile.church_id ainda não esteja atualizado)
+      if (user?.id) {
+        console.log('[ChurchConfirmation] Fallback: buscando por owner_user_id:', user.id);
+        const { data, error } = await supabase
+          .from("churches")
+          .select("*")
+          .eq("owner_user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (error) {
-        console.error("Error fetching church:", error);
-        navigate("/app/dashboard");
-        return;
+        if (data && !error) {
+          console.log('[ChurchConfirmation] Igreja encontrada via owner_user_id:', data.name);
+          setChurch(data);
+          setLoading(false);
+          return;
+        }
       }
 
-      setChurch(data);
-      setLoading(false);
+      // Se nada encontrado, ir para criar igreja
+      console.log('[ChurchConfirmation] Nenhuma igreja encontrada, redirecionando para /create-church');
+      navigate("/create-church");
     };
 
-    fetchChurch();
-  }, [profile?.church_id, navigate]);
+    // Aguardar um momento para garantir que o profile foi atualizado
+    if (user) {
+      fetchChurch();
+    }
+  }, [profile?.church_id, user, navigate]);
 
   if (loading) {
     return (
