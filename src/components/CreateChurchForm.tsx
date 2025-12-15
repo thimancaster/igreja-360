@@ -38,6 +38,8 @@ const CreateChurchForm: React.FC = () => {
     setIsLoading(true);
 
     try {
+      console.log('[CreateChurch] Iniciando criação da igreja para user:', user.id);
+
       // 1. Create the church
       const { data: churchData, error: churchError } = await supabase
         .from('churches')
@@ -48,28 +50,41 @@ const CreateChurchForm: React.FC = () => {
         .select()
         .single();
 
-      if (churchError) throw churchError;
-
-      // 2. ALWAYS update user's profile with church_id (removed isAdmin condition)
-      if (churchData) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ church_id: churchData.id })
-          .eq('id', user.id);
-
-        if (profileError) throw profileError;
-
-        // 3. Wait for profile refresh to complete before navigating
-        await refetchProfile();
+      if (churchError) {
+        console.error('[CreateChurch] Erro ao criar igreja:', churchError);
+        throw churchError;
       }
+
+      console.log('[CreateChurch] Igreja criada:', churchData.id);
+
+      // 2. Update user's profile with church_id
+      const { error: profileError, count } = await supabase
+        .from('profiles')
+        .update({ church_id: churchData.id })
+        .eq('id', user.id)
+        .select();
+
+      if (profileError) {
+        console.error('[CreateChurch] Erro ao atualizar perfil:', profileError);
+        throw profileError;
+      }
+
+      console.log('[CreateChurch] Perfil atualizado, count:', count);
+
+      // 3. Wait for profile refresh to complete
+      await refetchProfile();
+      console.log('[CreateChurch] Profile refetch completado');
 
       toast({ title: 'Igreja criada com sucesso!' });
       
-      // 4. Navigate to confirmation page
-      navigate('/church-confirmation');
+      // 4. Navigate with small delay to ensure state is updated
+      setTimeout(() => {
+        console.log('[CreateChurch] Navegando para /church-confirmation');
+        navigate('/church-confirmation', { replace: true });
+      }, 150);
 
     } catch (error: any) {
-      console.error('Erro ao criar igreja:', error);
+      console.error('[CreateChurch] Erro completo:', error);
       toast({
         title: 'Erro ao criar igreja',
         description: error.message || 'Ocorreu um erro inesperado.',
