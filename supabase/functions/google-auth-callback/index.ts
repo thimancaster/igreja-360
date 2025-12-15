@@ -14,6 +14,7 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
     const error = url.searchParams.get('error');
 
     if (error) {
@@ -22,6 +23,22 @@ serve(async (req) => {
 
     if (!code) {
       throw new Error('No authorization code received');
+    }
+
+    if (!state) {
+      throw new Error('No state parameter received');
+    }
+
+    // Decode user ID from state
+    let userId: string;
+    try {
+      const stateData = JSON.parse(atob(state));
+      userId = stateData.userId;
+      if (!userId) {
+        throw new Error('Invalid state: missing userId');
+      }
+    } catch (e) {
+      throw new Error('Invalid state parameter');
     }
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -63,25 +80,13 @@ serve(async (req) => {
     // Create Supabase client with service role
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get authenticated user
-    const authHeader = req.headers.get('authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (userError || !user) {
-      throw new Error('Invalid user token');
-    }
+    console.log('Google OAuth Callback - User ID from state:', userId);
 
     // Store tokens securely using encrypted storage function
     const { data: sessionId, error: sessionError } = await supabase.rpc(
       'store_encrypted_oauth_session',
       {
-        p_user_id: user.id,
+        p_user_id: userId,
         p_access_token: tokens.access_token,
         p_refresh_token: tokens.refresh_token || null,
       }
@@ -94,9 +99,9 @@ serve(async (req) => {
 
     console.log('Created encrypted OAuth session:', sessionId);
 
-    // Redirect with only session ID (not the tokens!)
-    const appUrl = Deno.env.get('APP_BASE_URL') || supabaseUrl;
-    const redirectUrl = `${appUrl}/app/integracoes?oauth_session=${sessionId}`;
+    // Redirect back to app with session ID
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://igreja-360-hub.lovable.app';
+    const redirectUrl = `${appBaseUrl}/app/integracoes?oauth_session=${sessionId}`;
 
     return new Response(null, {
       status: 302,
@@ -110,8 +115,8 @@ serve(async (req) => {
     console.error('Error in google-auth-callback:', error);
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const appUrl = Deno.env.get('APP_BASE_URL') || Deno.env.get('SUPABASE_URL');
-    const errorUrl = `${appUrl}/app/integracoes?oauth_error=${encodeURIComponent(errorMessage)}`;
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://igreja-360-hub.lovable.app';
+    const errorUrl = `${appBaseUrl}/app/integracoes?oauth_error=${encodeURIComponent(errorMessage)}`;
 
     return new Response(null, {
       status: 302,

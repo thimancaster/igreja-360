@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,9 +14,25 @@ serve(async (req) => {
   try {
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    if (!clientId || !supabaseUrl) {
+    if (!clientId || !supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing required environment variables');
+    }
+
+    // Get authenticated user from request
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      throw new Error('Authorization required');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (userError || !user) {
+      throw new Error('Invalid user token');
     }
 
     // Construir redirect_uri FIXO usando o SUPABASE_URL
@@ -29,6 +46,9 @@ serve(async (req) => {
       'https://www.googleapis.com/auth/drive.metadata.readonly'
     ].join(' ');
 
+    // Encode user ID in state parameter to pass through OAuth flow
+    const state = btoa(JSON.stringify({ userId: user.id }));
+
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
@@ -36,8 +56,9 @@ serve(async (req) => {
     authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('access_type', 'offline');
     authUrl.searchParams.set('prompt', 'consent');
+    authUrl.searchParams.set('state', state);
 
-    console.log('Google OAuth Start - Redirect URI:', redirectUri);
+    console.log('Google OAuth Start - Redirect URI:', redirectUri, 'User:', user.id);
 
     return new Response(
       JSON.stringify({ authUrl: authUrl.toString() }),
