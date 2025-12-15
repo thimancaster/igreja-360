@@ -44,6 +44,7 @@ export default function Integracoes() {
   const [sheetHeaders, setSheetHeaders] = useState<string[]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
+  const [isStartingOAuth, setIsStartingOAuth] = useState(false);
   
   // SECURITY FIX: Store OAuth tokens in React state instead of sessionStorage
   // This prevents exposure to XSS attacks and browser extensions
@@ -53,6 +54,7 @@ export default function Integracoes() {
   } | null>(null);
 
   const canManageIntegrations = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem gerenciar integrações
+  const hasOAuthTokens = oauthTokens?.accessToken != null;
 
   // Handle OAuth callback with secure session
   useEffect(() => {
@@ -274,7 +276,43 @@ export default function Integracoes() {
     setSheetHeaders([]);
   };
 
-  const isAddSheetButtonDisabled = !profile?.church_id || !canManageIntegrations; // Desabilitar se profile.church_id for nulo ou sem permissão
+  // Função para iniciar OAuth do Google
+  const handleStartGoogleOAuth = async () => {
+    if (!canManageIntegrations) return;
+    
+    // Se já tem tokens, apenas abre o dialog
+    if (hasOAuthTokens) {
+      setShowMappingDialog(true);
+      return;
+    }
+
+    setIsStartingOAuth(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-auth-start');
+      
+      if (error) {
+        throw new Error(error.message || 'Erro ao iniciar autenticação');
+      }
+
+      if (!data?.authUrl) {
+        throw new Error('URL de autenticação não recebida');
+      }
+
+      // Redirecionar para Google OAuth
+      window.location.href = data.authUrl;
+    } catch (error: any) {
+      console.error('Error starting Google OAuth:', error);
+      toast({
+        title: "Erro ao iniciar autenticação",
+        description: error.message || "Não foi possível iniciar o processo de autenticação com o Google.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStartingOAuth(false);
+    }
+  };
+
+  const isAddSheetButtonDisabled = !profile?.church_id || !canManageIntegrations || isStartingOAuth; // Desabilitar se profile.church_id for nulo ou sem permissão
 
   if (isLoading || roleLoading) {
     return (
@@ -312,9 +350,9 @@ export default function Integracoes() {
         <CardContent className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Planilhas Sincronizadas</h3>
-            <Button onClick={() => setShowMappingDialog(true)} disabled={isAddSheetButtonDisabled}>
-              <Plus className="mr-2 h-4 w-4" />
-              Adicionar Planilha
+            <Button onClick={handleStartGoogleOAuth} disabled={isAddSheetButtonDisabled}>
+              {isStartingOAuth ? <LoadingSpinner size="sm" className="mr-2" /> : <Plus className="mr-2 h-4 w-4" />}
+              {isStartingOAuth ? "Autenticando..." : "Adicionar Planilha"}
             </Button>
           </div>
           {isAddSheetButtonDisabled && !canManageIntegrations && (
