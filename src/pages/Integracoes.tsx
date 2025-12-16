@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon } from "lucide-react";
+import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon, CheckCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -340,7 +341,15 @@ export default function Integracoes() {
               <Sheet className="h-6 w-6 text-primary" />
             </div>
             <div className="flex-1">
-              <CardTitle>Google Sheets</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Google Sheets
+                {hasOAuthTokens && (
+                  <Badge className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Autenticado
+                  </Badge>
+                )}
+              </CardTitle>
               <CardDescription>
                 Conecte planilhas do Google para sincronizar automaticamente suas transações
               </CardDescription>
@@ -351,8 +360,22 @@ export default function Integracoes() {
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Planilhas Sincronizadas</h3>
             <Button onClick={handleStartGoogleOAuth} disabled={isAddSheetButtonDisabled}>
-              {isStartingOAuth ? <LoadingSpinner size="sm" className="mr-2" /> : <Plus className="mr-2 h-4 w-4" />}
-              {isStartingOAuth ? "Autenticando..." : "Adicionar Planilha"}
+              {isStartingOAuth ? (
+                <>
+                  <LoadingSpinner size="sm" className="mr-2" />
+                  Autenticando...
+                </>
+              ) : hasOAuthTokens ? (
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4 text-green-400" />
+                  Configurar Planilha
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar Planilha
+                </>
+              )}
             </Button>
           </div>
           {isAddSheetButtonDisabled && !canManageIntegrations && (
@@ -425,8 +448,16 @@ export default function Integracoes() {
               </Table>
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhuma planilha conectada ainda
+            <div className="text-center py-8 text-muted-foreground space-y-2">
+              {hasOAuthTokens ? (
+                <>
+                  <CheckCircle className="h-8 w-8 mx-auto text-green-500" />
+                  <p className="text-green-600 font-medium">Autenticado com Google</p>
+                  <p>Clique em "Configurar Planilha" para adicionar sua primeira integração.</p>
+                </>
+              ) : (
+                <p>Nenhuma planilha conectada ainda</p>
+              )}
             </div>
           )}
         </CardContent>
@@ -435,7 +466,15 @@ export default function Integracoes() {
       <Dialog open={showMappingDialog} onOpenChange={setShowMappingDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Adicionar Planilha Google Sheets</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              Adicionar Planilha Google Sheets
+              {hasOAuthTokens && (
+                <Badge variant="outline" className="border-green-500 text-green-600 text-xs">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Conectado
+                </Badge>
+              )}
+            </DialogTitle>
             <DialogDescription>
               Insira a URL da sua planilha do Google Sheets e mapeie as colunas.
               Certifique-se de que a planilha esteja configurada para acesso público (ou "Qualquer pessoa com o link pode visualizar").
