@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon, CheckCircle } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +17,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { useRole } from "@/hooks/useRole"; // Importar useRole
+import { useRole } from "@/hooks/useRole";
 
 const REQUIRED_FIELDS = [
   { key: "amount", label: "Valor da Transação" },
@@ -343,12 +344,21 @@ export default function Integracoes() {
             <div className="flex-1">
               <CardTitle className="flex items-center gap-2">
                 Google Sheets
-                {hasOAuthTokens && (
-                  <Badge className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" />
-                    Autenticado
-                  </Badge>
-                )}
+                <AnimatePresence>
+                  {hasOAuthTokens && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8, x: -10 }}
+                      animate={{ opacity: 1, scale: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.8, x: -10 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                    >
+                      <Badge className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3" />
+                        Autenticado
+                      </Badge>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </CardTitle>
               <CardDescription>
                 Conecte planilhas do Google para sincronizar automaticamente suas transações
@@ -449,15 +459,37 @@ export default function Integracoes() {
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground space-y-2">
-              {hasOAuthTokens ? (
-                <>
-                  <CheckCircle className="h-8 w-8 mx-auto text-green-500" />
-                  <p className="text-green-600 font-medium">Autenticado com Google</p>
-                  <p>Clique em "Configurar Planilha" para adicionar sua primeira integração.</p>
-                </>
-              ) : (
-                <p>Nenhuma planilha conectada ainda</p>
-              )}
+              <AnimatePresence mode="wait">
+                {hasOAuthTokens ? (
+                  <motion.div
+                    key="authenticated"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-2"
+                  >
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.1 }}
+                    >
+                      <CheckCircle className="h-8 w-8 mx-auto text-green-500" />
+                    </motion.div>
+                    <p className="text-green-600 font-medium">Autenticado com Google</p>
+                    <p>Clique em "Configurar Planilha" para adicionar sua primeira integração.</p>
+                  </motion.div>
+                ) : (
+                  <motion.p
+                    key="not-authenticated"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    Nenhuma planilha conectada ainda
+                  </motion.p>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </CardContent>
@@ -468,12 +500,20 @@ export default function Integracoes() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               Adicionar Planilha Google Sheets
-              {hasOAuthTokens && (
-                <Badge variant="outline" className="border-green-500 text-green-600 text-xs">
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                  Conectado
-                </Badge>
-              )}
+              <AnimatePresence>
+                {hasOAuthTokens && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  >
+                    <Badge variant="outline" className="border-green-500 text-green-600 text-xs">
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Conectado
+                    </Badge>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </DialogTitle>
             <DialogDescription>
               Insira a URL da sua planilha do Google Sheets e mapeie as colunas.
