@@ -145,7 +145,7 @@ const LandingPage: React.FC = () => {
 
             {/* Benefício 4: Ganhe Tempo */}
             <div className="flex flex-col md:flex-row-reverse items-center gap-12">
-              <div className="md:w-1/2">
+              <div className="md:w-1/2 pb-[10px] pt-[10px]">
                 <img src="/mockups/time-peace.png" alt="Mockup de Tempo" className="w-full h-72 object-cover rounded-xl" />
               </div>
               <div className="md:w-1/2 space-y-4 text-center md:text-left">
