@@ -8,11 +8,10 @@ import { Link } from "react-router-dom";
 import MockupDevice from "@/components/MockupDevice"; // Import MockupDevice
 
 const LandingPage: React.FC = () => {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
+  return <div className="min-h-screen bg-background text-foreground">
       {/* Header da Landing Page */}
       <header className="sticky top-0 z-40 w-full border-b bg-card/80 backdrop-blur-sm">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container flex h-16 items-center justify-between border-sidebar-accent border-[sidebar-primary-foreground]">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-glow">
               <span className="text-primary-foreground font-bold text-sm">I360</span>
@@ -327,7 +326,7 @@ const LandingPage: React.FC = () => {
         </section>
 
         {/* Secção de Chamada para Ação Final (CTA) */}
-        <section className="py-20 md:py-28 bg-primary text-primary-foreground text-center">
+        <section className="py-20 md:py-28 text-primary-foreground text-center bg-sky-950">
           <div className="container">
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight max-w-4xl mx-auto">
               Simplifique Hoje Mesmo. Solicite seu Acesso Beta.
@@ -348,8 +347,6 @@ const LandingPage: React.FC = () => {
           <p>© 2025 Igreja360 by Thiago Ferreira. Todos os direitos reservados.</p>
         </div>
       </footer>
-    </div>
-  );
-}
-
+    </div>;
+};
 export default LandingPage;
