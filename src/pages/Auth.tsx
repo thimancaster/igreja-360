@@ -117,7 +117,7 @@ export default function Auth() {
   };
   return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="w-full max-w-md border-border/50 shadow-xl bg-secondary-foreground">
-        <CardHeader className="text-center space-y-4 shadow-xl border-primary-light border">
+        <CardHeader className="text-center space-y-4 border rounded shadow-none my-[10px] mx-[10px] border-primary-light border-double">
           <div className="flex justify-center">
             <div className="p-3 bg-gradient-to-br from-primary to-primary-dark rounded-2xl shadow-lg">
               <Church className="h-10 w-10 text-primary-foreground" />
