@@ -117,7 +117,7 @@ export default function Auth() {
   };
   return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="w-full max-w-md border-border/50 shadow-xl bg-secondary-foreground">
-        <CardHeader className="text-center space-y-4 shadow-xl">
+        <CardHeader className="text-center space-y-4 shadow-xl border-primary-light border">
           <div className="flex justify-center">
             <div className="p-3 bg-gradient-to-br from-primary to-primary-dark rounded-2xl shadow-lg">
               <Church className="h-10 w-10 text-primary-foreground" />
@@ -130,7 +130,7 @@ export default function Auth() {
             Gestão clara. Igreja saudável.
           </CardDescription>
         </CardHeader>
-        <CardContent className="shadow-xl">
+        <CardContent className="shadow-xl border border-primary-dark rounded">
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Entrar</TabsTrigger>
