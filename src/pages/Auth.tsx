@@ -9,9 +9,12 @@ import { toast } from "@/hooks/use-toast";
 import { Church } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-
 export default function Auth() {
-  const { user, signIn, signUp } = useAuth();
+  const {
+    user,
+    signIn,
+    signUp
+  } = useAuth();
   const navigate = useNavigate();
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -23,10 +26,11 @@ export default function Auth() {
   // Redirecionar se já estiver logado (verificação síncrona)
   if (user) {
     // Usar setTimeout para evitar problemas de renderização
-    setTimeout(() => navigate('/', { replace: true }), 0);
+    setTimeout(() => navigate('/', {
+      replace: true
+    }), 0);
     return null;
   }
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -34,40 +38,38 @@ export default function Auth() {
       // Validate login inputs
       const loginSchema = z.object({
         email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
-        password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres").max(72, "Senha muito longa"),
+        password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres").max(72, "Senha muito longa")
       });
-
       const validated = loginSchema.parse({
         email: loginEmail,
-        password: loginPassword,
+        password: loginPassword
       });
-
       await signIn(validated.email, validated.password);
-      
+
       // Redirecionar explicitamente após login bem-sucedido
       console.log('Auth: Login successful, redirecting...');
-      navigate('/', { replace: true });
-      
+      navigate('/', {
+        replace: true
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
         toast({
           title: "Erro de validação",
           description: firstError.message,
-          variant: "destructive",
+          variant: "destructive"
         });
       } else {
         toast({
           title: "Erro ao entrar",
           description: error.message || "Verifique suas credenciais",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     } finally {
       setLoading(false);
     }
   };
-
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -76,52 +78,45 @@ export default function Auth() {
       const signupSchema = z.object({
         name: z.string().trim().min(1, "Nome é obrigatório").max(100, "Nome muito longo"),
         email: z.string().trim().email("Email inválido").max(255, "Email muito longo"),
-        password: z.string()
-          .min(8, "Senha deve ter no mínimo 8 caracteres")
-          .max(72, "Senha muito longa")
-          .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Senha deve conter maiúsculas, minúsculas e números"),
+        password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres").max(72, "Senha muito longa").regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Senha deve conter maiúsculas, minúsculas e números")
       });
-
       const validated = signupSchema.parse({
         name: signupName,
         email: signupEmail,
-        password: signupPassword,
+        password: signupPassword
       });
-
       await signUp(validated.email, validated.password, validated.name);
-      
       toast({
         title: "Conta criada!",
-        description: "Você já pode fazer login.",
+        description: "Você já pode fazer login."
       });
-      
+
       // Redirecionar após cadastro bem-sucedido
       console.log('Auth: Signup successful, redirecting...');
-      navigate('/', { replace: true });
-      
+      navigate('/', {
+        replace: true
+      });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
         toast({
           title: "Erro de validação",
           description: firstError.message,
-          variant: "destructive",
+          variant: "destructive"
         });
       } else {
         toast({
           title: "Erro ao cadastrar",
           description: error.message || "Tente novamente",
-          variant: "destructive",
+          variant: "destructive"
         });
       }
     } finally {
       setLoading(false);
     }
   };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md border-border/50 shadow-xl">
+  return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+      <Card className="w-full max-w-md border-border/50 shadow-xl bg-secondary-foreground">
         <CardHeader className="text-center space-y-4">
           <div className="flex justify-center">
             <div className="p-3 bg-gradient-to-br from-primary to-primary-dark rounded-2xl shadow-lg">
@@ -146,25 +141,11 @@ export default function Auth() {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="login-email">E-mail</Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    required
-                  />
+                  <Input id="login-email" type="email" placeholder="seu@email.com" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Senha</Label>
-                  <Input
-                    id="login-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    required
-                  />
+                  <Input id="login-password" type="password" placeholder="••••••••" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Entrando..." : "Entrar"}
@@ -176,37 +157,15 @@ export default function Auth() {
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Nome Completo</Label>
-                  <Input
-                    id="signup-name"
-                    type="text"
-                    placeholder="Seu nome"
-                    value={signupName}
-                    onChange={(e) => setSignupName(e.target.value)}
-                    required
-                  />
+                  <Input id="signup-name" type="text" placeholder="Seu nome" value={signupName} onChange={e => setSignupName(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">E-mail</Label>
-                  <Input
-                    id="signup-email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={signupEmail}
-                    onChange={(e) => setSignupEmail(e.target.value)}
-                    required
-                  />
+                  <Input id="signup-email" type="email" placeholder="seu@email.com" value={signupEmail} onChange={e => setSignupEmail(e.target.value)} required />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Senha</Label>
-                  <Input
-                    id="signup-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={signupPassword}
-                    onChange={(e) => setSignupPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
+                  <Input id="signup-password" type="password" placeholder="••••••••" value={signupPassword} onChange={e => setSignupPassword(e.target.value)} required minLength={6} />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Cadastrando..." : "Criar Conta"}
@@ -216,6 +175,5 @@ export default function Auth() {
           </Tabs>
         </CardContent>
       </Card>
-    </div>
-  );
+    </div>;
 }
