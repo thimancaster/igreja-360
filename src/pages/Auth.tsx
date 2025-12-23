@@ -130,7 +130,7 @@ export default function Auth() {
             Gestão clara. Igreja saudável.
           </CardDescription>
         </CardHeader>
-        <CardContent className="shadow-xl border border-primary-dark rounded">
+        <CardContent className="px-[10px] py-[20px] mx-[10px] my-[10px] border-0 border-dashed border-primary rounded-none shadow-none">
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Entrar</TabsTrigger>
