@@ -103,7 +103,7 @@ const CreateChurchForm: React.FC = () => {
             <Church className="h-6 w-6 text-primary" />
           </div>
           <CardTitle>Crie sua Igreja</CardTitle>
-          <CardDescription>
+          <CardDescription className="text-[sidebar-accent-foreground] text-sidebar-border">
             Você ainda não está vinculado a uma igreja. Crie a sua primeira igreja para continuar.
           </CardDescription>
         </CardHeader>
