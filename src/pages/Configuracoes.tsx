@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRole } from "@/hooks/useRole"; // Importar useRole
+import { useRole } from "@/hooks/useRole";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { User, Building2 } from "lucide-react";
-import { Database, Tables, TablesUpdate } from "@/integrations/supabase/types";
+import { Tables } from "@/integrations/supabase/types";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { formatCNPJ, validateCNPJ } from "@/lib/cnpjUtils";
 
-// Definir tipos para as linhas das tabelas e para os dados de atualização
 type ProfileRow = Tables<'profiles'>;
 type ChurchRow = Tables<'churches'>;
 
@@ -61,6 +61,8 @@ export default function Configuracoes() {
     city: "",
     state: "",
   });
+
+  const [cnpjError, setCnpjError] = useState<string | null>(null);
 
   // Update profile data when loaded
   useEffect(() => {
@@ -132,15 +134,34 @@ export default function Configuracoes() {
     updateProfileMutation.mutate(profileData);
   };
 
+  const handleCNPJChange = (value: string) => {
+    const formatted = formatCNPJ(value);
+    setChurchData({ ...churchData, cnpj: formatted });
+    
+    // Validar quando preenchido
+    if (formatted && !validateCNPJ(formatted)) {
+      setCnpjError("CNPJ inválido. Verifique os dígitos.");
+    } else {
+      setCnpjError(null);
+    }
+  };
+
   const handleChurchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validar CNPJ antes de submeter
+    if (churchData.cnpj && !validateCNPJ(churchData.cnpj)) {
+      toast.error("CNPJ inválido. Corrija antes de salvar.");
+      return;
+    }
+    
     // Transform empty strings to null to avoid unique constraint issues
     const cleanedData: ChurchUpdateData = {
       name: churchData.name,
-      cnpj: churchData.cnpj.trim() === "" ? null : churchData.cnpj,
-      address: churchData.address.trim() === "" ? null : churchData.address,
-      city: churchData.city.trim() === "" ? null : churchData.city,
-      state: churchData.state.trim() === "" ? null : churchData.state,
+      cnpj: churchData.cnpj?.trim() === "" ? null : churchData.cnpj,
+      address: churchData.address?.trim() === "" ? null : churchData.address,
+      city: churchData.city?.trim() === "" ? null : churchData.city,
+      state: churchData.state?.trim() === "" ? null : churchData.state,
     };
     updateChurchMutation.mutate(cleanedData);
   };
@@ -267,16 +288,21 @@ export default function Configuracoes() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="cnpj">CNPJ</Label>
+                    <Label htmlFor="cnpj">CNPJ (opcional)</Label>
                     <Input
                       id="cnpj"
-                      value={churchData.cnpj}
-                      onChange={(e) =>
-                        setChurchData({ ...churchData, cnpj: e.target.value })
-                      }
+                      value={churchData.cnpj || ""}
+                      onChange={(e) => handleCNPJChange(e.target.value)}
                       placeholder="00.000.000/0000-00"
-                      disabled={!canEditChurch} // Desabilitar se não puder editar
+                      disabled={!canEditChurch}
+                      className={cnpjError ? "border-destructive" : ""}
                     />
+                    {cnpjError && (
+                      <p className="text-xs text-destructive">{cnpjError}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Deixe em branco se não possuir CNPJ
+                    </p>
                   </div>
 
                   <div className="space-y-2">
