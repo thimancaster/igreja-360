@@ -137,14 +137,12 @@ export type Database = {
       }
       google_integrations: {
         Row: {
-          access_token: string | null
           access_token_enc: string | null
           church_id: string
           column_mapping: Json
           created_at: string | null
           id: string
           last_sync_at: string | null
-          refresh_token: string | null
           refresh_token_enc: string | null
           sheet_id: string
           sheet_name: string
@@ -152,14 +150,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          access_token?: string | null
           access_token_enc?: string | null
           church_id: string
           column_mapping: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
-          refresh_token?: string | null
           refresh_token_enc?: string | null
           sheet_id: string
           sheet_name: string
@@ -167,14 +163,12 @@ export type Database = {
           user_id: string
         }
         Update: {
-          access_token?: string | null
           access_token_enc?: string | null
           church_id?: string
           column_mapping?: Json
           created_at?: string | null
           id?: string
           last_sync_at?: string | null
-          refresh_token?: string | null
           refresh_token_enc?: string | null
           sheet_id?: string
           sheet_name?: string
@@ -266,32 +260,26 @@ export type Database = {
       }
       oauth_sessions: {
         Row: {
-          access_token: string | null
           access_token_enc: string | null
           created_at: string | null
           expires_at: string | null
           id: string
-          refresh_token: string | null
           refresh_token_enc: string | null
           user_id: string
         }
         Insert: {
-          access_token?: string | null
           access_token_enc?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
-          refresh_token?: string | null
           refresh_token_enc?: string | null
           user_id: string
         }
         Update: {
-          access_token?: string | null
           access_token_enc?: string | null
           created_at?: string | null
           expires_at?: string | null
           id?: string
-          refresh_token?: string | null
           refresh_token_enc?: string | null
           user_id?: string
         }
@@ -525,7 +513,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "tesoureiro" | "pastor" | "lider"
+      app_role: "admin" | "tesoureiro" | "pastor" | "lider" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -653,7 +641,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "tesoureiro", "pastor", "lider"],
+      app_role: ["admin", "tesoureiro", "pastor", "lider", "user"],
     },
   },
 } as const

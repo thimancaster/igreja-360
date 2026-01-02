@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon, CheckCircle } from "lucide-react";
+import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon, CheckCircle, AlertTriangle, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useIntegrations } from "@/hooks/useIntegrations";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -30,7 +31,7 @@ const REQUIRED_FIELDS = [
 export default function Integracoes() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, profile } = useAuth();
-  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole();
   const {
     integrations,
     isLoading,
@@ -47,15 +48,15 @@ export default function Integracoes() {
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
   const [isStartingOAuth, setIsStartingOAuth] = useState(false);
+  const [showOAuth403Instructions, setShowOAuth403Instructions] = useState(false);
   
   // SECURITY FIX: Store OAuth tokens in React state instead of sessionStorage
-  // This prevents exposure to XSS attacks and browser extensions
   const [oauthTokens, setOauthTokens] = useState<{
     accessToken: string;
     refreshToken: string | null;
   } | null>(null);
 
-  const canManageIntegrations = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem gerenciar integrações
+  const canManageIntegrations = isAdmin || isTesoureiro;
   const hasOAuthTokens = oauthTokens?.accessToken != null;
 
   // Handle OAuth callback with secure session
@@ -65,11 +66,32 @@ export default function Integracoes() {
       const oauthError = searchParams.get('oauth_error');
 
       if (oauthError) {
-        toast({
-          title: "Erro na autenticação",
-          description: decodeURIComponent(oauthError),
-          variant: "destructive",
-        });
+        const decodedError = decodeURIComponent(oauthError);
+        
+        // Detectar erro 403 (access_denied, Access blocked, etc.)
+        const is403Error = 
+          decodedError.includes('403') || 
+          decodedError.includes('access_denied') || 
+          decodedError.includes('Access blocked') ||
+          decodedError.includes('access blocked') ||
+          decodedError.includes('not authorized') ||
+          decodedError.includes('Access denied');
+        
+        if (is403Error) {
+          setShowOAuth403Instructions(true);
+          toast({
+            title: "Acesso Bloqueado pelo Google",
+            description: "O aplicativo está em modo de teste. Veja as instruções abaixo.",
+            variant: "destructive",
+            duration: 10000,
+          });
+        } else {
+          toast({
+            title: "Erro na autenticação",
+            description: decodedError,
+            variant: "destructive",
+          });
+        }
         setSearchParams({});
         return;
       }
@@ -334,6 +356,61 @@ export default function Integracoes() {
           </p>
         </div>
       </div>
+
+      {/* Alert de instruções para erro 403 do Google OAuth */}
+      <AnimatePresence>
+        {showOAuth403Instructions && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Alert variant="destructive" className="relative">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Acesso Bloqueado pelo Google</AlertTitle>
+              <AlertDescription className="mt-3 space-y-3">
+                <p>
+                  O aplicativo Google OAuth está em modo de teste. Para usar a integração com Google Sheets:
+                </p>
+                <ol className="list-decimal list-inside space-y-2 text-sm">
+                  <li>
+                    Acesse o <strong>Google Cloud Console</strong> (
+                    <a 
+                      href="https://console.cloud.google.com/apis/credentials/consent" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="underline hover:text-destructive-foreground"
+                    >
+                      console.cloud.google.com
+                    </a>
+                    )
+                  </li>
+                  <li>Vá em <strong>APIs e Serviços → Tela de Consentimento OAuth</strong></li>
+                  <li>
+                    Na seção <strong>Usuários de teste</strong>, adicione seu email Google Workspace
+                  </li>
+                  <li>
+                    <strong>Importante:</strong> Como o app está configurado como "Interno (Workspace)", 
+                    apenas usuários do seu domínio Google Workspace podem acessar
+                  </li>
+                </ol>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Nota: Apps internos do Workspace não precisam de verificação do Google, mas estão limitados aos usuários do domínio.
+                </p>
+              </AlertDescription>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2"
+                onClick={() => setShowOAuth403Instructions(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </Alert>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Card>
         <CardHeader>

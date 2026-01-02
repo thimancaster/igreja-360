@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
+import { formatCNPJ, validateCNPJ } from '@/lib/cnpjUtils';
 
 type Church = Tables<'churches'>;
 type ChurchUpdateData = TablesUpdate<'churches'>;
@@ -24,6 +25,7 @@ const GerenciarIgreja = () => {
   const queryClient = useQueryClient();
 
   const [churchData, setChurchData] = useState<Church | null>(null);
+  const [cnpjError, setCnpjError] = useState<string | null>(null);
 
   const { data: church, isLoading: isLoadingChurch } = useQuery({
     queryKey: ['church-details', profile?.church_id, isAdmin],
@@ -73,9 +75,27 @@ const GerenciarIgreja = () => {
     },
   });
 
+  const handleCNPJChange = (value: string) => {
+    if (!churchData) return;
+    const formatted = formatCNPJ(value);
+    setChurchData({ ...churchData, cnpj: formatted });
+    
+    if (formatted && !validateCNPJ(formatted)) {
+      setCnpjError("CNPJ inválido. Verifique os dígitos.");
+    } else {
+      setCnpjError(null);
+    }
+  };
+
   const handleChurchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!churchData) return;
+
+    // Validar CNPJ antes de submeter
+    if (churchData.cnpj && !validateCNPJ(churchData.cnpj)) {
+      toast({ title: 'Erro', description: 'CNPJ inválido. Corrija antes de salvar.', variant: 'destructive' });
+      return;
+    }
 
     const cleanedData: ChurchUpdateData = {
       name: churchData.name,
@@ -138,12 +158,20 @@ const GerenciarIgreja = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cnpj">CNPJ</Label>
+                  <Label htmlFor="cnpj">CNPJ (opcional)</Label>
                   <Input
                     id="cnpj"
                     value={churchData.cnpj || ''}
-                    onChange={(e) => setChurchData({ ...churchData, cnpj: e.target.value })}
+                    onChange={(e) => handleCNPJChange(e.target.value)}
+                    placeholder="00.000.000/0000-00"
+                    className={cnpjError ? "border-destructive" : ""}
                   />
+                  {cnpjError && (
+                    <p className="text-xs text-destructive mt-1">{cnpjError}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Deixe em branco se não possuir CNPJ
+                  </p>
                 </div>
               </div>
               <Button type="submit" disabled={updateChurchMutation.isPending}>
