@@ -32,21 +32,37 @@ export default function Configuracoes() {
   const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
   const queryClient = useQueryClient();
 
-  // Fetch church data
+  // Fetch church data - usando owner_user_id como fallback
   const { data: church, isLoading: churchLoading } = useQuery({
-    queryKey: ["church", profile?.church_id],
+    queryKey: ["church", profile?.church_id, user?.id],
     queryFn: async () => {
-      if (!profile?.church_id) return null;
-      const { data, error } = await supabase
-        .from("churches")
-        .select("*")
-        .eq("id", profile.church_id)
-        .single();
+      // Primeiro, tentar pelo church_id do profile
+      if (profile?.church_id) {
+        const { data, error } = await supabase
+          .from("churches")
+          .select("*")
+          .eq("id", profile.church_id)
+          .maybeSingle();
+        
+        if (data && !error) return data as ChurchRow;
+      }
       
-      if (error) throw error;
-      return data as ChurchRow;
+      // Fallback: buscar igreja onde o usuário é dono
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("churches")
+          .select("*")
+          .eq("owner_user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (data && !error) return data as ChurchRow;
+      }
+      
+      return null;
     },
-    enabled: !!profile?.church_id && !!user?.id,
+    enabled: !!user?.id,
   });
 
   const [profileData, setProfileData] = useState<ProfileUpdateData>({
@@ -111,17 +127,19 @@ export default function Configuracoes() {
   // Update church mutation
   const updateChurchMutation = useMutation({
     mutationFn: async (data: ChurchUpdateData) => {
-      if (!profile?.church_id) throw new Error("Igreja não encontrada");
+      // Usar church.id se disponível
+      const churchId = church?.id || profile?.church_id;
+      if (!churchId) throw new Error("Igreja não encontrada");
       
       const { error } = await supabase
         .from("churches")
         .update(data)
-        .eq("id", profile.church_id);
+        .eq("id", churchId);
       
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["church", profile?.church_id] });
+      queryClient.invalidateQueries({ queryKey: ["church"] });
       toast.success("Dados da igreja atualizados com sucesso!");
     },
     onError: (error) => {

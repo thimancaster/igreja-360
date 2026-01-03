@@ -45,13 +45,15 @@ const CreateChurchForm: React.FC = () => {
       console.log('[CreateChurch] Iniciando criação da igreja para user:', user.id);
 
       // 1. Create the church
-      const {
-        data: churchData,
-        error: churchError
-      } = await supabase.from('churches').insert({
-        name: values.churchName,
-        owner_user_id: user.id
-      }).select().single();
+      const { data: churchData, error: churchError } = await supabase
+        .from('churches')
+        .insert({
+          name: values.churchName,
+          owner_user_id: user.id
+        })
+        .select()
+        .single();
+        
       if (churchError) {
         console.error('[CreateChurch] Erro ao criar igreja:', churchError);
         throw churchError;
@@ -59,32 +61,41 @@ const CreateChurchForm: React.FC = () => {
       console.log('[CreateChurch] Igreja criada:', churchData.id);
 
       // 2. Update user's profile with church_id
-      const {
-        error: profileError,
-        count
-      } = await supabase.from('profiles').update({
-        church_id: churchData.id
-      }).eq('id', user.id).select();
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ church_id: churchData.id })
+        .eq('id', user.id);
+        
       if (profileError) {
         console.error('[CreateChurch] Erro ao atualizar perfil:', profileError);
         throw profileError;
       }
-      console.log('[CreateChurch] Perfil atualizado, count:', count);
+      console.log('[CreateChurch] Perfil atualizado com church_id:', churchData.id);
 
-      // 3. Wait for profile refresh to complete
+      // 3. Atribuir role 'admin' ao dono da igreja (se ainda não tiver)
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .upsert(
+          { user_id: user.id, role: 'admin' as const },
+          { onConflict: 'user_id,role' }
+        );
+        
+      if (roleError) {
+        console.warn('[CreateChurch] Aviso ao atribuir role admin:', roleError.message);
+      } else {
+        console.log('[CreateChurch] Role admin atribuída');
+      }
+
+      // 4. Aguardar atualização do perfil no contexto
       await refetchProfile();
       console.log('[CreateChurch] Profile refetch completado');
+      
       toast({
         title: 'Igreja criada com sucesso!'
       });
 
-      // 4. Navigate with small delay to ensure state is updated
-      setTimeout(() => {
-        console.log('[CreateChurch] Navegando para /church-confirmation');
-        navigate('/church-confirmation', {
-          replace: true
-        });
-      }, 150);
+      // 5. Navegar para confirmação
+      navigate('/church-confirmation', { replace: true });
     } catch (error: any) {
       console.error('[CreateChurch] Erro completo:', error);
       toast({
