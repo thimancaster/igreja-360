@@ -1,1 +1,13 @@
 project_id = "cxiudqwfwpdwpfyqpaxw"
+
+[functions.google-auth-start]
+verify_jwt = true
+
+[functions.google-auth-callback]
+verify_jwt = false
+
+[functions.get-sheet-headers]
+verify_jwt = true
+
+[functions.sync-sheet]
+verify_jwt = true
