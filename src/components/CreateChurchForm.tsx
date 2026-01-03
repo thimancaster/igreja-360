@@ -45,15 +45,13 @@ const CreateChurchForm: React.FC = () => {
       console.log('[CreateChurch] Iniciando criação da igreja para user:', user.id);
 
       // 1. Create the church
-      const { data: churchData, error: churchError } = await supabase
-        .from('churches')
-        .insert({
-          name: values.churchName,
-          owner_user_id: user.id
-        })
-        .select()
-        .single();
-        
+      const {
+        data: churchData,
+        error: churchError
+      } = await supabase.from('churches').insert({
+        name: values.churchName,
+        owner_user_id: user.id
+      }).select().single();
       if (churchError) {
         console.error('[CreateChurch] Erro ao criar igreja:', churchError);
         throw churchError;
@@ -61,11 +59,11 @@ const CreateChurchForm: React.FC = () => {
       console.log('[CreateChurch] Igreja criada:', churchData.id);
 
       // 2. Update user's profile with church_id
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ church_id: churchData.id })
-        .eq('id', user.id);
-        
+      const {
+        error: profileError
+      } = await supabase.from('profiles').update({
+        church_id: churchData.id
+      }).eq('id', user.id);
       if (profileError) {
         console.error('[CreateChurch] Erro ao atualizar perfil:', profileError);
         throw profileError;
@@ -73,13 +71,14 @@ const CreateChurchForm: React.FC = () => {
       console.log('[CreateChurch] Perfil atualizado com church_id:', churchData.id);
 
       // 3. Atribuir role 'admin' ao dono da igreja (se ainda não tiver)
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert(
-          { user_id: user.id, role: 'admin' as const },
-          { onConflict: 'user_id,role' }
-        );
-        
+      const {
+        error: roleError
+      } = await supabase.from('user_roles').upsert({
+        user_id: user.id,
+        role: 'admin' as const
+      }, {
+        onConflict: 'user_id,role'
+      });
       if (roleError) {
         console.warn('[CreateChurch] Aviso ao atribuir role admin:', roleError.message);
       } else {
@@ -89,13 +88,14 @@ const CreateChurchForm: React.FC = () => {
       // 4. Aguardar atualização do perfil no contexto
       await refetchProfile();
       console.log('[CreateChurch] Profile refetch completado');
-      
       toast({
         title: 'Igreja criada com sucesso!'
       });
 
       // 5. Navegar para confirmação
-      navigate('/church-confirmation', { replace: true });
+      navigate('/church-confirmation', {
+        replace: true
+      });
     } catch (error: any) {
       console.error('[CreateChurch] Erro completo:', error);
       toast({
@@ -109,7 +109,7 @@ const CreateChurchForm: React.FC = () => {
   };
   return <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+        <CardHeader className="text-center border-primary-dark">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 border-primary-dark">
             <Church className="h-6 w-6 text-primary" />
           </div>
