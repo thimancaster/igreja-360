@@ -28,22 +28,30 @@ const GerenciarIgreja = () => {
   const [cnpjError, setCnpjError] = useState<string | null>(null);
 
   const { data: church, isLoading: isLoadingChurch } = useQuery({
-    queryKey: ['church-details', profile?.church_id, isAdmin],
+    queryKey: ['church-details', profile?.church_id, profile?.id],
     queryFn: async () => {
       if (!profile) return null;
 
-      let query;
-      if (isAdmin) {
-        if (!profile.church_id) {
-          return null; 
-        }
-        query = supabase.from('churches').select('*').eq('id', profile.church_id);
-      } else {
-        if (!profile.church_id) return null;
-        query = supabase.from('churches').select('*').eq('id', profile.church_id);
+      // Primeiro, tentar pelo church_id do profile
+      if (profile.church_id) {
+        const { data, error } = await supabase
+          .from('churches')
+          .select('*')
+          .eq('id', profile.church_id)
+          .maybeSingle();
+        
+        if (data && !error) return data;
       }
 
-      const { data, error } = await query.single();
+      // Fallback: buscar igreja onde o usuário é dono
+      const { data, error } = await supabase
+        .from('churches')
+        .select('*')
+        .eq('owner_user_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
       if (error) throw new Error(error.message);
       return data;
     },

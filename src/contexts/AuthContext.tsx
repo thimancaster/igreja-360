@@ -31,13 +31,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('AuthContext: Error fetching profile:', error.message);
         return undefined;
       }
-      console.log('AuthContext: Profile fetched:', !!data);
+      
+      if (!data) {
+        console.log('AuthContext: No profile found for user');
+        return undefined;
+      }
+      
+      console.log('AuthContext: Profile fetched, church_id:', data.church_id);
       return data as Profile;
     } catch (err) {
       console.error('AuthContext: Error in fetchProfile:', err);
