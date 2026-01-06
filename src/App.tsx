@@ -13,14 +13,15 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthRedirect } from '@/components/AuthRedirect';
 
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { AdminRoute } from '@/components/AdminRoute';
 
 import { AppSidebar } from '@/components/AppSidebar';
 import { AppHeader } from '@/components/AppHeader';
-import { LoadingSpinner } from '@/components/LoadingSpinner'; // <-- CORREÇÃO: Adicionadas chaves {}
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 // Importações diretas (sem lazy) para garantir o build
 import Dashboard from '@/pages/Dashboard';
-import AuthPage from '@/pages/Auth'; // Importação Default
+import AuthPage from '@/pages/Auth';
 import NotFound from '@/pages/NotFound';
 import Transacoes from '@/pages/Transacoes';
 import Integracoes from '@/pages/Integracoes';
@@ -34,6 +35,7 @@ import GerenciarIgreja from '@/pages/admin/GerenciarIgreja';
 import GerenciarCategorias from '@/pages/admin/GerenciarCategorias';
 import CreateChurchPage from '@/pages/CreateChurch';
 import ChurchConfirmation from '@/pages/ChurchConfirmation';
+import SelectChurch from '@/pages/SelectChurch';
 import LandingPage from '@/pages/LandingPage';
 
 const App: React.FC = () => {
@@ -69,11 +71,11 @@ const App: React.FC = () => {
                               <Route path="importacao" element={<Importacao />} />
                               <Route path="integracoes" element={<Integracoes />} />
                               <Route path="relatorios" element={<Relatorios />} />
-                              <Route path="admin" element={<Admin />} />
-                              <Route path="admin/usuarios" element={<GerenciarUsuarios />} />
-                              <Route path="admin/ministerios" element={<GerenciarMinisterios />} />
-                              <Route path="admin/igreja" element={<GerenciarIgreja />} />
-                              <Route path="admin/categorias" element={<GerenciarCategorias />} />
+                              <Route path="admin" element={<AdminRoute><Admin /></AdminRoute>} />
+                              <Route path="admin/usuarios" element={<AdminRoute><GerenciarUsuarios /></AdminRoute>} />
+                              <Route path="admin/ministerios" element={<AdminRoute><GerenciarMinisterios /></AdminRoute>} />
+                              <Route path="admin/igreja" element={<AdminRoute><GerenciarIgreja /></AdminRoute>} />
+                              <Route path="admin/categorias" element={<AdminRoute><GerenciarCategorias /></AdminRoute>} />
                               <Route path="configuracoes" element={<Configuracoes />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
@@ -84,9 +86,10 @@ const App: React.FC = () => {
                   }
                 />
 
-                {/* Rotas de fluxo de criação (fora do layout principal) */}
+                {/* Rotas de fluxo de criação/seleção (fora do layout principal) */}
                 <Route path="/create-church" element={<ProtectedRoute><CreateChurchPage /></ProtectedRoute>} />
                 <Route path="/church-confirmation" element={<ProtectedRoute><ChurchConfirmation /></ProtectedRoute>} />
+                <Route path="/select-church" element={<ProtectedRoute><SelectChurch /></ProtectedRoute>} />
 
                 {/* Fallback global */}
                 <Route path="*" element={<NotFound />} />

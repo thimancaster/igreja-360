@@ -32,37 +32,26 @@ export default function Configuracoes() {
   const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
   const queryClient = useQueryClient();
 
-  // Fetch church data - usando owner_user_id como fallback
+  // Fetch church data - usando apenas profile.church_id (fonte única de verdade)
   const { data: church, isLoading: churchLoading } = useQuery({
-    queryKey: ["church", profile?.church_id, user?.id],
+    queryKey: ["church", profile?.church_id],
     queryFn: async () => {
-      // Primeiro, tentar pelo church_id do profile
-      if (profile?.church_id) {
-        const { data, error } = await supabase
-          .from("churches")
-          .select("*")
-          .eq("id", profile.church_id)
-          .maybeSingle();
-        
-        if (data && !error) return data as ChurchRow;
+      if (!profile?.church_id) return null;
+      
+      const { data, error } = await supabase
+        .from("churches")
+        .select("*")
+        .eq("id", profile.church_id)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Error fetching church:", error);
+        return null;
       }
       
-      // Fallback: buscar igreja onde o usuário é dono
-      if (user?.id) {
-        const { data, error } = await supabase
-          .from("churches")
-          .select("*")
-          .eq("owner_user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (data && !error) return data as ChurchRow;
-      }
-      
-      return null;
+      return data as ChurchRow;
     },
-    enabled: !!user?.id,
+    enabled: !!profile?.church_id,
   });
 
   const [profileData, setProfileData] = useState<ProfileUpdateData>({

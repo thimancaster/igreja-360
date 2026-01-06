@@ -28,10 +28,11 @@ const adminMenuItem = { title: "Administração", url: "/app/admin", icon: Users
 export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const { isAdmin, isLoading } = useRole();
+  const { isAdmin, isTesoureiro, isLoading } = useRole();
 
-  // Add admin menu item only if user is admin
-  const menuItems = isAdmin 
+  // Mostrar menu admin apenas para admin ou tesoureiro
+  const canAccessAdmin = isAdmin || isTesoureiro;
+  const menuItems = canAccessAdmin 
     ? [...baseMenuItems.slice(0, 5), adminMenuItem, baseMenuItems[5]]
     : baseMenuItems;
 
