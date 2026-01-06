@@ -28,34 +28,20 @@ const GerenciarIgreja = () => {
   const [cnpjError, setCnpjError] = useState<string | null>(null);
 
   const { data: church, isLoading: isLoadingChurch } = useQuery({
-    queryKey: ['church-details', profile?.church_id, profile?.id],
+    queryKey: ['church-details', profile?.church_id],
     queryFn: async () => {
-      if (!profile) return null;
+      if (!profile?.church_id) return null;
 
-      // Primeiro, tentar pelo church_id do profile
-      if (profile.church_id) {
-        const { data, error } = await supabase
-          .from('churches')
-          .select('*')
-          .eq('id', profile.church_id)
-          .maybeSingle();
-        
-        if (data && !error) return data;
-      }
-
-      // Fallback: buscar igreja onde o usuário é dono
       const { data, error } = await supabase
         .from('churches')
         .select('*')
-        .eq('owner_user_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('id', profile.church_id)
         .maybeSingle();
       
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!profile && !isRoleLoading,
+    enabled: !!profile?.church_id,
   });
 
   useEffect(() => {
@@ -76,7 +62,7 @@ const GerenciarIgreja = () => {
     },
     onSuccess: () => {
       toast({ title: 'Sucesso', description: 'Informações da igreja atualizadas.' });
-      queryClient.invalidateQueries({ queryKey: ['church-details', profile?.church_id, isAdmin] });
+      queryClient.invalidateQueries({ queryKey: ['church-details', profile?.church_id] });
     },
     onError: (error: any) => {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' });

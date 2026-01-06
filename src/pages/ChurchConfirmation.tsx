@@ -19,53 +19,36 @@ export default function ChurchConfirmation() {
 
   useEffect(() => {
     const fetchChurch = async () => {
-      console.log('[ChurchConfirmation] Iniciando busca, profile.church_id:', profile?.church_id);
+      console.log('[ChurchConfirmation] Buscando igreja, profile.church_id:', profile?.church_id);
       
-      // Tentar primeiro pelo profile.church_id
-      if (profile?.church_id) {
-        const { data, error } = await supabase
-          .from("churches")
-          .select("*")
-          .eq("id", profile.church_id)
-          .maybeSingle();
-
-        if (data && !error) {
-          console.log('[ChurchConfirmation] Igreja encontrada via profile.church_id:', data.name);
-          setChurch(data);
-          setLoading(false);
-          return;
-        }
+      // Usar apenas profile.church_id (fonte única de verdade)
+      if (!profile?.church_id) {
+        console.log('[ChurchConfirmation] Sem church_id, redirecionando para /');
+        navigate("/");
+        return;
       }
 
-      // Fallback: buscar pela igreja do owner (caso profile.church_id ainda não esteja atualizado)
-      if (user?.id) {
-        console.log('[ChurchConfirmation] Fallback: buscando por owner_user_id:', user.id);
-        const { data, error } = await supabase
-          .from("churches")
-          .select("*")
-          .eq("owner_user_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      const { data, error } = await supabase
+        .from("churches")
+        .select("*")
+        .eq("id", profile.church_id)
+        .maybeSingle();
 
-        if (data && !error) {
-          console.log('[ChurchConfirmation] Igreja encontrada via owner_user_id:', data.name);
-          setChurch(data);
-          setLoading(false);
-          return;
-        }
+      if (data && !error) {
+        console.log('[ChurchConfirmation] Igreja encontrada:', data.name);
+        setChurch(data);
+      } else {
+        console.log('[ChurchConfirmation] Igreja não encontrada, redirecionando');
+        navigate("/");
       }
-
-      // Se nada encontrado, ir para criar igreja
-      console.log('[ChurchConfirmation] Nenhuma igreja encontrada, redirecionando para /create-church');
-      navigate("/create-church");
+      
+      setLoading(false);
     };
 
-    // Aguardar um momento para garantir que o profile foi atualizado
-    if (user) {
+    if (user && profile !== undefined) {
       fetchChurch();
     }
-  }, [profile?.church_id, user, navigate]);
+  }, [profile?.church_id, user, profile, navigate]);
 
   if (loading) {
     return (
