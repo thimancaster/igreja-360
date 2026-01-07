@@ -115,13 +115,13 @@ export const normalizeType = (value: string): 'Receita' | 'Despesa' | null => {
 export const normalizeStatus = (value: string): 'Pendente' | 'Pago' | 'Vencido' | null => {
   if (typeof value !== 'string') return null;
   const lower = value.toLowerCase().trim();
-  if (['pendente', 'pending', 'aberto'].includes(lower)) {
+  if (['pendente', 'pending', 'aberto', 'a pagar', 'a receber'].includes(lower)) {
     return 'Pendente';
   }
-  if (['pago', 'paid', 'concluído', 'concluido'].includes(lower)) {
+  if (['pago', 'paid', 'concluído', 'concluido', 'recebido', 'quitado'].includes(lower)) {
     return 'Pago';
   }
-  if (['vencido', 'overdue', 'atrasado'].includes(lower)) {
+  if (['vencido', 'overdue', 'atrasado', 'em atraso'].includes(lower)) {
     return 'Vencido';
   }
   return null;
