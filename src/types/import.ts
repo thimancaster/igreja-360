@@ -70,24 +70,23 @@ export const transactionImportSchema = rawImportSchema.transform((data, ctx) => 
   }
 
   // Retornar os dados processados, garantindo que correspondam a ProcessedTransaction
-  return {
-    ...data,
-    description: data.description, // Agora garantido como string
-    amount: data.amount, // Agora garantido como number > 0
-    type: data.type, // Agora garantido como 'Receita' | 'Despesa'
-    church_id: data.church_id, // Agora garantido como string (uuid)
-    status: data.status || 'Pendente', // Padrão se não fornecido
-    origin: data.origin || 'Importação de Planilha', // Padrão se não fornecido
+  // IMPORTANTE: NÃO incluir 'id' para que o banco gere automaticamente
+  const result: ProcessedTransaction = {
+    description: data.description,
+    amount: data.amount,
+    type: data.type,
+    church_id: data.church_id,
+    status: data.status || 'Pendente',
+    origin: data.origin || 'Importação de Planilha',
     created_by: data.created_by || null,
     category_id: data.category_id || null,
     ministry_id: data.ministry_id || null,
     due_date: data.due_date || null,
     payment_date: data.payment_date || null,
     notes: data.notes || null,
-    created_at: data.created_at || null,
-    updated_at: data.updated_at || null,
-    id: data.id || undefined, // id é opcional em Insert, então undefined está ok
-  } as ProcessedTransaction; // Cast explícito para garantir o tipo de saída
+  };
+  
+  return result;
 });
 
 // Interface for the column mapping state

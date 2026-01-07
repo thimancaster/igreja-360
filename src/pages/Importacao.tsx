@@ -110,7 +110,19 @@ export default function Importacao() {
         const header = columnMapping[fieldKey];
         if (header) {
           const cellValue = row[headers.indexOf(header)];
-          rowData[fieldKey] = cellValue;
+          // Formatar valores para preview
+          if (fieldKey === 'due_date' || fieldKey === 'payment_date') {
+            rowData[fieldKey] = parseDate(cellValue) || '-';
+          } else if (fieldKey === 'amount') {
+            const amount = parseAmount(cellValue);
+            rowData[fieldKey] = amount !== null ? amount.toFixed(2) : '-';
+          } else if (fieldKey === 'type') {
+            rowData[fieldKey] = normalizeType(String(cellValue || '')) || String(cellValue || '-');
+          } else if (fieldKey === 'status') {
+            rowData[fieldKey] = normalizeStatus(String(cellValue || '')) || String(cellValue || '-');
+          } else {
+            rowData[fieldKey] = cellValue !== undefined && cellValue !== null ? String(cellValue) : '-';
+          }
         }
       });
       return rowData;
