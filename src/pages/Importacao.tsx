@@ -15,8 +15,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ColumnMapping, ImportPreviewRow, ProcessedTransaction } from "@/types/import";
 import { readSpreadsheet, parseAmount, parseDate, normalizeType, normalizeStatus, validateTransaction } from "@/utils/importHelpers";
-import { useRole } from "@/hooks/useRole"; // Importar useRole
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { useRole } from "@/hooks/useRole";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
+import { CategoryMinistryMapper } from "@/components/import/CategoryMinistryMapper";
+import { ImportHistory } from "@/components/import/ImportHistory";
 
 const REQUIRED_FIELDS: (keyof ColumnMapping)[] = ["description", "amount", "type", "status"];
 const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
@@ -43,14 +46,19 @@ export default function Importacao() {
   const [previewData, setPreviewData] = useState<ImportPreviewRow[]>([]);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  
+  // Category and Ministry mapping
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [selectedMinistryId, setSelectedMinistryId] = useState<string | null>(null);
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole(); // Usar isAdmin e isTesoureiro
+  const { user, profile } = useAuth();
+  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
+  const { data: catMinData, isLoading: catMinLoading } = useCategoriesAndMinistries();
 
-  const canImport = isAdmin || isTesoureiro; // Apenas admin e tesoureiro podem importar
+  const canImport = isAdmin || isTesoureiro;
 
   const onDrop = (acceptedFiles: File[]) => {
     if (!canImport) {
@@ -59,7 +67,7 @@ export default function Importacao() {
     }
     if (acceptedFiles.length > 0) {
       const selectedFile = acceptedFiles[0];
-      if (selectedFile.size > 5 * 1024 * 1024) { // 5MB limit
+      if (selectedFile.size > 5 * 1024 * 1024) {
         toast({ title: "Arquivo muito grande", description: "O tamanho máximo do arquivo é 5MB.", variant: "destructive" });
         return;
       }
@@ -75,7 +83,7 @@ export default function Importacao() {
       "text/csv": [".csv"],
     },
     maxFiles: 1,
-    disabled: !canImport, // Desabilitar dropzone se não puder importar
+    disabled: !canImport,
   });
 
   const handleFileStep = async () => {
@@ -110,7 +118,6 @@ export default function Importacao() {
         const header = columnMapping[fieldKey];
         if (header) {
           const cellValue = row[headers.indexOf(header)];
-          // Formatar valores para preview
           if (fieldKey === 'due_date' || fieldKey === 'payment_date') {
             rowData[fieldKey] = parseDate(cellValue) || '-';
           } else if (fieldKey === 'amount') {
@@ -133,16 +140,32 @@ export default function Importacao() {
 
   const handleImport = async () => {
     if (!canImport) return;
-    if (!user) {
-      toast({ title: "Erro de Autenticação", description: "Usuário não encontrado.", variant: "destructive" });
+    if (!user || !profile?.church_id) {
+      toast({ title: "Erro de Autenticação", description: "Usuário ou igreja não encontrados.", variant: "destructive" });
       return;
     }
     setImporting(true);
     setProgress(0);
 
+    let uploadRecord: { id: string } | null = null;
+
     try {
-      const { data: profile } = await supabase.from("profiles").select("church_id").eq("id", user.id).single();
-      if (!profile?.church_id) throw new Error("Igreja não encontrada para o seu perfil.");
+      // Create upload record
+      const { data: uploadData, error: uploadError } = await supabase
+        .from("sheet_uploads")
+        .insert({
+          church_id: profile.church_id,
+          user_id: user.id,
+          filename: file?.name || "importacao.xlsx",
+          file_size: file?.size || 0,
+          status: "Processando",
+          records_imported: 0,
+        })
+        .select("id")
+        .single();
+
+      if (uploadError) throw uploadError;
+      uploadRecord = uploadData;
 
       const transactionsToInsert: ProcessedTransaction[] = [];
       const errors: { row: number; error: string }[] = [];
@@ -163,8 +186,8 @@ export default function Importacao() {
           due_date: parseDate(mappedRow.due_date),
           payment_date: parseDate(mappedRow.payment_date),
           notes: mappedRow.notes || null,
-          category_id: null,
-          ministry_id: null,
+          category_id: selectedCategoryId,
+          ministry_id: selectedMinistryId,
           church_id: profile.church_id,
           created_by: user.id,
           origin: 'Importação de Planilha',
@@ -176,7 +199,7 @@ export default function Importacao() {
         } else {
           errors.push({ row: i + 2, error: validation.error?.errors[0].message || "Erro desconhecido" });
         }
-        setProgress(((i + 1) / dataRows.length) * 100);
+        setProgress(((i + 1) / dataRows.length) * 50);
       }
 
       if (errors.length > 0) {
@@ -208,8 +231,21 @@ export default function Importacao() {
         throw new Error("Todas as transações já existem no sistema. Nenhuma transação foi importada.");
       }
 
+      setProgress(75);
+
       const { error: insertError } = await supabase.from("transactions").insert(nonDuplicates);
       if (insertError) throw insertError;
+
+      // Update upload record with success
+      await supabase
+        .from("sheet_uploads")
+        .update({
+          status: "Concluído",
+          records_imported: nonDuplicates.length,
+        })
+        .eq("id", uploadRecord.id);
+
+      setProgress(100);
 
       const skippedCount = transactionsToInsert.length - nonDuplicates.length;
       const message = skippedCount > 0 
@@ -220,16 +256,27 @@ export default function Importacao() {
 
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sheet-uploads"] });
       navigate("/app/dashboard");
 
     } catch (error: any) {
+      // Update upload record with error
+      if (uploadRecord) {
+        await supabase
+          .from("sheet_uploads")
+          .update({
+            status: "Erro",
+            error_details: error.message,
+          })
+          .eq("id", uploadRecord.id);
+      }
       toast({ title: "Erro na Importação", description: error.message, variant: "destructive" });
     } finally {
       setImporting(false);
     }
   };
 
-  if (roleLoading) {
+  if (roleLoading || catMinLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <LoadingSpinner size="lg" />
@@ -238,7 +285,7 @@ export default function Importacao() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 space-y-6">
       <Card className="max-w-4xl mx-auto">
         {step === 1 && (
           <>
@@ -280,25 +327,40 @@ export default function Importacao() {
               <CardTitle>Passo 2: Mapeamento de Colunas</CardTitle>
               <CardDescription>Associe as colunas do seu arquivo aos campos de transação do sistema. Campos com * são obrigatórios.</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {(Object.keys(FIELD_LABELS) as (keyof ColumnMapping)[]).map(field => (
-                <div key={field} className="space-y-2">
-                  <Label htmlFor={field}>
-                    {FIELD_LABELS[field]}
-                    {REQUIRED_FIELDS.includes(field) && <span className="text-destructive">*</span>}
-                  </Label>
-                  <Select value={columnMapping[field]} onValueChange={value => setColumnMapping(prev => ({ ...prev, [field]: value }))} disabled={!canImport}>
-                    <SelectTrigger id={field}>
-                      <SelectValue placeholder="Selecione uma coluna" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {headers.map(header => (
-                        <SelectItem key={header} value={header}>{header}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ))}
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {(Object.keys(FIELD_LABELS) as (keyof ColumnMapping)[])
+                  .filter(field => field !== 'category_id' && field !== 'ministry_id')
+                  .map(field => (
+                  <div key={field} className="space-y-2">
+                    <Label htmlFor={field}>
+                      {FIELD_LABELS[field]}
+                      {REQUIRED_FIELDS.includes(field) && <span className="text-destructive">*</span>}
+                    </Label>
+                    <Select value={columnMapping[field]} onValueChange={value => setColumnMapping(prev => ({ ...prev, [field]: value }))} disabled={!canImport}>
+                      <SelectTrigger id={field}>
+                        <SelectValue placeholder="Selecione uma coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {headers.map(header => (
+                          <SelectItem key={header} value={header}>{header}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Category and Ministry Mapper */}
+              <CategoryMinistryMapper
+                categories={catMinData?.categories || []}
+                ministries={catMinData?.ministries || []}
+                selectedCategoryId={selectedCategoryId}
+                selectedMinistryId={selectedMinistryId}
+                onCategoryChange={setSelectedCategoryId}
+                onMinistryChange={setSelectedMinistryId}
+                disabled={!canImport}
+              />
             </CardContent>
             <CardFooter className="justify-between">
               <Button variant="outline" onClick={() => setStep(1)} disabled={!canImport}>
@@ -315,7 +377,20 @@ export default function Importacao() {
           <>
             <CardHeader>
               <CardTitle>Passo 3: Pré-visualização e Confirmação</CardTitle>
-              <CardDescription>Confira as primeiras 5 linhas para garantir que o mapeamento está correto. Um total de {dataRows.length} linhas serão importadas.</CardDescription>
+              <CardDescription>
+                Confira as primeiras 5 linhas para garantir que o mapeamento está correto. 
+                Um total de {dataRows.length} linhas serão importadas.
+                {selectedCategoryId && (
+                  <span className="block mt-1">
+                    Categoria: <Badge variant="secondary">{catMinData?.categories.find(c => c.id === selectedCategoryId)?.name}</Badge>
+                  </span>
+                )}
+                {selectedMinistryId && (
+                  <span className="block mt-1">
+                    Ministério: <Badge variant="secondary">{catMinData?.ministries.find(m => m.id === selectedMinistryId)?.name}</Badge>
+                  </span>
+                )}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {importing ? (
@@ -325,7 +400,7 @@ export default function Importacao() {
                   <p>{Math.round(progress)}%</p>
                 </div>
               ) : (
-                <div className="border rounded-lg">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -359,6 +434,11 @@ export default function Importacao() {
           </>
         )}
       </Card>
+
+      {/* Import History */}
+      <div className="max-w-4xl mx-auto">
+        <ImportHistory />
+      </div>
     </div>
   );
 }
