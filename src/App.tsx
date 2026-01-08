@@ -33,6 +33,7 @@ import GerenciarUsuarios from '@/pages/admin/GerenciarUsuarios';
 import GerenciarMinisterios from '@/pages/admin/GerenciarMinisterios';
 import GerenciarIgreja from '@/pages/admin/GerenciarIgreja';
 import GerenciarCategorias from '@/pages/admin/GerenciarCategorias';
+import GerenciarDados from '@/pages/admin/GerenciarDados';
 import CreateChurchPage from '@/pages/CreateChurch';
 import ChurchConfirmation from '@/pages/ChurchConfirmation';
 import SelectChurch from '@/pages/SelectChurch';
@@ -76,6 +77,7 @@ const App: React.FC = () => {
                               <Route path="admin/ministerios" element={<AdminRoute><GerenciarMinisterios /></AdminRoute>} />
                               <Route path="admin/igreja" element={<AdminRoute><GerenciarIgreja /></AdminRoute>} />
                               <Route path="admin/categorias" element={<AdminRoute><GerenciarCategorias /></AdminRoute>} />
+                              <Route path="admin/dados" element={<AdminRoute><GerenciarDados /></AdminRoute>} />
                               <Route path="configuracoes" element={<Configuracoes />} />
                               <Route path="*" element={<NotFound />} />
                             </Routes>
