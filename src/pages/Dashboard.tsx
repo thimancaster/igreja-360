@@ -88,7 +88,7 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
           Dashboard Financeiro
         </h1>
-        <p className="mt-1 text-zinc-800">Visão geral das finanças da sua igreja</p>
+        <p className="mt-1 text-sidebar">Visão geral das finanças da sua igreja</p>
       </motion.div>
 
       {/* Banner de Vencimentos */}
