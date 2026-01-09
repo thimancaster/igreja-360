@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          church_id: string
+          created_at: string | null
+          details: Json | null
+          entity_count: number | null
+          entity_type: string
+          id: string
+          user_id: string
+          user_name: string | null
+        }
+        Insert: {
+          action: string
+          church_id: string
+          created_at?: string | null
+          details?: Json | null
+          entity_count?: number | null
+          entity_type: string
+          id?: string
+          user_id: string
+          user_name?: string | null
+        }
+        Update: {
+          action?: string
+          church_id?: string
+          created_at?: string | null
+          details?: Json | null
+          entity_count?: number | null
+          entity_type?: string
+          id?: string
+          user_id?: string
+          user_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           church_id: string
@@ -380,11 +424,13 @@ export type Database = {
           description: string
           due_date: string | null
           id: string
+          installment_number: number | null
           ministry_id: string | null
           notes: string | null
           origin: string | null
           payment_date: string | null
           status: string
+          total_installments: number | null
           type: string
           updated_at: string | null
         }
@@ -397,11 +443,13 @@ export type Database = {
           description: string
           due_date?: string | null
           id?: string
+          installment_number?: number | null
           ministry_id?: string | null
           notes?: string | null
           origin?: string | null
           payment_date?: string | null
           status?: string
+          total_installments?: number | null
           type: string
           updated_at?: string | null
         }
@@ -414,11 +462,13 @@ export type Database = {
           description?: string
           due_date?: string | null
           id?: string
+          installment_number?: number | null
           ministry_id?: string | null
           notes?: string | null
           origin?: string | null
           payment_date?: string | null
           status?: string
+          total_installments?: number | null
           type?: string
           updated_at?: string | null
         }

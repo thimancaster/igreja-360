@@ -51,6 +51,8 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
     payment_date: "",
     status: "Pendente",
     notes: "",
+    installment_number: "1",
+    total_installments: "1",
   });
 
   useEffect(() => {
@@ -65,6 +67,8 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
         payment_date: transaction.payment_date || "",
         status: transaction.status,
         notes: "",
+        installment_number: String(transaction.installment_number || 1),
+        total_installments: String(transaction.total_installments || 1),
       });
     } else {
       setFormData({
@@ -77,6 +81,8 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
         payment_date: "",
         status: "Pendente",
         notes: "",
+        installment_number: "1",
+        total_installments: "1",
       });
     }
   }, [transaction, open]);
@@ -148,6 +154,8 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
         notes: validated.notes || null,
         church_id: profile.church_id,
         created_by: user.id,
+        installment_number: parseInt(formData.installment_number) || 1,
+        total_installments: parseInt(formData.total_installments) || 1,
       };
 
       if (transaction) {
@@ -333,10 +341,36 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
                 type="date"
                 value={formData.payment_date}
                 onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                disabled={!canEdit} // Desabilitar se não puder editar
+                disabled={!canEdit}
               />
             </div>
           )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="installment_number">Parcela Atual</Label>
+              <Input
+                id="installment_number"
+                type="number"
+                min="1"
+                value={formData.installment_number}
+                onChange={(e) => setFormData({ ...formData, installment_number: e.target.value })}
+                disabled={!canEdit}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="total_installments">Total de Parcelas</Label>
+              <Input
+                id="total_installments"
+                type="number"
+                min="1"
+                value={formData.total_installments}
+                onChange={(e) => setFormData({ ...formData, total_installments: e.target.value })}
+                disabled={!canEdit}
+              />
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Observações</Label>
