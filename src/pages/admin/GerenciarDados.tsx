@@ -1,28 +1,114 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Trash2, AlertTriangle, Database, FileSpreadsheet, Tag, Building2 } from "lucide-react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { ConfirmDeleteDialog } from "@/components/admin/ConfirmDeleteDialog";
+import { AuditLogViewer } from "@/components/admin/AuditLogViewer";
+import { exportToExcel } from "@/utils/exportHelpers";
 
 type DataType = 'transactions' | 'categories' | 'ministries' | 'all';
 
 export default function GerenciarDados() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { isAdmin, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
   const [selectedAction, setSelectedAction] = useState<DataType | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Fetch church name for confirmation
+  const { data: church } = useQuery({
+    queryKey: ["church", profile?.church_id],
+    queryFn: async () => {
+      if (!profile?.church_id) return null;
+      const { data, error } = await supabase
+        .from("churches")
+        .select("name")
+        .eq("id", profile.church_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.church_id,
+  });
+
+  // Fetch data for backup export
+  const fetchDataForBackup = async (type: DataType) => {
+    if (!profile?.church_id) return null;
+
+    const data: Record<string, unknown[]> = {};
+
+    if (type === 'transactions' || type === 'all') {
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*, categories(name), ministries(name)")
+        .eq("church_id", profile.church_id);
+      data.transactions = transactions || [];
+    }
+
+    if (type === 'categories' || type === 'all') {
+      const { data: categories } = await supabase
+        .from("categories")
+        .select("*")
+        .eq("church_id", profile.church_id);
+      data.categories = categories || [];
+    }
+
+    if (type === 'ministries' || type === 'all') {
+      const { data: ministries } = await supabase
+        .from("ministries")
+        .select("*")
+        .eq("church_id", profile.church_id);
+      data.ministries = ministries || [];
+    }
+
+    return data;
+  };
+
+  // Log audit action
+  const logAuditAction = async (action: string, entityType: string, entityCount: number) => {
+    if (!profile?.church_id || !user?.id) return;
+
+    const { data: userProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .single();
+
+    await supabase.from("audit_logs").insert({
+      church_id: profile.church_id,
+      user_id: user.id,
+      user_name: userProfile?.full_name || user.email || "Desconhecido",
+      action,
+      entity_type: entityType,
+      entity_count: entityCount,
+    });
+  };
 
   // Delete transactions
   const deleteTransactionsMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (exportBackup: boolean) => {
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
+      
+      // Count transactions before deletion
+      const { count } = await supabase
+        .from("transactions")
+        .select("*", { count: "exact", head: true })
+        .eq("church_id", profile.church_id);
+
+      // Export backup if requested
+      if (exportBackup) {
+        const data = await fetchDataForBackup('transactions');
+        if (data?.transactions && (data.transactions as unknown[]).length > 0) {
+          exportToExcel(data.transactions as Record<string, unknown>[], `backup_transacoes_${new Date().toISOString().split('T')[0]}`, "Transações");
+        }
+      }
       
       const { error } = await supabase
         .from("transactions")
@@ -30,11 +116,17 @@ export default function GerenciarDados() {
         .eq("church_id", profile.church_id);
       
       if (error) throw error;
+
+      // Log audit
+      await logAuditAction("DELETE_TRANSACTIONS", "transactions", count || 0);
+
+      return count || 0;
     },
-    onSuccess: () => {
+    onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Todas as transações foram excluídas!");
+      queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+      toast.success(`${count} transação(ões) excluída(s)!`);
     },
     onError: (error) => {
       toast.error("Erro ao excluir transações: " + error.message);
@@ -43,10 +135,21 @@ export default function GerenciarDados() {
 
   // Delete categories
   const deleteCategoriesMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (exportBackup: boolean) => {
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
       
-      // First, remove category references from transactions
+      const { count } = await supabase
+        .from("categories")
+        .select("*", { count: "exact", head: true })
+        .eq("church_id", profile.church_id);
+
+      if (exportBackup) {
+        const data = await fetchDataForBackup('categories');
+        if (data?.categories && (data.categories as unknown[]).length > 0) {
+          exportToExcel(data.categories as Record<string, unknown>[], `backup_categorias_${new Date().toISOString().split('T')[0]}`, "Categorias");
+        }
+      }
+      
       await supabase
         .from("transactions")
         .update({ category_id: null })
@@ -58,11 +161,16 @@ export default function GerenciarDados() {
         .eq("church_id", profile.church_id);
       
       if (error) throw error;
+
+      await logAuditAction("DELETE_CATEGORIES", "categories", count || 0);
+
+      return count || 0;
     },
-    onSuccess: () => {
+    onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      toast.success("Todas as categorias foram excluídas!");
+      queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+      toast.success(`${count} categoria(s) excluída(s)!`);
     },
     onError: (error) => {
       toast.error("Erro ao excluir categorias: " + error.message);
@@ -71,10 +179,21 @@ export default function GerenciarDados() {
 
   // Delete ministries
   const deleteMinistriesMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (exportBackup: boolean) => {
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
       
-      // First, remove ministry references from transactions
+      const { count } = await supabase
+        .from("ministries")
+        .select("*", { count: "exact", head: true })
+        .eq("church_id", profile.church_id);
+
+      if (exportBackup) {
+        const data = await fetchDataForBackup('ministries');
+        if (data?.ministries && (data.ministries as unknown[]).length > 0) {
+          exportToExcel(data.ministries as Record<string, unknown>[], `backup_ministerios_${new Date().toISOString().split('T')[0]}`, "Ministérios");
+        }
+      }
+      
       await supabase
         .from("transactions")
         .update({ ministry_id: null })
@@ -86,11 +205,16 @@ export default function GerenciarDados() {
         .eq("church_id", profile.church_id);
       
       if (error) throw error;
+
+      await logAuditAction("DELETE_MINISTRIES", "ministries", count || 0);
+
+      return count || 0;
     },
-    onSuccess: () => {
+    onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ["ministries"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      toast.success("Todos os ministérios foram excluídos!");
+      queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+      toast.success(`${count} ministério(s) excluído(s)!`);
     },
     onError: (error) => {
       toast.error("Erro ao excluir ministérios: " + error.message);
@@ -99,51 +223,61 @@ export default function GerenciarDados() {
 
   // Delete all data
   const deleteAllDataMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (exportBackup: boolean) => {
       if (!profile?.church_id) throw new Error("Igreja não encontrada");
       
+      if (exportBackup) {
+        const data = await fetchDataForBackup('all');
+        if (data) {
+          const allData = [
+            ...(data.transactions as Record<string, unknown>[] || []).map(t => ({ ...t, _tipo: "Transação" })),
+            ...(data.categories as Record<string, unknown>[] || []).map(c => ({ ...c, _tipo: "Categoria" })),
+            ...(data.ministries as Record<string, unknown>[] || []).map(m => ({ ...m, _tipo: "Ministério" })),
+          ];
+          if (allData.length > 0) {
+            exportToExcel(allData, `backup_completo_${new Date().toISOString().split('T')[0]}`, "Backup Completo");
+          }
+        }
+      }
+      
       // Delete in order to respect foreign keys
-      // 1. Delete transactions first
       const { error: transError } = await supabase
         .from("transactions")
         .delete()
         .eq("church_id", profile.church_id);
       if (transError) throw transError;
 
-      // 2. Delete sheet_uploads
       const { error: uploadsError } = await supabase
         .from("sheet_uploads")
         .delete()
         .eq("church_id", profile.church_id);
       if (uploadsError) throw uploadsError;
 
-      // 3. Delete categories
       const { error: catError } = await supabase
         .from("categories")
         .delete()
         .eq("church_id", profile.church_id);
       if (catError) throw catError;
 
-      // 4. Delete ministries
       const { error: minError } = await supabase
         .from("ministries")
         .delete()
         .eq("church_id", profile.church_id);
       if (minError) throw minError;
 
-      // 5. Delete column_mappings
       const { error: mapError } = await supabase
         .from("column_mappings")
         .delete()
         .eq("church_id", profile.church_id);
       if (mapError) throw mapError;
 
-      // 6. Delete notifications
       const { error: notifError } = await supabase
         .from("notifications")
         .delete()
         .eq("church_id", profile.church_id);
       if (notifError) throw notifError;
+
+      await logAuditAction("DELETE_ALL", "all", 0);
     },
     onSuccess: () => {
       queryClient.invalidateQueries();
@@ -154,21 +288,27 @@ export default function GerenciarDados() {
     },
   });
 
-  const handleConfirmDelete = () => {
+  const handleOpenDialog = (type: DataType) => {
+    setSelectedAction(type);
+    setDialogOpen(true);
+  };
+
+  const handleConfirmDelete = (exportBackup: boolean) => {
     switch (selectedAction) {
       case 'transactions':
-        deleteTransactionsMutation.mutate();
+        deleteTransactionsMutation.mutate(exportBackup);
         break;
       case 'categories':
-        deleteCategoriesMutation.mutate();
+        deleteCategoriesMutation.mutate(exportBackup);
         break;
       case 'ministries':
-        deleteMinistriesMutation.mutate();
+        deleteMinistriesMutation.mutate(exportBackup);
         break;
       case 'all':
-        deleteAllDataMutation.mutate();
+        deleteAllDataMutation.mutate(exportBackup);
         break;
     }
+    setDialogOpen(false);
     setSelectedAction(null);
   };
 
@@ -177,6 +317,16 @@ export default function GerenciarDados() {
     deleteCategoriesMutation.isPending || 
     deleteMinistriesMutation.isPending || 
     deleteAllDataMutation.isPending;
+
+  const getActionLabel = (type: DataType | null) => {
+    switch (type) {
+      case 'transactions': return "excluir todas as transações";
+      case 'categories': return "excluir todas as categorias";
+      case 'ministries': return "excluir todos os ministérios";
+      case 'all': return "limpar TODO o banco de dados";
+      default: return "";
+    }
+  };
 
   if (roleLoading) {
     return (
@@ -250,37 +400,15 @@ export default function GerenciarDados() {
                 </p>
               </div>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  disabled={isPending}
-                  onClick={() => setSelectedAction('transactions')}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir todas as transações?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação é irreversível. Todas as transações (receitas e despesas) 
-                    da sua igreja serão permanentemente excluídas.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setSelectedAction(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleConfirmDelete}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Sim, excluir tudo
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button 
+              variant="destructive" 
+              size="sm"
+              disabled={isPending}
+              onClick={() => handleOpenDialog('transactions')}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
           </div>
 
           <Separator />
@@ -296,37 +424,15 @@ export default function GerenciarDados() {
                 </p>
               </div>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  disabled={isPending}
-                  onClick={() => setSelectedAction('categories')}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir todas as categorias?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação é irreversível. Todas as categorias serão excluídas e 
-                    as transações existentes terão suas categorias removidas.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setSelectedAction(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleConfirmDelete}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Sim, excluir tudo
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button 
+              variant="destructive" 
+              size="sm"
+              disabled={isPending}
+              onClick={() => handleOpenDialog('categories')}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
           </div>
 
           <Separator />
@@ -342,37 +448,15 @@ export default function GerenciarDados() {
                 </p>
               </div>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  disabled={isPending}
-                  onClick={() => setSelectedAction('ministries')}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir todos os ministérios?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação é irreversível. Todos os ministérios serão excluídos e 
-                    as transações existentes terão seus ministérios removidos.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setSelectedAction(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleConfirmDelete}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Sim, excluir tudo
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button 
+              variant="destructive" 
+              size="sm"
+              disabled={isPending}
+              onClick={() => handleOpenDialog('ministries')}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
           </div>
 
           <Separator />
@@ -389,50 +473,14 @@ export default function GerenciarDados() {
                 </p>
               </div>
             </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
-                  disabled={isPending}
-                  onClick={() => setSelectedAction('all')}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Limpar Tudo
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-destructive">
-                    ⚠️ Limpar TODO o banco de dados?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription className="space-y-2">
-                    <p>
-                      <strong>Esta ação é IRREVERSÍVEL!</strong>
-                    </p>
-                    <p>
-                      Todos os seguintes dados serão permanentemente excluídos:
-                    </p>
-                    <ul className="list-disc list-inside text-sm">
-                      <li>Todas as transações (receitas e despesas)</li>
-                      <li>Todas as categorias</li>
-                      <li>Todos os ministérios</li>
-                      <li>Histórico de importações</li>
-                      <li>Mapeamentos de colunas</li>
-                      <li>Notificações</li>
-                    </ul>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setSelectedAction(null)}>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={handleConfirmDelete}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Sim, LIMPAR TUDO
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button 
+              variant="destructive" 
+              disabled={isPending}
+              onClick={() => handleOpenDialog('all')}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Limpar Tudo
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -443,6 +491,20 @@ export default function GerenciarDados() {
           <span>Excluindo dados...</span>
         </div>
       )}
+
+      {/* Audit Log Viewer */}
+      <AuditLogViewer />
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDeleteDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        churchName={church?.name || ""}
+        actionType={getActionLabel(selectedAction)}
+        requireTyping={selectedAction === 'all'}
+        onConfirm={handleConfirmDelete}
+        isLoading={isPending}
+      />
     </div>
   );
 }

@@ -14,13 +14,15 @@ const rawImportSchema = z.object({
   payment_date: z.string().nullable().optional(),
   category_id: z.string().uuid().nullable().optional(),
   ministry_id: z.string().uuid().nullable().optional(),
-  church_id: z.string().uuid().nullable().optional(), // Tornar opcional para a entrada
+  church_id: z.string().uuid().nullable().optional(),
   created_by: z.string().uuid().nullable().optional(),
   notes: z.string().max(2000, 'Notas podem ter no máximo 2000 caracteres.').nullable().optional(),
   origin: z.string().nullable().optional(),
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
   id: z.string().uuid().nullable().optional(),
+  installment_number: z.number().int().min(1).nullable().optional(),
+  total_installments: z.number().int().min(1).nullable().optional(),
 });
 
 // Zod schema for a single transaction, used for validation and transformation
@@ -32,7 +34,7 @@ export const transactionImportSchema = rawImportSchema.transform((data, ctx) => 
       message: 'Descrição é obrigatória.',
       path: ['description'],
     });
-    return z.NEVER; // Retorna NEVER para indicar falha na transformação
+    return z.NEVER;
   }
   if (data.amount === undefined || data.amount === null || data.amount <= 0) {
     ctx.addIssue({
@@ -70,7 +72,6 @@ export const transactionImportSchema = rawImportSchema.transform((data, ctx) => 
   }
 
   // Retornar os dados processados, garantindo que correspondam a ProcessedTransaction
-  // IMPORTANTE: NÃO incluir 'id' para que o banco gere automaticamente
   const result: ProcessedTransaction = {
     description: data.description,
     amount: data.amount,
@@ -84,6 +85,8 @@ export const transactionImportSchema = rawImportSchema.transform((data, ctx) => 
     due_date: data.due_date || null,
     payment_date: data.payment_date || null,
     notes: data.notes || null,
+    installment_number: data.installment_number || 1,
+    total_installments: data.total_installments || 1,
   };
   
   return result;
@@ -100,6 +103,8 @@ export interface ColumnMapping {
   category_id: string;
   ministry_id: string;
   notes: string;
+  installment_number: string;
+  total_installments: string;
 }
 
 // Interface for a row in the preview table

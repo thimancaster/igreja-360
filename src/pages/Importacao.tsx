@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { UploadCloud, FileText, ChevronRight, ChevronLeft, Check, Loader2 } from "lucide-react";
+import { UploadCloud, FileText, ChevronRight, ChevronLeft, Check, Loader2, Download } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ColumnMapping, ImportPreviewRow, ProcessedTransaction } from "@/types/import";
 import { readSpreadsheet, parseAmount, parseDate, normalizeType, normalizeStatus, validateTransaction } from "@/utils/importHelpers";
+import { downloadImportTemplate } from "@/utils/exportHelpers";
 import { useRole } from "@/hooks/useRole";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
@@ -32,6 +33,8 @@ const FIELD_LABELS: Record<keyof ColumnMapping, string> = {
   category_id: "Categoria",
   ministry_id: "Ministério",
   notes: "Notas",
+  installment_number: "Nº Parcela",
+  total_installments: "Total de Parcelas",
 };
 
 export default function Importacao() {
@@ -42,6 +45,7 @@ export default function Importacao() {
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({
     description: "", amount: "", type: "", status: "", due_date: "",
     payment_date: "", category_id: "", ministry_id: "", notes: "",
+    installment_number: "", total_installments: "",
   });
   const [previewData, setPreviewData] = useState<ImportPreviewRow[]>([]);
   const [importing, setImporting] = useState(false);
@@ -291,7 +295,22 @@ export default function Importacao() {
           <>
             <CardHeader>
               <CardTitle>Passo 1: Upload do Arquivo</CardTitle>
-              <CardDescription>Selecione ou arraste um arquivo .xlsx, .xls ou .csv para importar.</CardDescription>
+              <CardDescription className="flex items-center justify-between">
+                <span>Selecione ou arraste um arquivo .xlsx, .xls ou .csv para importar.</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    downloadImportTemplate();
+                    toast({ title: "Download iniciado", description: "O modelo de importação está sendo baixado." });
+                  }}
+                  className="ml-4"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Baixar Modelo
+                </Button>
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div {...getRootProps()} className={`p-10 border-2 border-dashed rounded-lg text-center cursor-pointer ${isDragActive ? 'border-primary' : 'border-border'} ${!canImport ? 'opacity-50 cursor-not-allowed' : ''}`}>
