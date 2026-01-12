@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { logger } from "@/lib/logger";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -11,7 +12,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (loading) {
-        console.warn('ProtectedRoute: Timeout - forcing redirect to auth');
+        logger.warn('ProtectedRoute: Timeout - forcing redirect to auth');
         setHasTimedOut(true);
       }
     }, 5000);
@@ -30,7 +31,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   // Redirecionar se não tem usuário ou deu timeout
   if (!user || hasTimedOut) {
-    console.log('ProtectedRoute: No user or timeout, redirecting to /auth');
+    logger.log('ProtectedRoute: No user or timeout, redirecting to /auth');
     return <Navigate to="/auth" replace />;
   }
 

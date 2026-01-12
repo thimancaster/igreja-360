@@ -19,6 +19,7 @@ import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useRole } from "@/hooks/useRole";
+import { logger } from "@/lib/logger";
 
 const REQUIRED_FIELDS = [
   { key: "amount", label: "Valor da Transação" },
@@ -134,7 +135,7 @@ export default function Integracoes() {
         );
 
         if (decryptError || !decryptedTokens || decryptedTokens.length === 0) {
-          console.error('Failed to decrypt OAuth tokens:', decryptError);
+          logger.error('Failed to decrypt OAuth tokens:', decryptError);
           toast({
             title: "Erro",
             description: "Não foi possível recuperar os tokens OAuth. Tente novamente.",
@@ -238,8 +239,8 @@ export default function Integracoes() {
       });
 
     } catch (error: any) {
-      console.error('Error loading sheet headers:', error);
-      toast({ 
+      logger.error('Error loading sheet headers:', error);
+      toast({
         title: "Erro", 
         description: error.message || "Não foi possível carregar os cabeçalhos da planilha.", 
         variant: "destructive" 
@@ -325,7 +326,7 @@ export default function Integracoes() {
       // Redirecionar para Google OAuth
       window.location.href = data.authUrl;
     } catch (error: any) {
-      console.error('Error starting Google OAuth:', error);
+      logger.error('Error starting Google OAuth:', error);
       toast({
         title: "Erro ao iniciar autenticação",
         description: error.message || "Não foi possível iniciar o processo de autenticação com o Google.",

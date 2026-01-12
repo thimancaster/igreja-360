@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Building2, CheckCircle2, MapPin, FileText } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
-import { LoadingSpinner } from "@/components/LoadingSpinner"; // Importar LoadingSpinner
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { logger } from "@/lib/logger";
 
 type Church = Tables<'churches'>;
 
@@ -19,11 +20,11 @@ export default function ChurchConfirmation() {
 
   useEffect(() => {
     const fetchChurch = async () => {
-      console.log('[ChurchConfirmation] Buscando igreja, profile.church_id:', profile?.church_id);
+      logger.log('[ChurchConfirmation] Buscando igreja');
       
       // Usar apenas profile.church_id (fonte única de verdade)
       if (!profile?.church_id) {
-        console.log('[ChurchConfirmation] Sem church_id, redirecionando para /');
+        logger.log('[ChurchConfirmation] Sem church_id, redirecionando para /');
         navigate("/");
         return;
       }
@@ -35,10 +36,10 @@ export default function ChurchConfirmation() {
         .maybeSingle();
 
       if (data && !error) {
-        console.log('[ChurchConfirmation] Igreja encontrada:', data.name);
+        logger.log('[ChurchConfirmation] Igreja encontrada');
         setChurch(data);
       } else {
-        console.log('[ChurchConfirmation] Igreja não encontrada, redirecionando');
+        logger.log('[ChurchConfirmation] Igreja não encontrada, redirecionando');
         navigate("/");
       }
       
