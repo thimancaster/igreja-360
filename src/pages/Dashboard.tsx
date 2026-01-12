@@ -15,9 +15,14 @@ import { RevenueExpenseChart } from "@/components/dashboard/RevenueExpenseChart"
 import { MonthlyComparisonChart } from "@/components/dashboard/MonthlyComparisonChart";
 import { BalanceAreaChart } from "@/components/dashboard/BalanceAreaChart";
 import { DueTransactionsBanner } from "@/components/dashboard/DueTransactionsBanner";
+import { TodaysDueCard } from "@/components/dashboard/TodaysDueCard";
+import { FinancialHealthGauge } from "@/components/dashboard/FinancialHealthGauge";
+import { UpcomingPaymentsCalendar } from "@/components/dashboard/UpcomingPaymentsCalendar";
+import { QuickActionsBar } from "@/components/dashboard/QuickActionsBar";
 import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
+
 export default function Dashboard() {
   const [filters, setFilters] = useState({
     period: "mes-atual",
@@ -91,8 +96,24 @@ export default function Dashboard() {
         <p className="mt-1 text-sidebar">Visão geral das finanças da sua igreja</p>
       </motion.div>
 
+      {/* Quick Actions Bar */}
+      <QuickActionsBar />
+
       {/* Banner de Vencimentos */}
       <DueTransactionsBanner />
+
+      {/* Top Section: Contas para Pagar Hoje + Saúde Financeira */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <TodaysDueCard />
+        </div>
+        <div>
+          <FinancialHealthGauge />
+        </div>
+      </div>
+
+      {/* Calendário de Vencimentos */}
+      <UpcomingPaymentsCalendar />
 
       {/* Cards de Destaque com Animação */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

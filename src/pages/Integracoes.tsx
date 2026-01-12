@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon, CheckCircle, AlertTriangle, X } from "lucide-react";
+import { Sheet, Plus, RefreshCw, Trash2, Link as LinkIcon, CheckCircle, AlertTriangle, X, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIntegrations } from "@/hooks/useIntegrations";
+import { usePublicSheetIntegrations } from "@/hooks/usePublicSheetIntegrations";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -41,7 +43,16 @@ export default function Integracoes() {
     deleteIntegration,
   } = useIntegrations();
 
+  const {
+    integrations: publicIntegrations,
+    isLoading: publicLoading,
+    createIntegration: createPublicIntegration,
+    syncIntegration: syncPublicIntegration,
+    deleteIntegration: deletePublicIntegration,
+  } = usePublicSheetIntegrations();
+
   const [showMappingDialog, setShowMappingDialog] = useState(false);
+  const [showPublicMappingDialog, setShowPublicMappingDialog] = useState(false);
   const [sheetUrl, setSheetUrl] = useState<string>("");
   const [sheetId, setSheetId] = useState<string>("");
   const [sheetName, setSheetName] = useState<string>("");
@@ -50,6 +61,7 @@ export default function Integracoes() {
   const [isProcessingSheet, setIsProcessingSheet] = useState(false);
   const [isStartingOAuth, setIsStartingOAuth] = useState(false);
   const [showOAuth403Instructions, setShowOAuth403Instructions] = useState(false);
+  const [activeTab, setActiveTab] = useState("oauth");
   
   // SECURITY FIX: Store OAuth tokens in React state instead of sessionStorage
   const [oauthTokens, setOauthTokens] = useState<{
@@ -337,9 +349,91 @@ export default function Integracoes() {
     }
   };
 
+  // Handle public sheet URL and load headers
+  const handleLoadPublicSheetHeaders = async () => {
+    if (!canManageIntegrations) return;
+    if (!sheetUrl) {
+      toast({ title: "URL Inválida", description: "Por favor, insira uma URL válida do Google Sheets.", variant: "destructive" });
+      return;
+    }
+
+    setIsProcessingSheet(true);
+    try {
+      const response = await supabase.functions.invoke('get-public-sheet-headers', {
+        body: { sheetUrl },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erro ao carregar cabeçalhos');
+      }
+
+      const data = response.data;
+
+      if (!data.success) {
+        throw new Error(data.error || 'Erro desconhecido');
+      }
+
+      setSheetId(data.sheetId);
+      setSheetHeaders(data.headers);
+      setSheetName(data.sheetName || 'Planilha Pública');
+
+      toast({ 
+        title: "Cabeçalhos Carregados", 
+        description: `${data.headers.length} colunas encontradas.`
+      });
+
+    } catch (error: any) {
+      logger.error('Error loading public sheet headers:', error);
+      toast({
+        title: "Erro", 
+        description: error.message || "Não foi possível carregar os cabeçalhos da planilha.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsProcessingSheet(false);
+    }
+  };
+
+  const handleSavePublicIntegration = async () => {
+    if (!canManageIntegrations) return;
+    if (!sheetId || !profile?.church_id || !sheetUrl) {
+      toast({
+        title: "Erro",
+        description: "Dados insuficientes para criar a integração.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const missingFields = REQUIRED_FIELDS.filter((field) => !columnMapping[field.key]);
+    if (missingFields.length > 0) {
+      toast({
+        title: "Mapeamento incompleto",
+        description: `Por favor, mapeie todos os campos obrigatórios.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await createPublicIntegration.mutateAsync({
+      churchId: profile.church_id,
+      sheetUrl,
+      sheetId,
+      sheetName,
+      columnMapping,
+    });
+
+    setShowPublicMappingDialog(false);
+    setSheetUrl("");
+    setSheetId("");
+    setSheetName("");
+    setColumnMapping({});
+    setSheetHeaders([]);
+  };
+
   const isAddSheetButtonDisabled = !profile?.church_id || !canManageIntegrations || isStartingOAuth; // Desabilitar se profile.church_id for nulo ou sem permissão
 
-  if (isLoading || roleLoading) {
+  if (isLoading || roleLoading || publicLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <LoadingSpinner size="lg" />
@@ -413,37 +507,50 @@ export default function Integracoes() {
         )}
       </AnimatePresence>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Sheet className="h-6 w-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <CardTitle className="flex items-center gap-2">
-                Google Sheets
-                <AnimatePresence>
-                  {hasOAuthTokens && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8, x: -10 }}
-                      animate={{ opacity: 1, scale: 1, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.8, x: -10 }}
-                      transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    >
-                      <Badge className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1">
-                        <CheckCircle className="h-3 w-3" />
-                        Autenticado
-                      </Badge>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </CardTitle>
-              <CardDescription>
-                Conecte planilhas do Google para sincronizar automaticamente suas transações
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="oauth" className="flex items-center gap-2">
+            <Sheet className="h-4 w-4" />
+            Planilha Autenticada
+          </TabsTrigger>
+          <TabsTrigger value="public" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            Planilha Pública
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="oauth">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Sheet className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <CardTitle className="flex items-center gap-2">
+                    Google Sheets (OAuth)
+                    <AnimatePresence>
+                      {hasOAuthTokens && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8, x: -10 }}
+                          animate={{ opacity: 1, scale: 1, x: 0 }}
+                          exit={{ opacity: 0, scale: 0.8, x: -10 }}
+                          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        >
+                          <Badge className="bg-green-500 hover:bg-green-600 text-white flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            Autenticado
+                          </Badge>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </CardTitle>
+                  <CardDescription>
+                    Conecte planilhas privadas do Google com autenticação segura
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-semibold">Planilhas Sincronizadas</h3>
@@ -570,8 +677,117 @@ export default function Integracoes() {
               </AnimatePresence>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="public">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-accent/10 rounded-lg">
+                  <Globe className="h-6 w-6 text-accent" />
+                </div>
+                <div className="flex-1">
+                  <CardTitle>Planilha Pública</CardTitle>
+                  <CardDescription>
+                    Cole o link de uma planilha publicada na web - sem necessidade de autenticação
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Como publicar sua planilha</AlertTitle>
+                <AlertDescription>
+                  Para usar esta opção, sua planilha deve estar publicada na web:
+                  <ol className="list-decimal list-inside mt-2 space-y-1 text-sm">
+                    <li>Abra a planilha no Google Sheets</li>
+                    <li>Vá em <strong>Arquivo → Publicar na web</strong></li>
+                    <li>Clique em <strong>Publicar</strong></li>
+                    <li>Cole a URL da planilha abaixo</li>
+                  </ol>
+                </AlertDescription>
+              </Alert>
+
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold">Planilhas Públicas Conectadas</h3>
+                <Button onClick={() => setShowPublicMappingDialog(true)} disabled={!canManageIntegrations || !profile?.church_id}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar Planilha Pública
+                </Button>
+              </div>
+
+              {publicIntegrations && publicIntegrations.length > 0 ? (
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>URL</TableHead>
+                        <TableHead>Última Sincronização</TableHead>
+                        <TableHead>Registros</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {publicIntegrations.map((integration) => (
+                        <TableRow key={integration.id}>
+                          <TableCell className="font-medium">{integration.sheet_name}</TableCell>
+                          <TableCell>
+                            <a 
+                              href={integration.sheet_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-primary hover:underline flex items-center gap-1"
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                              Abrir
+                            </a>
+                          </TableCell>
+                          <TableCell>
+                            {integration.last_sync_at
+                              ? format(new Date(integration.last_sync_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })
+                              : "Nunca"}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{integration.records_synced || 0}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => syncPublicIntegration.mutate(integration.id)}
+                                disabled={syncPublicIntegration.isPending || !canManageIntegrations}
+                              >
+                                {syncPublicIntegration.isPending ? <LoadingSpinner size="sm" /> : <RefreshCw className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => deletePublicIntegration.mutate(integration.id)}
+                                disabled={deletePublicIntegration.isPending || !canManageIntegrations}
+                              >
+                                {deletePublicIntegration.isPending ? <LoadingSpinner size="sm" /> : <Trash2 className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Nenhuma planilha pública conectada ainda</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={showMappingDialog} onOpenChange={setShowMappingDialog}>
         <DialogContent className="max-w-2xl">
@@ -653,6 +869,80 @@ export default function Integracoes() {
                 disabled={!sheetId || sheetHeaders.length === 0 || createIntegration.isPending || !canManageIntegrations}
               >
                 {createIntegration.isPending ? <LoadingSpinner size="sm" className="mr-2" /> : null}
+                Salvar e Sincronizar
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for Public Sheet Mapping */}
+      <Dialog open={showPublicMappingDialog} onOpenChange={setShowPublicMappingDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-accent" />
+              Adicionar Planilha Pública
+            </DialogTitle>
+            <DialogDescription>
+              Cole a URL da sua planilha pública do Google Sheets. A planilha deve estar publicada na web.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="public-sheet-url">URL da Planilha Pública</Label>
+              <Input
+                id="public-sheet-url"
+                placeholder="Ex: https://docs.google.com/spreadsheets/d/SEU_ID/edit"
+                value={sheetUrl}
+                onChange={(e) => setSheetUrl(e.target.value)}
+                disabled={!canManageIntegrations}
+              />
+              <Button onClick={handleLoadPublicSheetHeaders} disabled={!sheetUrl || isProcessingSheet || !canManageIntegrations}>
+                {isProcessingSheet ? <LoadingSpinner size="sm" className="mr-2" /> : null}
+                {isProcessingSheet ? "Carregando..." : "Carregar Colunas"}
+              </Button>
+            </div>
+
+            {sheetHeaders.length > 0 && (
+              <div className="space-y-4">
+                <h4 className="font-medium">Mapeamento de Campos</h4>
+                {REQUIRED_FIELDS.map((field) => (
+                  <div key={field.key} className="space-y-2">
+                    <Label>{field.label}</Label>
+                    <Select
+                      value={columnMapping[field.key] || ""}
+                      onValueChange={(value) =>
+                        setColumnMapping((prev) => ({ ...prev, [field.key]: value }))
+                      }
+                      disabled={!canManageIntegrations}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a coluna" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sheetHeaders.map((header) => (
+                          <SelectItem key={header} value={header}>
+                            {header}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowPublicMappingDialog(false)} disabled={createPublicIntegration.isPending}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleSavePublicIntegration}
+                disabled={!sheetId || sheetHeaders.length === 0 || createPublicIntegration.isPending || !canManageIntegrations}
+              >
+                {createPublicIntegration.isPending ? <LoadingSpinner size="sm" className="mr-2" /> : null}
                 Salvar e Sincronizar
               </Button>
             </DialogFooter>
