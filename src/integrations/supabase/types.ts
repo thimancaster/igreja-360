@@ -364,6 +364,59 @@ export type Database = {
           },
         ]
       }
+      public_sheet_integrations: {
+        Row: {
+          church_id: string
+          column_mapping: Json
+          created_at: string | null
+          id: string
+          last_sync_at: string | null
+          records_synced: number | null
+          sheet_id: string
+          sheet_name: string
+          sheet_url: string
+          sync_status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          church_id: string
+          column_mapping?: Json
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          records_synced?: number | null
+          sheet_id: string
+          sheet_name?: string
+          sheet_url: string
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          church_id?: string
+          column_mapping?: Json
+          created_at?: string | null
+          id?: string
+          last_sync_at?: string | null
+          records_synced?: number | null
+          sheet_id?: string
+          sheet_name?: string
+          sheet_url?: string
+          sync_status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "public_sheet_integrations_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sheet_uploads: {
         Row: {
           church_id: string
