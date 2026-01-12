@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { logger } from '@/lib/logger';
 
 export const AuthRedirect: React.FC = () => {
   const { session, user, loading: authLoading, profile, refetchProfile } = useAuth();
@@ -14,7 +15,7 @@ export const AuthRedirect: React.FC = () => {
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (authLoading) {
-        console.warn('AuthRedirect: Timeout - forcing navigation');
+        logger.warn('AuthRedirect: Timeout - forcing navigation');
         setHasTimedOut(true);
       }
     }, 5000);
@@ -26,18 +27,18 @@ export const AuthRedirect: React.FC = () => {
     const handleRedirect = async () => {
       // Se deu timeout, redirecionar para auth
       if (hasTimedOut) {
-        console.log('AuthRedirect: Timeout occurred, redirecting to /auth');
+        logger.log('AuthRedirect: Timeout occurred, redirecting to /auth');
         navigate('/auth', { replace: true });
         return;
       }
 
       // Aguardar auth loading
       if (authLoading) {
-        console.log('AuthRedirect: Still loading auth...');
+        logger.log('AuthRedirect: Still loading auth...');
         return;
       }
 
-      console.log('AuthRedirect: Auth loaded', { 
+      logger.log('AuthRedirect: Auth loaded', { 
         hasSession: !!session, 
         hasProfile: !!profile,
         hasChurch: !!profile?.church_id 
@@ -66,29 +67,28 @@ export const AuthRedirect: React.FC = () => {
             .eq('owner_user_id', user.id);
 
           if (error) {
-            console.error('AuthRedirect: Error fetching churches:', error);
+            logger.error('AuthRedirect: Error fetching churches');
             navigate('/create-church', { replace: true });
             return;
           }
 
           const churchCount = churches?.length || 0;
-          console.log('AuthRedirect: Found churches for owner:', churchCount);
+          logger.log('AuthRedirect: Found churches for owner:', churchCount);
 
           if (churchCount === 0) {
             // Nenhuma igreja -> criar nova
             navigate('/create-church', { replace: true });
           } else if (churchCount === 1) {
             // Uma igreja -> vincular automaticamente
-            const churchId = churches[0].id;
-            console.log('AuthRedirect: Auto-linking single church:', churchId);
+            logger.log('AuthRedirect: Auto-linking single church');
             
             const { error: updateError } = await supabase
               .from('profiles')
-              .update({ church_id: churchId })
+              .update({ church_id: churches[0].id })
               .eq('id', user.id);
 
             if (updateError) {
-              console.error('AuthRedirect: Error linking church:', updateError);
+              logger.error('AuthRedirect: Error linking church');
               navigate('/create-church', { replace: true });
               return;
             }
@@ -100,7 +100,7 @@ export const AuthRedirect: React.FC = () => {
             navigate('/select-church', { replace: true });
           }
         } catch (err) {
-          console.error('AuthRedirect: Error in church check:', err);
+          logger.error('AuthRedirect: Error in church check');
           navigate('/create-church', { replace: true });
         }
       }

@@ -13,11 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Church } from 'lucide-react';
+import { logger } from '@/lib/logger';
+
 const formSchema = z.object({
   churchName: z.string().min(3, {
     message: 'O nome da igreja deve ter pelo menos 3 caracteres.'
   })
 });
+
 const CreateChurchForm: React.FC = () => {
   const {
     user,
@@ -31,6 +34,7 @@ const CreateChurchForm: React.FC = () => {
       churchName: ''
     }
   });
+
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!user) {
       toast({
@@ -42,7 +46,7 @@ const CreateChurchForm: React.FC = () => {
     }
     setIsLoading(true);
     try {
-      console.log('[CreateChurch] Iniciando criação da igreja para user:', user.id);
+      logger.log('[CreateChurch] Iniciando criação da igreja');
 
       // 1. Create the church
       const {
@@ -52,11 +56,12 @@ const CreateChurchForm: React.FC = () => {
         name: values.churchName,
         owner_user_id: user.id
       }).select().single();
+
       if (churchError) {
-        console.error('[CreateChurch] Erro ao criar igreja:', churchError);
+        logger.error('[CreateChurch] Erro ao criar igreja:', churchError);
         throw churchError;
       }
-      console.log('[CreateChurch] Igreja criada:', churchData.id);
+      logger.log('[CreateChurch] Igreja criada com sucesso');
 
       // 2. Update user's profile with church_id
       const {
@@ -64,11 +69,12 @@ const CreateChurchForm: React.FC = () => {
       } = await supabase.from('profiles').update({
         church_id: churchData.id
       }).eq('id', user.id);
+
       if (profileError) {
-        console.error('[CreateChurch] Erro ao atualizar perfil:', profileError);
+        logger.error('[CreateChurch] Erro ao atualizar perfil:', profileError);
         throw profileError;
       }
-      console.log('[CreateChurch] Perfil atualizado com church_id:', churchData.id);
+      logger.log('[CreateChurch] Perfil atualizado');
 
       // 3. Atribuir role 'admin' ao dono da igreja (se ainda não tiver)
       const {
@@ -79,15 +85,17 @@ const CreateChurchForm: React.FC = () => {
       }, {
         onConflict: 'user_id,role'
       });
+
       if (roleError) {
-        console.warn('[CreateChurch] Aviso ao atribuir role admin:', roleError.message);
+        logger.warn('[CreateChurch] Aviso ao atribuir role admin:', roleError.message);
       } else {
-        console.log('[CreateChurch] Role admin atribuída');
+        logger.log('[CreateChurch] Role admin atribuída');
       }
 
       // 4. Aguardar atualização do perfil no contexto
       await refetchProfile();
-      console.log('[CreateChurch] Profile refetch completado');
+      logger.log('[CreateChurch] Profile refetch completado');
+      
       toast({
         title: 'Igreja criada com sucesso!'
       });
@@ -97,7 +105,7 @@ const CreateChurchForm: React.FC = () => {
         replace: true
       });
     } catch (error: any) {
-      console.error('[CreateChurch] Erro completo:', error);
+      logger.error('[CreateChurch] Erro completo:', error);
       toast({
         title: 'Erro ao criar igreja',
         description: error.message || 'Ocorreu um erro inesperado.',
@@ -107,7 +115,9 @@ const CreateChurchForm: React.FC = () => {
       setIsLoading(false);
     }
   };
-  return <div className="flex min-h-screen items-center justify-center bg-background p-4">
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center border-primary-dark">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 border-primary-dark">
@@ -122,14 +132,16 @@ const CreateChurchForm: React.FC = () => {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField control={form.control} name="churchName" render={({
-              field
-            }) => <FormItem>
-                    <FormLabel>Nome da Igreja</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Ex: Igreja Batista da Esperança" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>} />
+                field
+              }) => (
+                <FormItem>
+                  <FormLabel>Nome da Igreja</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ex: Igreja Batista da Esperança" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <LoadingSpinner size="sm" className="mr-2" />}
                 {isLoading ? 'Criando...' : 'Criar Igreja'}
@@ -138,6 +150,8 @@ const CreateChurchForm: React.FC = () => {
           </Form>
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 };
+
 export default CreateChurchForm;

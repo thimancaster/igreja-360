@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
+import { logger } from '@/lib/logger';
 
 type Profile = Tables<'profiles'>;
 
@@ -26,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
-      console.log('AuthContext: Fetching profile for user:', userId);
+      logger.log('AuthContext: Fetching profile for user');
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -34,19 +35,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (error) {
-        console.error('AuthContext: Error fetching profile:', error.message);
+        logger.error('AuthContext: Error fetching profile:', error.message);
         return undefined;
       }
       
       if (!data) {
-        console.log('AuthContext: No profile found for user');
+        logger.log('AuthContext: No profile found for user');
         return undefined;
       }
       
-      console.log('AuthContext: Profile fetched, church_id:', data.church_id);
+      logger.log('AuthContext: Profile fetched successfully');
       return data as Profile;
     } catch (err) {
-      console.error('AuthContext: Error in fetchProfile:', err);
+      logger.error('AuthContext: Error in fetchProfile:', err);
       return undefined;
     }
   }, []);
@@ -62,19 +63,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
 
     const initializeAuth = async () => {
-      console.log('AuthContext: Initializing...');
+      logger.log('AuthContext: Initializing...');
       try {
         const { data: { session: currentSession }, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('AuthContext: Error getting session:', error.message);
+          logger.error('AuthContext: Error getting session:', error.message);
           if (isMounted) {
             setLoading(false);
           }
           return;
         }
 
-        console.log('AuthContext: Session found:', !!currentSession);
+        logger.log('AuthContext: Session found:', !!currentSession);
 
         if (isMounted) {
           setSession(currentSession);
@@ -87,11 +88,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
           
-          console.log('AuthContext: Setting loading to false');
+          logger.log('AuthContext: Setting loading to false');
           setLoading(false);
         }
       } catch (err) {
-        console.error('AuthContext: Error initializing auth:', err);
+        logger.error('AuthContext: Error initializing auth:', err);
         if (isMounted) {
           setLoading(false);
         }
@@ -104,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (event, newSession) => {
         if (!isMounted) return;
 
-        console.log('AuthContext: Auth state changed:', event);
+        logger.log('AuthContext: Auth state changed:', event);
         
         setSession(newSession);
         setUser(newSession?.user ?? null);
@@ -135,17 +136,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [fetchProfile]);
 
   const signIn = async (email: string, password: string) => {
-    console.log('AuthContext: Signing in...');
+    logger.log('AuthContext: Signing in...');
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) throw error;
-    console.log('AuthContext: Sign in successful');
+    logger.log('AuthContext: Sign in successful');
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    console.log('AuthContext: Signing up...');
+    logger.log('AuthContext: Signing up...');
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -157,17 +158,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
     });
     if (error) throw error;
-    console.log('AuthContext: Sign up successful');
+    logger.log('AuthContext: Sign up successful');
   };
 
   const signOut = async () => {
-    console.log('AuthContext: Signing out...');
+    logger.log('AuthContext: Signing out...');
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setSession(null);
     setUser(null);
     setProfile(undefined);
-    console.log('AuthContext: Sign out successful');
+    logger.log('AuthContext: Sign out successful');
   };
 
   const value: AuthContextType = {

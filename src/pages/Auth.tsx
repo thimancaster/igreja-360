@@ -9,6 +9,8 @@ import { toast } from "@/hooks/use-toast";
 import { Church } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
+import { logger } from "@/lib/logger";
+
 export default function Auth() {
   const {
     user,
@@ -31,6 +33,7 @@ export default function Auth() {
     }), 0);
     return null;
   }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -47,7 +50,7 @@ export default function Auth() {
       await signIn(validated.email, validated.password);
 
       // Redirecionar explicitamente após login bem-sucedido
-      console.log('Auth: Login successful, redirecting...');
+      logger.log('Auth: Login successful, redirecting...');
       navigate('/', {
         replace: true
       });
@@ -70,6 +73,7 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -92,7 +96,7 @@ export default function Auth() {
       });
 
       // Redirecionar após cadastro bem-sucedido
-      console.log('Auth: Signup successful, redirecting...');
+      logger.log('Auth: Signup successful, redirecting...');
       navigate('/', {
         replace: true
       });
@@ -115,7 +119,9 @@ export default function Auth() {
       setLoading(false);
     }
   };
-  return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="w-full max-w-md border-border/50 shadow-xl bg-secondary-foreground">
         <CardHeader className="text-center space-y-4 rounded shadow-none my-[10px] mx-[10px] border-double border-0 border-secondary-foreground">
           <div className="flex justify-center">
@@ -175,5 +181,6 @@ export default function Auth() {
           </Tabs>
         </CardContent>
       </Card>
-    </div>;
+    </div>
+  );
 }
