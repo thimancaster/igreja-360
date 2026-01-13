@@ -20,6 +20,7 @@ import { FinancialHealthGauge } from "@/components/dashboard/FinancialHealthGaug
 import { UpcomingPaymentsCalendar } from "@/components/dashboard/UpcomingPaymentsCalendar";
 import { QuickActionsBar } from "@/components/dashboard/QuickActionsBar";
 import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
+import { useSparklineData } from "@/hooks/useSparklineData";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
 
@@ -48,6 +49,9 @@ export default function Dashboard() {
   const {
     data: trendData
   } = useTrendData();
+  const {
+    data: sparklineData
+  } = useSparklineData(7);
   const ministries = categoriesAndMinistries?.ministries || [];
 
   // Filtrar transações por busca
@@ -115,15 +119,43 @@ export default function Dashboard() {
       {/* Calendário de Vencimentos */}
       <UpcomingPaymentsCalendar />
 
-      {/* Cards de Destaque com Animação */}
+      {/* Cards de Destaque com Animação e Sparklines */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {statsLoading ? <>
             {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
           </> : <>
-            <AnimatedStatsCard title="Contas a Pagar" value={stats?.totalPayable || 0} icon={<DollarSign className="h-5 w-5" />} variant="warning" delay={0} />
-            <AnimatedStatsCard title="Contas Pagas" value={stats?.totalPaid || 0} trend={trendData?.revenueTrend} icon={<TrendingUp className="h-5 w-5" />} variant="success" delay={1} />
-            <AnimatedStatsCard title="Contas Vencidas" value={stats?.totalOverdue || 0} icon={<TrendingDown className="h-5 w-5" />} variant="danger" delay={2} />
-            <AnimatedStatsCard title="Saldo Total" value={stats?.balance || 0} icon={<Wallet className="h-5 w-5" />} variant="default" delay={3} />
+            <AnimatedStatsCard 
+              title="Contas a Pagar" 
+              value={stats?.totalPayable || 0} 
+              icon={<DollarSign className="h-5 w-5" />} 
+              variant="warning" 
+              delay={0}
+              sparklineData={sparklineData?.expensesData}
+            />
+            <AnimatedStatsCard 
+              title="Contas Pagas" 
+              value={stats?.totalPaid || 0} 
+              trend={trendData?.revenueTrend} 
+              icon={<TrendingUp className="h-5 w-5" />} 
+              variant="success" 
+              delay={1}
+              sparklineData={sparklineData?.revenueData}
+            />
+            <AnimatedStatsCard 
+              title="Contas Vencidas" 
+              value={stats?.totalOverdue || 0} 
+              icon={<TrendingDown className="h-5 w-5" />} 
+              variant="danger" 
+              delay={2}
+            />
+            <AnimatedStatsCard 
+              title="Saldo Total" 
+              value={stats?.balance || 0} 
+              icon={<Wallet className="h-5 w-5" />} 
+              variant="default" 
+              delay={3}
+              sparklineData={sparklineData?.balanceData}
+            />
           </>}
       </div>
 

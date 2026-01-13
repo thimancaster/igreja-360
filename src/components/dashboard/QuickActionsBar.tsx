@@ -48,7 +48,7 @@ export const QuickActionsBar: React.FC = () => {
     {
       icon: <Plus className="h-4 w-4" />,
       label: "Nova Transação",
-      onClick: () => navigate("/transacoes"),
+      onClick: () => navigate("/app/transacoes"),
       variant: "default" as const,
     },
     {
@@ -61,7 +61,7 @@ export const QuickActionsBar: React.FC = () => {
     {
       icon: <FileDown className="h-4 w-4" />,
       label: "Relatórios",
-      onClick: () => navigate("/relatorios"),
+      onClick: () => navigate("/app/relatorios"),
       variant: "outline" as const,
     },
   ];

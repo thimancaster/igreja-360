@@ -678,8 +678,8 @@ export default function Integracoes() {
             </div>
           )}
         </CardContent>
-          </Card>
-        </TabsContent>
+        </Card>
+      </TabsContent>
 
         <TabsContent value="public">
           <Card>

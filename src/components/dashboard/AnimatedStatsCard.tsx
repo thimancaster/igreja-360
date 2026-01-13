@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Sparkline } from './Sparkline';
 
 interface AnimatedStatsCardProps {
   title: string;
@@ -12,6 +13,8 @@ interface AnimatedStatsCardProps {
   variant?: 'default' | 'success' | 'danger' | 'warning';
   delay?: number;
   formatAsCurrency?: boolean;
+  sparklineData?: number[];
+  sparklineColor?: string;
 }
 
 const AnimatedCounter = ({ value, formatAsCurrency = true }: { value: number; formatAsCurrency?: boolean }) => {
@@ -51,6 +54,13 @@ const iconStyles = {
   warning: 'bg-amber-500/20 text-amber-600',
 };
 
+const sparklineColors = {
+  default: 'hsl(var(--primary))',
+  success: '#10b981',
+  danger: '#ef4444',
+  warning: '#f59e0b',
+};
+
 export const AnimatedStatsCard = ({
   title,
   value,
@@ -59,6 +69,8 @@ export const AnimatedStatsCard = ({
   variant = 'default',
   delay = 0,
   formatAsCurrency = true,
+  sparklineData,
+  sparklineColor,
 }: AnimatedStatsCardProps) => {
   const TrendIcon = trend === undefined || trend === 0 ? Minus : trend > 0 ? TrendingUp : TrendingDown;
   const trendColor = trend === undefined || trend === 0 
@@ -66,6 +78,8 @@ export const AnimatedStatsCard = ({
     : trend > 0 
       ? 'text-emerald-600' 
       : 'text-rose-600';
+
+  const effectiveSparklineColor = sparklineColor || sparklineColors[variant];
 
   return (
     <motion.div
@@ -87,7 +101,7 @@ export const AnimatedStatsCard = ({
       )}>
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1">
               <p className="text-sm font-medium text-muted-foreground">{title}</p>
               <motion.p 
                 className="text-2xl font-bold tracking-tight"
@@ -97,21 +111,44 @@ export const AnimatedStatsCard = ({
               >
                 <AnimatedCounter value={value} formatAsCurrency={formatAsCurrency} />
               </motion.p>
-              {trend !== undefined && (
-                <motion.div 
-                  className={cn('flex items-center gap-1 text-sm font-medium', trendColor)}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: delay * 0.1 + 0.5 }}
-                >
-                  <TrendIcon className="h-4 w-4" />
-                  <span>{Math.abs(trend).toFixed(1)}%</span>
-                  <span className="text-muted-foreground font-normal">vs mês anterior</span>
-                </motion.div>
-              )}
+              
+              {/* Trend and Sparkline row */}
+              <div className="flex items-center justify-between gap-4">
+                {trend !== undefined && (
+                  <motion.div 
+                    className={cn('flex items-center gap-1 text-sm font-medium', trendColor)}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: delay * 0.1 + 0.5 }}
+                  >
+                    <TrendIcon className="h-4 w-4" />
+                    <span>{Math.abs(trend).toFixed(1)}%</span>
+                    <span className="text-muted-foreground font-normal text-xs">vs mês</span>
+                  </motion.div>
+                )}
+                
+                {/* Sparkline */}
+                {sparklineData && sparklineData.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: delay * 0.1 + 0.6 }}
+                    className="flex-shrink-0"
+                  >
+                    <Sparkline 
+                      data={sparklineData} 
+                      color={effectiveSparklineColor}
+                      width={80}
+                      height={32}
+                      strokeWidth={1.5}
+                    />
+                  </motion.div>
+                )}
+              </div>
             </div>
+            
             <motion.div 
-              className={cn('p-3 rounded-xl', iconStyles[variant])}
+              className={cn('p-3 rounded-xl ml-4', iconStyles[variant])}
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ 
