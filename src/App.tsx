@@ -1,7 +1,7 @@
 // src/App.tsx
-// --- VERSÃO COM IMPORT CORRIGIDO DO LOADING SPINNER ---
+// --- VERSÃO COM LAZY LOADING PARA REDUZIR BUNDLE SIZE ---
 
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -19,25 +19,25 @@ import { AppSidebar } from '@/components/AppSidebar';
 import { AppHeader } from '@/components/AppHeader';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
-// Importações diretas (sem lazy) para garantir o build
-import Dashboard from '@/pages/Dashboard';
-import AuthPage from '@/pages/Auth';
-import NotFound from '@/pages/NotFound';
-import Transacoes from '@/pages/Transacoes';
-import Integracoes from '@/pages/Integracoes';
-import Importacao from '@/pages/Importacao';
-import Relatorios from '@/pages/Relatorios';
-import Configuracoes from '@/pages/Configuracoes';
-import Admin from '@/pages/Admin';
-import GerenciarUsuarios from '@/pages/admin/GerenciarUsuarios';
-import GerenciarMinisterios from '@/pages/admin/GerenciarMinisterios';
-import GerenciarIgreja from '@/pages/admin/GerenciarIgreja';
-import GerenciarCategorias from '@/pages/admin/GerenciarCategorias';
-import GerenciarDados from '@/pages/admin/GerenciarDados';
-import CreateChurchPage from '@/pages/CreateChurch';
-import ChurchConfirmation from '@/pages/ChurchConfirmation';
-import SelectChurch from '@/pages/SelectChurch';
-import LandingPage from '@/pages/LandingPage';
+// Lazy loading para reduzir bundle inicial - páginas carregadas sob demanda
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const AuthPage = lazy(() => import('@/pages/Auth'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
+const Transacoes = lazy(() => import('@/pages/Transacoes'));
+const Integracoes = lazy(() => import('@/pages/Integracoes'));
+const Importacao = lazy(() => import('@/pages/Importacao'));
+const Relatorios = lazy(() => import('@/pages/Relatorios'));
+const Configuracoes = lazy(() => import('@/pages/Configuracoes'));
+const Admin = lazy(() => import('@/pages/Admin'));
+const GerenciarUsuarios = lazy(() => import('@/pages/admin/GerenciarUsuarios'));
+const GerenciarMinisterios = lazy(() => import('@/pages/admin/GerenciarMinisterios'));
+const GerenciarIgreja = lazy(() => import('@/pages/admin/GerenciarIgreja'));
+const GerenciarCategorias = lazy(() => import('@/pages/admin/GerenciarCategorias'));
+const GerenciarDados = lazy(() => import('@/pages/admin/GerenciarDados'));
+const CreateChurchPage = lazy(() => import('@/pages/CreateChurch'));
+const ChurchConfirmation = lazy(() => import('@/pages/ChurchConfirmation'));
+const SelectChurch = lazy(() => import('@/pages/SelectChurch'));
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
 
 const App: React.FC = () => {
   return (
