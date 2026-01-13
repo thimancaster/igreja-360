@@ -677,6 +677,7 @@ export default function Integracoes() {
               </AnimatePresence>
             </div>
           )}
+        </CardContent>
           </Card>
         </TabsContent>
 
