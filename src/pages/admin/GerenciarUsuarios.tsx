@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Users, Pencil, Trash2, MoreHorizontal, Building2, Search } from "lucide-react";
+import { Users, Pencil, Trash2, MoreHorizontal, Building2, Search, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "@/integrations/supabase/types";
@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useRole } from "@/hooks/useRole";
 import { AssignUserDialog } from "@/components/users/AssignUserDialog";
+import { InviteUserDialog } from "@/components/users/InviteUserDialog";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -61,6 +62,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 
 export default function GerenciarUsuarios() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ProfileWithDetails | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<ProfileWithDetails | null>(null);
@@ -226,6 +228,29 @@ export default function GerenciarUsuarios() {
     },
   });
 
+  const inviteUserMutation = useMutation({
+    mutationFn: async ({ email, fullName, role, churchId }: { email: string; fullName: string; role: AppRole; churchId: string }) => {
+      if (!canManage) throw new Error("Você não tem permissão para convidar usuários.");
+
+      const { data, error } = await supabase.functions.invoke("invite-user", {
+        body: { email, fullName, role, churchId },
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(data?.message || "Convite enviado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["admin-profiles"] });
+      setInviteDialogOpen(false);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao convidar usuário: ${error.message}`);
+    },
+  });
+
   const handleEditUser = (profileItem: ProfileWithDetails) => {
     setSelectedUser(profileItem);
     setDialogOpen(true);
@@ -238,6 +263,10 @@ export default function GerenciarUsuarios() {
 
   const handleDialogSubmit = async (data: { userId: string; fullName: string; role: AppRole; churchId: string | null }) => {
     await updateUserMutation.mutateAsync(data);
+  };
+
+  const handleInviteSubmit = async (data: { email: string; fullName: string; role: AppRole; churchId: string }) => {
+    await inviteUserMutation.mutateAsync(data);
   };
 
   const getInitials = (name: string | null) => {
@@ -288,14 +317,22 @@ export default function GerenciarUsuarios() {
                 </CardDescription>
               </div>
             </div>
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar usuário..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative flex-1 sm:flex-initial sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar usuário..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {canManage && (
+                <Button onClick={() => setInviteDialogOpen(true)} className="shrink-0">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Convidar
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -417,6 +454,17 @@ export default function GerenciarUsuarios() {
           )}
         </CardContent>
       </Card>
+
+      {/* Invite User Dialog */}
+      <InviteUserDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        churches={churches || []}
+        defaultChurchId={profile?.church_id || null}
+        onSubmit={handleInviteSubmit}
+        isLoading={inviteUserMutation.isPending}
+        isAdmin={isAdmin}
+      />
 
       {/* Edit User Dialog */}
       <AssignUserDialog
