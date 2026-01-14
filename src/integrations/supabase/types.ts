@@ -476,6 +476,7 @@ export type Database = {
           created_by: string | null
           description: string
           due_date: string | null
+          external_id: string | null
           id: string
           installment_number: number | null
           invoice_url: string | null
@@ -496,6 +497,7 @@ export type Database = {
           created_by?: string | null
           description: string
           due_date?: string | null
+          external_id?: string | null
           id?: string
           installment_number?: number | null
           invoice_url?: string | null
@@ -516,6 +518,7 @@ export type Database = {
           created_by?: string | null
           description?: string
           due_date?: string | null
+          external_id?: string | null
           id?: string
           installment_number?: number | null
           invoice_url?: string | null

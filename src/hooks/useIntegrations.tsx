@@ -125,9 +125,14 @@ export const useIntegrations = () => {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["google-integrations"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      
+      const inserted = data.recordsInserted || 0;
+      const updated = data.recordsUpdated || 0;
+      const skipped = data.recordsSkipped || 0;
+      
       toast({
         title: "Sincronização concluída",
-        description: `${data.recordsImported} transações foram importadas.`,
+        description: `${inserted} nova(s), ${updated} atualizada(s), ${skipped} ignorada(s).`,
       });
     },
     onError: (error: Error) => {

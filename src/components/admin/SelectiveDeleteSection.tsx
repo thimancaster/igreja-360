@@ -29,6 +29,7 @@ interface SelectiveDeleteFilters {
   status: string;
   ministry_id: string;
   category_id: string;
+  searchDescription: string;
 }
 
 const initialFilters: SelectiveDeleteFilters = {
@@ -39,6 +40,7 @@ const initialFilters: SelectiveDeleteFilters = {
   status: "all",
   ministry_id: "all",
   category_id: "all",
+  searchDescription: "",
 };
 
 export function SelectiveDeleteSection() {
@@ -111,6 +113,9 @@ export function SelectiveDeleteSection() {
     }
     if (filters.category_id && filters.category_id !== "all") {
       query = query.eq("category_id", filters.category_id);
+    }
+    if (filters.searchDescription && filters.searchDescription.trim()) {
+      query = query.ilike("description", `%${filters.searchDescription.trim()}%`);
     }
 
     return query;
@@ -202,7 +207,8 @@ export function SelectiveDeleteSection() {
       (filters.origin && filters.origin !== "all") ||
       (filters.status && filters.status !== "all") ||
       (filters.ministry_id && filters.ministry_id !== "all") ||
-      (filters.category_id && filters.category_id !== "all");
+      (filters.category_id && filters.category_id !== "all") ||
+      (filters.searchDescription && filters.searchDescription.trim());
 
     if (!hasFilter) {
       toast.error("Selecione pelo menos um filtro");
@@ -235,6 +241,17 @@ export function SelectiveDeleteSection() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Search by Description */}
+          <div className="space-y-2">
+            <Label>Buscar por Descrição</Label>
+            <Input
+              type="text"
+              placeholder="Ex: Dízimo, Aluguel, Salário..."
+              value={filters.searchDescription}
+              onChange={(e) => setFilters({ ...filters, searchDescription: e.target.value })}
+            />
+          </div>
+
           {/* Date Range */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
