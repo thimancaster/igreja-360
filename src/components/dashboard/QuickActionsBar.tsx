@@ -4,18 +4,24 @@ import { Plus, RefreshCw, FileDown, X, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useIntegrations } from "@/hooks/useIntegrations";
+import { usePublicSheetIntegrations } from "@/hooks/usePublicSheetIntegrations";
 import { toast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export const QuickActionsBar: React.FC = () => {
   const navigate = useNavigate();
-  const { integrations, syncIntegration } = useIntegrations();
+  const { integrations: googleIntegrations, syncIntegration: syncGoogle } = useIntegrations();
+  const { integrations: publicIntegrations, syncIntegration: syncPublic } = usePublicSheetIntegrations();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleSyncAll = async () => {
-    if (!integrations || integrations.length === 0) {
+    const googleCount = googleIntegrations?.length || 0;
+    const publicCount = publicIntegrations?.length || 0;
+    const totalCount = googleCount + publicCount;
+
+    if (totalCount === 0) {
       toast({
         title: "Nenhuma integração",
         description: "Configure uma planilha primeiro em Integrações.",
@@ -25,14 +31,46 @@ export const QuickActionsBar: React.FC = () => {
     }
 
     setIsSyncing(true);
+    let successCount = 0;
+    let errorCount = 0;
+
     try {
-      for (const integration of integrations) {
-        await syncIntegration.mutateAsync(integration.id);
+      // Sync Google integrations
+      if (googleIntegrations && googleIntegrations.length > 0) {
+        for (const integration of googleIntegrations) {
+          try {
+            await syncGoogle.mutateAsync(integration.id);
+            successCount++;
+          } catch {
+            errorCount++;
+          }
+        }
       }
-      toast({
-        title: "Sincronização concluída",
-        description: `${integrations.length} planilha(s) sincronizada(s).`,
-      });
+
+      // Sync Public Sheet integrations
+      if (publicIntegrations && publicIntegrations.length > 0) {
+        for (const integration of publicIntegrations) {
+          try {
+            await syncPublic.mutateAsync(integration.id);
+            successCount++;
+          } catch {
+            errorCount++;
+          }
+        }
+      }
+
+      if (errorCount === 0) {
+        toast({
+          title: "Sincronização concluída",
+          description: `${successCount} planilha(s) sincronizada(s) com sucesso.`,
+        });
+      } else {
+        toast({
+          title: "Sincronização parcial",
+          description: `${successCount} sincronizada(s), ${errorCount} com erro.`,
+          variant: "destructive",
+        });
+      }
     } catch {
       toast({
         title: "Erro na sincronização",

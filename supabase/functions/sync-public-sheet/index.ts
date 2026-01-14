@@ -123,11 +123,41 @@ function sanitizeString(value: any): string {
   return String(value).trim().slice(0, 500);
 }
 
-// Create a unique hash for transaction deduplication
+// Create external_id for row tracking
+function createExternalId(sheetId: string, rowIndex: number): string {
+  return `public_${sheetId}_row_${rowIndex}`;
+}
+
+// Create a unique hash for transaction deduplication (fallback)
 function createTransactionHash(description: string, amount: number, dueDate: string | null, type: string): string {
   const normalized = `${description.toLowerCase().trim()}|${amount}|${dueDate || ''}|${type}`;
-  // Simple hash using btoa
   return btoa(unescape(encodeURIComponent(normalized)));
+}
+
+// Detect changes between existing and incoming transaction
+function detectChanges(
+  existing: { description: string; amount: number; due_date: string | null; type: string; status: string },
+  incoming: { description: string; amount: number; due_date: string | null; type: string; status: string }
+): Record<string, any> {
+  const changes: Record<string, any> = {};
+  
+  if (existing.description !== incoming.description) {
+    changes.description = incoming.description;
+  }
+  if (Math.abs(existing.amount - incoming.amount) > 0.01) {
+    changes.amount = incoming.amount;
+  }
+  if (existing.due_date !== incoming.due_date) {
+    changes.due_date = incoming.due_date;
+  }
+  if (existing.type !== incoming.type) {
+    changes.type = incoming.type;
+  }
+  if (existing.status !== incoming.status) {
+    changes.status = incoming.status;
+  }
+  
+  return changes;
 }
 
 serve(async (req) => {
@@ -246,29 +276,36 @@ serve(async (req) => {
 
     console.log(`[sync-public-sheet] Column mapping:`, colIndexMap);
 
-    // Fetch existing transactions from this origin for deduplication
+    // Fetch existing transactions from this origin for intelligent sync
     const { data: existingTransactions } = await supabase
       .from('transactions')
-      .select('id, description, amount, due_date, type, status')
+      .select('id, description, amount, due_date, type, status, external_id')
       .eq('church_id', integration.church_id)
       .eq('origin', 'Planilha Pública');
 
-    // Create a map of existing transaction hashes
-    const existingHashes = new Map<string, { id: string; status: string }>();
+    // Create maps for deduplication
+    const existingByExternalId = new Map<string, any>();
+    const existingByHash = new Map<string, { id: string; status: string }>();
+    
     (existingTransactions || []).forEach((t: any) => {
+      if (t.external_id) {
+        existingByExternalId.set(t.external_id, t);
+      }
       const hash = createTransactionHash(t.description, t.amount, t.due_date, t.type);
-      existingHashes.set(hash, { id: t.id, status: t.status });
+      existingByHash.set(hash, { id: t.id, status: t.status });
     });
 
-    console.log(`[sync-public-sheet] Found ${existingHashes.size} existing transactions for deduplication`);
+    console.log(`[sync-public-sheet] Found ${existingByExternalId.size} by external_id, ${existingByHash.size} by hash`);
 
     // Process rows
     const newTransactions: any[] = [];
-    const updatesToMake: { id: string; status: string }[] = [];
+    const updatesToMake: { id: string; changes: Record<string, any> }[] = [];
     let skippedCount = 0;
+    const changesDetected = { description: 0, amount: 0, status: 0, due_date: 0, type: 0 };
     const rows = table.rows || [];
 
-    for (const row of rows) {
+    for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+      const row = rows[rowIndex];
       const cells = row.c || [];
       
       // Get values based on mapping
@@ -292,35 +329,84 @@ serve(async (req) => {
 
       // For Receita, use payment_date instead of due_date
       const paymentDate = type === 'Receita' ? (dueDate || new Date().toISOString().split('T')[0]) : null;
+      const finalDueDate = type === 'Receita' ? null : dueDate;
 
-      // Check for duplicates
-      const hash = createTransactionHash(description, amount, dueDate, type);
-      const existing = existingHashes.get(hash);
+      // Create external_id for this row
+      const externalId = createExternalId(integration.sheet_id, rowIndex);
 
-      if (existing) {
-        // Transaction exists - check if status changed
-        if (existing.status !== status) {
-          updatesToMake.push({ id: existing.id, status });
+      // Priority 1: Check by external_id
+      const existingByExtId = existingByExternalId.get(externalId);
+      if (existingByExtId) {
+        // Found by external_id - check ALL changes
+        const changes = detectChanges(
+          {
+            description: existingByExtId.description,
+            amount: Number(existingByExtId.amount),
+            due_date: existingByExtId.due_date,
+            type: existingByExtId.type,
+            status: existingByExtId.status,
+          },
+          { description, amount, due_date: finalDueDate, type, status }
+        );
+
+        if (Object.keys(changes).length > 0) {
+          // Track what changed
+          if (changes.description) changesDetected.description++;
+          if (changes.amount) changesDetected.amount++;
+          if (changes.status) changesDetected.status++;
+          if (changes.due_date) changesDetected.due_date++;
+          if (changes.type) changesDetected.type++;
+          
+          if (paymentDate && type === 'Receita') {
+            changes.payment_date = paymentDate;
+          }
+          
+          updatesToMake.push({ id: existingByExtId.id, changes });
         } else {
           skippedCount++;
         }
         continue;
       }
 
+      // Priority 2: Check by hash (for legacy data without external_id)
+      const hash = createTransactionHash(description, amount, finalDueDate, type);
+      const existingByHashData = existingByHash.get(hash);
+      
+      if (existingByHashData) {
+        // Found by hash - only update status and add external_id
+        const changes: Record<string, any> = { external_id: externalId };
+        if (existingByHashData.status !== status) {
+          changes.status = status;
+          changesDetected.status++;
+        }
+        
+        if (Object.keys(changes).length > 1 || existingByHashData.status !== status) {
+          updatesToMake.push({ id: existingByHashData.id, changes });
+        } else {
+          // Just add external_id for future syncs
+          updatesToMake.push({ id: existingByHashData.id, changes: { external_id: externalId } });
+          skippedCount++;
+        }
+        continue;
+      }
+
+      // Priority 3: New transaction
       newTransactions.push({
         church_id: integration.church_id,
         description,
         amount,
         type,
-        due_date: type === 'Receita' ? null : dueDate, // No due_date for Receita
+        due_date: finalDueDate,
         payment_date: paymentDate,
         status,
         origin: 'Planilha Pública',
         created_by: user.id,
+        external_id: externalId,
       });
     }
 
     console.log(`[sync-public-sheet] Processing: ${newTransactions.length} new, ${updatesToMake.length} updates, ${skippedCount} skipped`);
+    console.log(`[sync-public-sheet] Changes detected:`, changesDetected);
 
     // Insert new transactions
     let recordsInserted = 0;
@@ -346,16 +432,22 @@ serve(async (req) => {
       recordsInserted = insertedData?.length || 0;
     }
 
-    // Update status of existing transactions
+    // Update existing transactions
     let recordsUpdated = 0;
     for (const update of updatesToMake) {
+      if (Object.keys(update.changes).length === 0) continue;
+      
       const { error } = await supabase
         .from('transactions')
-        .update({ status: update.status })
+        .update(update.changes)
         .eq('id', update.id);
       
       if (!error) {
-        recordsUpdated++;
+        // Only count as updated if more than just external_id changed
+        const significantChanges = Object.keys(update.changes).filter(k => k !== 'external_id');
+        if (significantChanges.length > 0) {
+          recordsUpdated++;
+        }
       }
     }
 
@@ -377,6 +469,7 @@ serve(async (req) => {
         recordsInserted,
         recordsUpdated,
         recordsSkipped: skippedCount,
+        changesDetected,
         message: `${recordsInserted} novas transações, ${recordsUpdated} atualizadas, ${skippedCount} ignoradas.`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
