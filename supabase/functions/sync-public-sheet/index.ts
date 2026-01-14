@@ -95,8 +95,13 @@ function parseType(value: any): string {
   return 'Despesa';
 }
 
-// Determine status
-function parseStatus(value: any): string {
+// Determine status - For Receita, always return Pago
+function parseStatus(value: any, type: string): string {
+  // Receitas are always confirmed/paid
+  if (type === 'Receita') {
+    return 'Pago';
+  }
+  
   if (!value) return 'Pendente';
   
   const str = String(value).toLowerCase().trim();
@@ -116,6 +121,13 @@ function parseStatus(value: any): string {
 function sanitizeString(value: any): string {
   if (!value) return '';
   return String(value).trim().slice(0, 500);
+}
+
+// Create a unique hash for transaction deduplication
+function createTransactionHash(description: string, amount: number, dueDate: string | null, type: string): string {
+  const normalized = `${description.toLowerCase().trim()}|${amount}|${dueDate || ''}|${type}`;
+  // Simple hash using btoa
+  return btoa(unescape(encodeURIComponent(normalized)));
 }
 
 serve(async (req) => {
@@ -234,8 +246,26 @@ serve(async (req) => {
 
     console.log(`[sync-public-sheet] Column mapping:`, colIndexMap);
 
+    // Fetch existing transactions from this origin for deduplication
+    const { data: existingTransactions } = await supabase
+      .from('transactions')
+      .select('id, description, amount, due_date, type, status')
+      .eq('church_id', integration.church_id)
+      .eq('origin', 'Planilha Pública');
+
+    // Create a map of existing transaction hashes
+    const existingHashes = new Map<string, { id: string; status: string }>();
+    (existingTransactions || []).forEach((t: any) => {
+      const hash = createTransactionHash(t.description, t.amount, t.due_date, t.type);
+      existingHashes.set(hash, { id: t.id, status: t.status });
+    });
+
+    console.log(`[sync-public-sheet] Found ${existingHashes.size} existing transactions for deduplication`);
+
     // Process rows
-    const transactions: any[] = [];
+    const newTransactions: any[] = [];
+    const updatesToMake: { id: string; status: string }[] = [];
+    let skippedCount = 0;
     const rows = table.rows || [];
 
     for (const row of rows) {
@@ -252,33 +282,52 @@ serve(async (req) => {
       const amount = parseNumericValue(getValue('amount'));
       const type = parseType(getValue('type'));
       const dueDate = parseDate(getValue('due_date'));
-      const status = parseStatus(getValue('status'));
+      const rawStatus = getValue('status');
+      const status = parseStatus(rawStatus, type);
 
       // Skip invalid rows
       if (!description || amount <= 0) {
         continue;
       }
 
-      transactions.push({
+      // For Receita, use payment_date instead of due_date
+      const paymentDate = type === 'Receita' ? (dueDate || new Date().toISOString().split('T')[0]) : null;
+
+      // Check for duplicates
+      const hash = createTransactionHash(description, amount, dueDate, type);
+      const existing = existingHashes.get(hash);
+
+      if (existing) {
+        // Transaction exists - check if status changed
+        if (existing.status !== status) {
+          updatesToMake.push({ id: existing.id, status });
+        } else {
+          skippedCount++;
+        }
+        continue;
+      }
+
+      newTransactions.push({
         church_id: integration.church_id,
         description,
         amount,
         type,
-        due_date: dueDate,
+        due_date: type === 'Receita' ? null : dueDate, // No due_date for Receita
+        payment_date: paymentDate,
         status,
         origin: 'Planilha Pública',
         created_by: user.id,
       });
     }
 
-    console.log(`[sync-public-sheet] Processed ${transactions.length} valid transactions`);
+    console.log(`[sync-public-sheet] Processing: ${newTransactions.length} new, ${updatesToMake.length} updates, ${skippedCount} skipped`);
 
-    // Insert transactions
-    let recordsImported = 0;
-    if (transactions.length > 0) {
+    // Insert new transactions
+    let recordsInserted = 0;
+    if (newTransactions.length > 0) {
       const { error: insertError, data: insertedData } = await supabase
         .from('transactions')
-        .insert(transactions)
+        .insert(newTransactions)
         .select();
 
       if (insertError) {
@@ -294,7 +343,20 @@ serve(async (req) => {
         );
       }
 
-      recordsImported = insertedData?.length || 0;
+      recordsInserted = insertedData?.length || 0;
+    }
+
+    // Update status of existing transactions
+    let recordsUpdated = 0;
+    for (const update of updatesToMake) {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ status: update.status })
+        .eq('id', update.id);
+      
+      if (!error) {
+        recordsUpdated++;
+      }
     }
 
     // Update integration status
@@ -303,17 +365,19 @@ serve(async (req) => {
       .update({
         sync_status: 'success',
         last_sync_at: new Date().toISOString(),
-        records_synced: (integration.records_synced || 0) + recordsImported,
+        records_synced: (integration.records_synced || 0) + recordsInserted,
       })
       .eq('id', integrationId);
 
-    console.log(`[sync-public-sheet] Sync complete. Imported ${recordsImported} records`);
+    console.log(`[sync-public-sheet] Sync complete. Inserted: ${recordsInserted}, Updated: ${recordsUpdated}, Skipped: ${skippedCount}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        recordsImported,
-        message: `${recordsImported} transações importadas com sucesso.`,
+        recordsInserted,
+        recordsUpdated,
+        recordsSkipped: skippedCount,
+        message: `${recordsInserted} novas transações, ${recordsUpdated} atualizadas, ${skippedCount} ignoradas.`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
