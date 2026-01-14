@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
@@ -35,9 +36,20 @@ import { SearchInput } from "@/components/ui/search-input";
 import { SortableTableHeader } from "@/components/ui/sortable-table-header";
 
 export default function Transacoes() {
+  const { user } = useAuth();
   const { data: transactions, isLoading } = useTransactions();
   const { data: categoriesAndMinistries, isLoading: filtersLoading } = useCategoriesAndMinistries();
-  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole();
+  const { 
+    isAdmin, 
+    isTesoureiro, 
+    isPastor, 
+    isLider,
+    canManageTransactions,
+    canAddExpenses,
+    canOnlyViewOwnTransactions,
+    userMinistries,
+    isLoading: roleLoading 
+  } = useRole();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -45,8 +57,26 @@ export default function Transacoes() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
 
+  // Filtrar transações baseado nas permissões do usuário
+  const filteredByPermission = (transactions || []).filter((t) => {
+    // Admin, Tesoureiro e Pastor veem todas
+    if (isAdmin || isTesoureiro || isPastor) return true;
+    
+    // Líder vê apenas do seu ministério
+    if (isLider) {
+      return userMinistries.includes(t.ministry_id || '');
+    }
+    
+    // Usuário comum vê apenas o que ele criou
+    if (canOnlyViewOwnTransactions) {
+      return t.created_by === user?.id;
+    }
+    
+    return true;
+  });
+
   // Preparar dados para filtros (adicionando campos de categoria/ministério como strings)
-  const transactionsWithSearchFields = (transactions || []).map((t) => ({
+  const transactionsWithSearchFields = filteredByPermission.map((t) => ({
     ...t,
     categoryName: t.categories?.name || "",
     ministryName: t.ministries?.name || "",
@@ -67,6 +97,11 @@ export default function Transacoes() {
   });
 
   const pagination = usePagination(filteredData, { initialPageSize: 10 });
+
+  // Filtrar ministérios disponíveis para líder
+  const availableMinistries = isLider
+    ? (categoriesAndMinistries?.ministries || []).filter(m => userMinistries.includes(m.id))
+    : categoriesAndMinistries?.ministries || [];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -136,7 +171,11 @@ export default function Transacoes() {
     setSelectedTransaction(null);
   };
 
-  const canManageTransactions = isAdmin || isTesoureiro;
+  // Determinar se o usuário pode adicionar transações
+  const canAddTransactions = canManageTransactions || canOnlyViewOwnTransactions;
+  
+  // Usuário comum só pode adicionar receitas
+  const restrictToRevenue = canOnlyViewOwnTransactions && !canAddExpenses;
 
   if (isLoading || filtersLoading || roleLoading) {
     return (
@@ -151,11 +190,15 @@ export default function Transacoes() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Transações</h1>
-          <p className="text-muted-foreground mt-1">Gerencie todas as transações financeiras</p>
+          <p className="text-muted-foreground mt-1">
+            {canOnlyViewOwnTransactions 
+              ? "Visualize e adicione suas receitas" 
+              : "Gerencie todas as transações financeiras"}
+          </p>
         </div>
-        <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={!canManageTransactions}>
+        <Button className="gap-2" onClick={() => setDialogOpen(true)} disabled={!canAddTransactions}>
           <Plus className="h-4 w-4" />
-          Nova Transação
+          {restrictToRevenue ? "Nova Receita" : "Nova Transação"}
         </Button>
       </div>
 
@@ -271,7 +314,7 @@ export default function Transacoes() {
                           variant="outline"
                           size="icon"
                           onClick={() => handleEdit(transaction)}
-                          disabled={!canManageTransactions}
+                          disabled={!canManageTransactions && transaction.created_by !== user?.id}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -321,8 +364,9 @@ export default function Transacoes() {
         onOpenChange={handleDialogClose}
         transaction={selectedTransaction}
         categories={categoriesAndMinistries?.categories || []}
-        ministries={categoriesAndMinistries?.ministries || []}
-        canEdit={canManageTransactions}
+        ministries={availableMinistries}
+        canEdit={canManageTransactions || (canOnlyViewOwnTransactions && !selectedTransaction)}
+        restrictToRevenue={restrictToRevenue}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
