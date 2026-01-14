@@ -11,6 +11,7 @@ import { Trash2, AlertTriangle, Database, FileSpreadsheet, Tag, Building2 } from
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ConfirmDeleteDialog } from "@/components/admin/ConfirmDeleteDialog";
 import { AuditLogViewer } from "@/components/admin/AuditLogViewer";
+import { SelectiveDeleteSection } from "@/components/admin/SelectiveDeleteSection";
 import { exportToExcel } from "@/utils/exportHelpers";
 
 type DataType = 'transactions' | 'categories' | 'ministries' | 'all';
@@ -377,6 +378,9 @@ export default function GerenciarDados() {
           Exclua ou limpe dados do banco de dados da sua igreja
         </p>
       </div>
+
+      {/* Selective Delete Section */}
+      <SelectiveDeleteSection />
 
       <Card className="border-destructive/50">
         <CardHeader>

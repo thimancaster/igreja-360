@@ -58,19 +58,21 @@ export function TransactionDialog({
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [formData, setFormData] = useState({
+  const getInitialFormData = (isRevenue: boolean) => ({
     description: "",
     category_id: "",
     ministry_id: "",
-    type: restrictToRevenue ? "Receita" : "Despesa",
+    type: isRevenue ? "Receita" : "Despesa",
     amount: "",
     due_date: "",
-    payment_date: "",
-    status: "Pendente",
+    payment_date: isRevenue ? new Date().toISOString().split('T')[0] : "",
+    status: isRevenue ? "Pago" : "Pendente",
     notes: "",
     installment_number: "1",
     total_installments: "1",
   });
+
+  const [formData, setFormData] = useState(getInitialFormData(restrictToRevenue));
 
   useEffect(() => {
     if (transaction) {
@@ -90,23 +92,33 @@ export function TransactionDialog({
       setInvoiceUrl(transaction.invoice_url || null);
       setSelectedFile(null);
     } else {
-      setFormData({
-        description: "",
-        category_id: "",
-        ministry_id: "",
-        type: restrictToRevenue ? "Receita" : "Despesa",
-        amount: "",
-        due_date: "",
-        payment_date: "",
-        status: "Pendente",
-        notes: "",
-        installment_number: "1",
-        total_installments: "1",
-      });
+      setFormData(getInitialFormData(restrictToRevenue));
       setInvoiceUrl(null);
       setSelectedFile(null);
     }
   }, [transaction, open, restrictToRevenue]);
+
+  // When type changes to Receita, auto-set status and payment_date
+  const handleTypeChange = (value: string) => {
+    if (value === "Receita") {
+      setFormData({ 
+        ...formData, 
+        type: value, 
+        category_id: "",
+        status: "Pago",
+        payment_date: new Date().toISOString().split('T')[0],
+        due_date: "" // Clear due_date for revenue
+      });
+    } else {
+      setFormData({ 
+        ...formData, 
+        type: value, 
+        category_id: "",
+        status: "Pendente",
+        payment_date: "",
+      });
+    }
+  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -328,7 +340,7 @@ export function TransactionDialog({
               <Label htmlFor="type">Tipo</Label>
               <Select
                 value={formData.type}
-                onValueChange={(value) => setFormData({ ...formData, type: value, category_id: "" })}
+                onValueChange={handleTypeChange}
                 disabled={!canEdit || restrictToRevenue}
               >
                 <SelectTrigger>
@@ -347,16 +359,27 @@ export function TransactionDialog({
               <Label htmlFor="status">Status</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value) => setFormData({ ...formData, status: value })}
-                disabled={!canEdit}
+                onValueChange={(value) => {
+                  const updates: any = { status: value };
+                  // Auto-set payment_date when changing to Pago
+                  if (value === "Pago" && !formData.payment_date) {
+                    updates.payment_date = new Date().toISOString().split('T')[0];
+                  }
+                  setFormData({ ...formData, ...updates });
+                }}
+                disabled={!canEdit || formData.type === "Receita"} // Disable for Receita since it's always Pago
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Pendente">Pendente</SelectItem>
-                  <SelectItem value="Pago">Pago</SelectItem>
-                  <SelectItem value="Vencido">Vencido</SelectItem>
+                  {formData.type !== "Receita" && (
+                    <>
+                      <SelectItem value="Pendente">Pendente</SelectItem>
+                      <SelectItem value="Vencido">Vencido</SelectItem>
+                    </>
+                  )}
+                  <SelectItem value="Pago">{formData.type === "Receita" ? "Confirmado" : "Pago"}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -429,19 +452,37 @@ export function TransactionDialog({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="due_date">Data de Vencimento</Label>
-              <Input
-                id="due_date"
-                type="date"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                disabled={!canEdit}
-              />
-            </div>
+            {/* Hide due_date for Receita since it's auto-confirmed */}
+            {formData.type !== "Receita" && (
+              <div className="space-y-2">
+                <Label htmlFor="due_date">Data de Vencimento</Label>
+                <Input
+                  id="due_date"
+                  type="date"
+                  value={formData.due_date}
+                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                  disabled={!canEdit}
+                />
+              </div>
+            )}
+
+            {/* For Receita, show Data de Entrada in the same grid */}
+            {formData.type === "Receita" && (
+              <div className="space-y-2">
+                <Label htmlFor="payment_date">Data de Entrada</Label>
+                <Input
+                  id="payment_date"
+                  type="date"
+                  value={formData.payment_date}
+                  onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
+                  disabled={!canEdit}
+                />
+              </div>
+            )}
           </div>
 
-          {formData.status === "Pago" && (
+          {/* For Despesa, show payment_date only when status is Pago */}
+          {formData.type !== "Receita" && formData.status === "Pago" && (
             <div className="space-y-2">
               <Label htmlFor="payment_date">Data de Pagamento</Label>
               <Input

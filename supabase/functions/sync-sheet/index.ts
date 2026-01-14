@@ -22,6 +22,13 @@ function sanitizeString(input: string | null | undefined): string {
     .trim();
 }
 
+// Create a unique hash for transaction deduplication
+function createTransactionHash(description: string, amount: number, dueDate: string | null, type: string): string {
+  const normalized = `${description.toLowerCase().trim()}|${amount}|${dueDate || ''}|${type}`;
+  // Simple hash using btoa
+  return btoa(unescape(encodeURIComponent(normalized)));
+}
+
 // Validation schema for transaction data with sanitization
 const transactionSchema = z.object({
   church_id: z.string().uuid(),
@@ -287,9 +294,27 @@ serve(async (req) => {
 
     const mapping = integration.column_mapping as Record<string, string>;
 
+    // Fetch existing transactions from this origin for deduplication
+    const { data: existingTransactions } = await supabase
+      .from('transactions')
+      .select('id, description, amount, due_date, type, status')
+      .eq('church_id', integration.church_id)
+      .eq('origin', 'Google Sheets');
+
+    // Create a map of existing transaction hashes
+    const existingHashes = new Map<string, { id: string; status: string }>();
+    (existingTransactions || []).forEach((t: any) => {
+      const hash = createTransactionHash(t.description, t.amount, t.due_date, t.type);
+      existingHashes.set(hash, { id: t.id, status: t.status });
+    });
+
+    console.log(`Found ${existingHashes.size} existing transactions for deduplication`);
+
     // Transform and validate data rows
-    const transactions = [];
+    const newTransactions = [];
+    const updatesToMake: { id: string; status: string }[] = [];
     const validationErrors = [];
+    let skippedCount = 0;
     
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
@@ -332,10 +357,47 @@ serve(async (req) => {
         transaction.type = transaction.amount > 0 ? 'Receita' : 'Despesa';
       }
 
+      // For Receita, auto-set status to Pago and handle dates
+      if (transaction.type === 'Receita') {
+        transaction.status = 'Pago';
+        // Use due_date as payment_date for Receita
+        if (transaction.due_date && !transaction.payment_date) {
+          transaction.payment_date = transaction.due_date;
+        }
+        if (!transaction.payment_date) {
+          transaction.payment_date = new Date().toISOString().split('T')[0];
+        }
+        transaction.due_date = null; // Clear due_date for Receita
+      }
+
+      // Skip if no description
+      if (!transaction.description || transaction.description.trim() === '') {
+        continue;
+      }
+
+      // Check for duplicates
+      const hash = createTransactionHash(
+        transaction.description, 
+        Math.abs(transaction.amount), 
+        transaction.due_date, 
+        transaction.type
+      );
+      const existing = existingHashes.get(hash);
+
+      if (existing) {
+        // Transaction exists - check if status changed (only for Despesa)
+        if (transaction.type !== 'Receita' && existing.status !== transaction.status) {
+          updatesToMake.push({ id: existing.id, status: transaction.status });
+        } else {
+          skippedCount++;
+        }
+        continue;
+      }
+
       // Validate transaction
       try {
         const validated = transactionSchema.parse(transaction);
-        transactions.push(validated);
+        newTransactions.push(validated);
       } catch (error) {
         if (error instanceof z.ZodError) {
           validationErrors.push(`Row ${i + 2}: ${error.errors.map(e => e.message).join(', ')}`);
@@ -343,7 +405,7 @@ serve(async (req) => {
       }
     }
 
-    if (validationErrors.length > 0) {
+    if (validationErrors.length > 0 && newTransactions.length === 0 && updatesToMake.length === 0) {
       console.warn('Validation errors:', validationErrors);
       return new Response(
         JSON.stringify({ 
@@ -358,16 +420,34 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Validated ${transactions.length} transactions for import`);
+    console.log(`Processing: ${newTransactions.length} new, ${updatesToMake.length} updates, ${skippedCount} skipped`);
 
-    // Insert transactions
-    const { error: insertError } = await supabase
-      .from('transactions')
-      .insert(transactions);
+    // Insert new transactions
+    let recordsInserted = 0;
+    if (newTransactions.length > 0) {
+      const { error: insertError, data: insertedData } = await supabase
+        .from('transactions')
+        .insert(newTransactions)
+        .select();
 
-    if (insertError) {
-      console.error('Insert error:', insertError);
-      throw new Error(`Failed to insert transactions: ${insertError.message}`);
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        throw new Error(`Failed to insert transactions: ${insertError.message}`);
+      }
+      recordsInserted = insertedData?.length || 0;
+    }
+
+    // Update status of existing transactions
+    let recordsUpdated = 0;
+    for (const update of updatesToMake) {
+      const { error } = await supabase
+        .from('transactions')
+        .update({ status: update.status })
+        .eq('id', update.id);
+      
+      if (!error) {
+        recordsUpdated++;
+      }
     }
 
     // Update last sync time
@@ -376,12 +456,16 @@ serve(async (req) => {
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', integrationId);
 
-    console.log(`Sync completed: ${transactions.length} records imported`);
+    console.log(`Sync completed: ${recordsInserted} inserted, ${recordsUpdated} updated, ${skippedCount} skipped`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        recordsImported: transactions.length 
+        recordsInserted,
+        recordsUpdated,
+        recordsSkipped: skippedCount,
+        message: `${recordsInserted} novas transações, ${recordsUpdated} atualizadas, ${skippedCount} ignoradas.`,
+        validationErrors: validationErrors.length > 0 ? validationErrors.slice(0, 5) : undefined
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -391,7 +475,7 @@ serve(async (req) => {
     console.error('Error in sync-sheet:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: 'Sync operation failed' }),
+      JSON.stringify({ error: 'Sync operation failed', details: errorMessage }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
