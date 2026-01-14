@@ -14,8 +14,12 @@ export interface Transaction {
   ministry_id: string | null;
   church_id: string;
   created_at: string;
+  created_by: string | null;
+  invoice_url: string | null;
   installment_number: number | null;
   total_installments: number | null;
+  notes: string | null;
+  origin: string | null;
   categories?: {
     name: string;
     color: string | null;
