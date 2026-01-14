@@ -478,6 +478,7 @@ export type Database = {
           due_date: string | null
           id: string
           installment_number: number | null
+          invoice_url: string | null
           ministry_id: string | null
           notes: string | null
           origin: string | null
@@ -497,6 +498,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           installment_number?: number | null
+          invoice_url?: string | null
           ministry_id?: string | null
           notes?: string | null
           origin?: string | null
@@ -516,6 +518,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           installment_number?: number | null
+          invoice_url?: string | null
           ministry_id?: string | null
           notes?: string | null
           origin?: string | null
@@ -542,6 +545,35 @@ export type Database = {
           },
           {
             foreignKeyName: "transactions_ministry_id_fkey"
+            columns: ["ministry_id"]
+            isOneToOne: false
+            referencedRelation: "ministries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_ministries: {
+        Row: {
+          created_at: string | null
+          id: string
+          ministry_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          ministry_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          ministry_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ministries_ministry_id_fkey"
             columns: ["ministry_id"]
             isOneToOne: false
             referencedRelation: "ministries"

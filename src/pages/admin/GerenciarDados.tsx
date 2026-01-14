@@ -17,7 +17,7 @@ type DataType = 'transactions' | 'categories' | 'ministries' | 'all';
 
 export default function GerenciarDados() {
   const { user, profile } = useAuth();
-  const { isAdmin, isLoading: roleLoading } = useRole();
+  const { canDeleteData, isLoading: roleLoading } = useRole();
   const queryClient = useQueryClient();
   const [selectedAction, setSelectedAction] = useState<DataType | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -336,7 +336,7 @@ export default function GerenciarDados() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canDeleteData) {
     return (
       <div className="flex-1 flex items-center justify-center p-6">
         <Card className="max-w-md">
@@ -346,7 +346,7 @@ export default function GerenciarDados() {
               Acesso Negado
             </CardTitle>
             <CardDescription>
-              Apenas administradores podem acessar esta página.
+              Apenas administradores e tesoureiros podem acessar esta página.
             </CardDescription>
           </CardHeader>
         </Card>

@@ -3,13 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { differenceInDays, parseISO } from "date-fns";
 
-interface DueTransaction {
+export interface DueTransaction {
   id: string;
   description: string;
   amount: number;
   due_date: string;
   daysRemaining: number;
   type: string;
+  status: string;
+  categories?: { name: string } | null;
+  ministries?: { name: string } | null;
 }
 
 export function useDueTransactionAlerts(daysAhead: number = 7) {
@@ -28,7 +31,7 @@ export function useDueTransactionAlerts(daysAhead: number = 7) {
 
       const { data, error } = await supabase
         .from("transactions")
-        .select("id, description, amount, due_date, type")
+        .select("id, description, amount, due_date, type, status, categories(name), ministries(name)")
         .eq("church_id", profile.church_id)
         .eq("status", "Pendente")
         .not("due_date", "is", null)
@@ -39,8 +42,14 @@ export function useDueTransactionAlerts(daysAhead: number = 7) {
       if (error) throw error;
 
       const transactionsWithDays: DueTransaction[] = (data || []).map((t) => ({
-        ...t,
+        id: t.id,
+        description: t.description,
+        amount: Number(t.amount),
         due_date: t.due_date!,
+        type: t.type,
+        status: t.status,
+        categories: t.categories,
+        ministries: t.ministries,
         daysRemaining: differenceInDays(parseISO(t.due_date!), today),
       }));
 

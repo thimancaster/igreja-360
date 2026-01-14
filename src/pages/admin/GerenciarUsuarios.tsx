@@ -71,9 +71,10 @@ export default function GerenciarUsuarios() {
 
   const queryClient = useQueryClient();
   const { user, profile, loading: authLoading } = useAuth();
-  const { isAdmin, isTesoureiro, isLoading: roleLoading } = useRole();
+  const { isAdmin, canManageUsers, isLoading: roleLoading } = useRole();
 
-  const canManage = isAdmin || isTesoureiro;
+  // Apenas admin pode gerenciar usuários
+  const canManage = canManageUsers;
 
   // Fetch all churches for admin
   const { data: churches } = useQuery({

@@ -19,6 +19,7 @@ import { TodaysDueCard } from "@/components/dashboard/TodaysDueCard";
 import { FinancialHealthGauge } from "@/components/dashboard/FinancialHealthGauge";
 import { UpcomingPaymentsCalendar } from "@/components/dashboard/UpcomingPaymentsCalendar";
 import { QuickActionsBar } from "@/components/dashboard/QuickActionsBar";
+import { OverdueTransactionsCard } from "@/components/dashboard/OverdueTransactionsCard";
 import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
 import { useSparklineData } from "@/hooks/useSparklineData";
 import { Card } from "@/components/ui/card";
@@ -106,6 +107,9 @@ export default function Dashboard() {
       {/* Banner de Vencimentos */}
       <DueTransactionsBanner />
 
+      {/* Contas Vencidas com ação rápida */}
+      <OverdueTransactionsCard />
+
       {/* Top Section: Contas para Pagar Hoje + Saúde Financeira */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="lg:col-span-2">
@@ -116,7 +120,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Calendário de Vencimentos */}
+      {/* Calendário de Vencimentos Interativo */}
       <UpcomingPaymentsCalendar />
 
       {/* Cards de Destaque com Animação e Sparklines */}

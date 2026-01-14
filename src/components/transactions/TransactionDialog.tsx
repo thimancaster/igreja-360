@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Transaction } from "@/hooks/useTransactions";
 import { Tables } from "@/integrations/supabase/types";
+import { Upload, FileText, X, Camera } from "lucide-react";
 
 interface TransactionDialogProps {
   open: boolean;
@@ -32,20 +33,36 @@ interface TransactionDialogProps {
   transaction?: Transaction | null;
   categories: Tables<'categories'>[];
   ministries: Tables<'ministries'>[];
-  canEdit: boolean; // Nova prop para controlar a edição
+  canEdit: boolean;
+  restrictToRevenue?: boolean; // Nova prop para restringir apenas a receitas
 }
 
-export function TransactionDialog({ open, onOpenChange, transaction, categories, ministries, canEdit }: TransactionDialogProps) {
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+
+export function TransactionDialog({ 
+  open, 
+  onOpenChange, 
+  transaction, 
+  categories, 
+  ministries, 
+  canEdit,
+  restrictToRevenue = false 
+}: TransactionDialogProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     description: "",
     category_id: "",
     ministry_id: "",
-    type: "Despesa",
+    type: restrictToRevenue ? "Receita" : "Despesa",
     amount: "",
     due_date: "",
     payment_date: "",
@@ -70,12 +87,14 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
         installment_number: String(transaction.installment_number || 1),
         total_installments: String(transaction.total_installments || 1),
       });
+      setInvoiceUrl(transaction.invoice_url || null);
+      setSelectedFile(null);
     } else {
       setFormData({
         description: "",
         category_id: "",
         ministry_id: "",
-        type: "Despesa",
+        type: restrictToRevenue ? "Receita" : "Despesa",
         amount: "",
         due_date: "",
         payment_date: "",
@@ -84,12 +103,71 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
         installment_number: "1",
         total_installments: "1",
       });
+      setInvoiceUrl(null);
+      setSelectedFile(null);
     }
-  }, [transaction, open]);
+  }, [transaction, open, restrictToRevenue]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+      toast({
+        title: "Tipo de arquivo inválido",
+        description: "Aceitos: PDF, JPG, PNG",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        title: "Arquivo muito grande",
+        description: "O tamanho máximo é 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  const uploadInvoice = async (transactionId: string): Promise<string | null> => {
+    if (!selectedFile || !user?.id) return invoiceUrl;
+
+    setUploadingFile(true);
+    try {
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${user.id}/${transactionId}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('invoices')
+        .upload(fileName, selectedFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('invoices')
+        .getPublicUrl(fileName);
+
+      return urlData.publicUrl;
+    } catch (error: any) {
+      console.error('Error uploading invoice:', error);
+      toast({
+        title: "Erro ao enviar arquivo",
+        description: error.message,
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setUploadingFile(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canEdit) { // Impedir submissão se não puder editar
+    if (!canEdit) {
       toast({
         title: "Permissão Negada",
         description: "Você não tem permissão para criar ou editar transações.",
@@ -159,9 +237,15 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
       };
 
       if (transaction) {
+        // Upload invoice if there's a new file
+        let finalInvoiceUrl = invoiceUrl;
+        if (selectedFile) {
+          finalInvoiceUrl = await uploadInvoice(transaction.id);
+        }
+
         const { error } = await supabase
           .from("transactions")
-          .update(dataToSave)
+          .update({ ...dataToSave, invoice_url: finalInvoiceUrl })
           .eq("id", transaction.id);
 
         if (error) throw error;
@@ -171,11 +255,25 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
           description: "Transação atualizada com sucesso!",
         });
       } else {
-        const { error } = await supabase
+        // Create transaction first, then upload invoice
+        const { data: newTransaction, error } = await supabase
           .from("transactions")
-          .insert([dataToSave]);
+          .insert([dataToSave])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Upload invoice if there's a file
+        if (selectedFile && newTransaction) {
+          const uploadedUrl = await uploadInvoice(newTransaction.id);
+          if (uploadedUrl) {
+            await supabase
+              .from("transactions")
+              .update({ invoice_url: uploadedUrl })
+              .eq("id", newTransaction.id);
+          }
+        }
 
         toast({
           title: "Sucesso",
@@ -207,12 +305,20 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
 
   const filteredCategories = categories.filter(cat => cat.type === formData.type);
 
+  const removeFile = () => {
+    setSelectedFile(null);
+    setInvoiceUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {transaction ? "Editar Transação" : "Nova Transação"}
+            {transaction ? "Editar Transação" : restrictToRevenue ? "Nova Receita" : "Nova Transação"}
           </DialogTitle>
         </DialogHeader>
 
@@ -223,14 +329,16 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.type}
                 onValueChange={(value) => setFormData({ ...formData, type: value, category_id: "" })}
-                disabled={!canEdit} // Desabilitar se não puder editar
+                disabled={!canEdit || restrictToRevenue}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Receita">Receita</SelectItem>
-                  <SelectItem value="Despesa">Despesa</SelectItem>
+                  {!restrictToRevenue && (
+                    <SelectItem value="Despesa">Despesa</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -240,7 +348,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value })}
-                disabled={!canEdit} // Desabilitar se não puder editar
+                disabled={!canEdit}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -261,7 +369,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               required
-              disabled={!canEdit} // Desabilitar se não puder editar
+              disabled={!canEdit}
             />
           </div>
 
@@ -271,7 +379,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.category_id}
                 onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-                disabled={!canEdit} // Desabilitar se não puder editar
+                disabled={!canEdit}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma categoria" />
@@ -291,7 +399,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               <Select
                 value={formData.ministry_id}
                 onValueChange={(value) => setFormData({ ...formData, ministry_id: value })}
-                disabled={!canEdit} // Desabilitar se não puder editar
+                disabled={!canEdit}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um ministério" />
@@ -317,7 +425,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 required
-                disabled={!canEdit} // Desabilitar se não puder editar
+                disabled={!canEdit}
               />
             </div>
 
@@ -328,7 +436,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
                 type="date"
                 value={formData.due_date}
                 onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                disabled={!canEdit} // Desabilitar se não puder editar
+                disabled={!canEdit}
               />
             </div>
           </div>
@@ -372,6 +480,85 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
             </div>
           </div>
 
+          {/* Upload de Nota Fiscal */}
+          <div className="space-y-2">
+            <Label>Nota Fiscal / Comprovante</Label>
+            <div className="border-2 border-dashed rounded-lg p-4 transition-colors hover:border-primary/50">
+              {selectedFile || invoiceUrl ? (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    <span className="text-sm truncate max-w-[200px]">
+                      {selectedFile?.name || "Arquivo anexado"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {invoiceUrl && !selectedFile && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(invoiceUrl, '_blank')}
+                      >
+                        Ver
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={removeFile}
+                      disabled={!canEdit}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={!canEdit}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Anexar Arquivo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (fileInputRef.current) {
+                          fileInputRef.current.setAttribute('capture', 'environment');
+                          fileInputRef.current.click();
+                          fileInputRef.current.removeAttribute('capture');
+                        }
+                      }}
+                      disabled={!canEdit}
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Tirar Foto
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    PDF, JPG ou PNG (máx. 5MB)
+                  </p>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="notes">Observações</Label>
             <Textarea
@@ -379,7 +566,7 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
-              disabled={!canEdit} // Desabilitar se não puder editar
+              disabled={!canEdit}
             />
           </div>
 
@@ -387,8 +574,8 @@ export function TransactionDialog({ open, onOpenChange, transaction, categories,
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !canEdit}>
-              {loading ? "Salvando..." : transaction ? "Atualizar" : "Criar"}
+            <Button type="submit" disabled={loading || uploadingFile || !canEdit}>
+              {loading || uploadingFile ? "Salvando..." : transaction ? "Atualizar" : "Criar"}
             </Button>
           </DialogFooter>
         </form>
