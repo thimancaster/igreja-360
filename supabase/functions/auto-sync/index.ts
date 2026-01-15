@@ -1,0 +1,163 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  console.log('Auto-sync: Starting automatic synchronization check...');
+
+  try {
+    // Get all churches with sync enabled
+    const { data: churchSettings, error: settingsError } = await supabase
+      .from('app_settings')
+      .select('church_id, setting_key, setting_value')
+      .in('setting_key', ['sync_enabled', 'sync_interval_hours', 'last_auto_sync']);
+
+    if (settingsError) {
+      console.error('Auto-sync: Error fetching settings:', settingsError);
+      throw settingsError;
+    }
+
+    // Group settings by church
+    const churchSettingsMap: Record<string, Record<string, string>> = {};
+    churchSettings?.forEach(setting => {
+      if (!churchSettingsMap[setting.church_id]) {
+        churchSettingsMap[setting.church_id] = {};
+      }
+      churchSettingsMap[setting.church_id][setting.setting_key] = setting.setting_value;
+    });
+
+    const results: any[] = [];
+    const now = new Date();
+
+    for (const [churchId, settings] of Object.entries(churchSettingsMap)) {
+      const syncEnabled = settings['sync_enabled'] === 'true';
+      const intervalHours = parseInt(settings['sync_interval_hours'] || '6', 10);
+      const lastAutoSync = settings['last_auto_sync'] ? new Date(settings['last_auto_sync']) : null;
+
+      if (!syncEnabled) {
+        console.log(`Auto-sync: Church ${churchId} has sync disabled, skipping`);
+        continue;
+      }
+
+      // Check if enough time has passed since last sync
+      if (lastAutoSync) {
+        const hoursSinceLastSync = (now.getTime() - lastAutoSync.getTime()) / (1000 * 60 * 60);
+        if (hoursSinceLastSync < intervalHours) {
+          console.log(`Auto-sync: Church ${churchId} - Only ${hoursSinceLastSync.toFixed(1)}h since last sync (interval: ${intervalHours}h), skipping`);
+          continue;
+        }
+      }
+
+      console.log(`Auto-sync: Processing church ${churchId}...`);
+
+      // Get Google integrations
+      const { data: googleIntegrations } = await supabase
+        .from('google_integrations')
+        .select('id, user_id')
+        .eq('church_id', churchId);
+
+      // Get public sheet integrations
+      const { data: publicIntegrations } = await supabase
+        .from('public_sheet_integrations')
+        .select('id, user_id')
+        .eq('church_id', churchId);
+
+      let churchResult = { churchId, synced: 0, errors: 0 };
+
+      // Sync Google integrations
+      for (const integration of googleIntegrations || []) {
+        try {
+          const response = await fetch(`${supabaseUrl}/functions/v1/sync-sheet`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              integrationId: integration.id,
+              syncType: 'automatic',
+            }),
+          });
+
+          if (response.ok) {
+            churchResult.synced++;
+          } else {
+            churchResult.errors++;
+            console.error(`Auto-sync: Error syncing Google integration ${integration.id}`);
+          }
+        } catch (err) {
+          churchResult.errors++;
+          console.error(`Auto-sync: Exception syncing Google integration ${integration.id}:`, err);
+        }
+      }
+
+      // Sync public sheet integrations
+      for (const integration of publicIntegrations || []) {
+        try {
+          const response = await fetch(`${supabaseUrl}/functions/v1/sync-public-sheet`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              integrationId: integration.id,
+              syncType: 'automatic',
+            }),
+          });
+
+          if (response.ok) {
+            churchResult.synced++;
+          } else {
+            churchResult.errors++;
+            console.error(`Auto-sync: Error syncing public sheet integration ${integration.id}`);
+          }
+        } catch (err) {
+          churchResult.errors++;
+          console.error(`Auto-sync: Exception syncing public sheet integration ${integration.id}:`, err);
+        }
+      }
+
+      // Update last_auto_sync
+      await supabase
+        .from('app_settings')
+        .upsert({
+          church_id: churchId,
+          setting_key: 'last_auto_sync',
+          setting_value: now.toISOString(),
+        }, {
+          onConflict: 'church_id,setting_key',
+        });
+
+      results.push(churchResult);
+      console.log(`Auto-sync: Church ${churchId} completed - ${churchResult.synced} synced, ${churchResult.errors} errors`);
+    }
+
+    console.log('Auto-sync: Completed successfully', { processedChurches: results.length });
+
+    return new Response(
+      JSON.stringify({ success: true, results }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Auto-sync: Fatal error:', error);
+    return new Response(
+      JSON.stringify({ success: false, error: errorMessage }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

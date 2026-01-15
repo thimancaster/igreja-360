@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.sync-public-sheet]
 verify_jwt = true
+
+[functions.auto-sync]
+verify_jwt = false

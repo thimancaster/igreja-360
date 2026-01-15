@@ -1,4 +1,4 @@
-import { Users, Building2, ChevronRight, Home, Tag, Database } from "lucide-react";
+import { Users, Building2, ChevronRight, Home, Tag, Database, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -80,6 +80,21 @@ export default function Admin() {
                   <CardTitle>Gerenciar Dados</CardTitle>
                 </div>
                 <CardDescription className="mt-2">Exclua ou limpe dados do banco de dados.</CardDescription>
+              </div>
+              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link to="/app/admin/configuracoes-sistema" className="block hover:shadow-lg transition-shadow rounded-lg">
+          <Card className="h-full">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <div className="flex items-center gap-3">
+                  <Settings className="h-6 w-6 text-primary" />
+                  <CardTitle>Configurações do Sistema</CardTitle>
+                </div>
+                <CardDescription className="mt-2">Sincronização automática e histórico.</CardDescription>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </CardHeader>

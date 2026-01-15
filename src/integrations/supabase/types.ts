@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          church_id: string
+          created_at: string | null
+          id: string
+          setting_key: string
+          setting_value: string
+          updated_at: string | null
+        }
+        Insert: {
+          church_id: string
+          created_at?: string | null
+          id?: string
+          setting_key: string
+          setting_value: string
+          updated_at?: string | null
+        }
+        Update: {
+          church_id?: string
+          created_at?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -460,6 +495,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "sheet_uploads_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_history: {
+        Row: {
+          church_id: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          integration_id: string
+          integration_type: string
+          records_inserted: number | null
+          records_skipped: number | null
+          records_updated: number | null
+          status: string | null
+          sync_type: string | null
+          user_id: string | null
+        }
+        Insert: {
+          church_id: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          integration_id: string
+          integration_type: string
+          records_inserted?: number | null
+          records_skipped?: number | null
+          records_updated?: number | null
+          status?: string | null
+          sync_type?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          church_id?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          integration_id?: string
+          integration_type?: string
+          records_inserted?: number | null
+          records_skipped?: number | null
+          records_updated?: number | null
+          status?: string | null
+          sync_type?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_history_church_id_fkey"
             columns: ["church_id"]
             isOneToOne: false
             referencedRelation: "churches"
