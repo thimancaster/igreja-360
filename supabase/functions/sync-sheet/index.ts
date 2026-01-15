@@ -114,7 +114,8 @@ serve(async (req) => {
   }
 
   try {
-    const { integrationId } = await req.json();
+    const body = await req.json();
+    const { integrationId, syncType = 'manual' } = body;
     const authHeader = req.headers.get('Authorization')!;
 
     if (!authHeader) {
@@ -548,6 +549,21 @@ serve(async (req) => {
       .from('google_integrations')
       .update({ last_sync_at: new Date().toISOString() })
       .eq('id', integrationId);
+
+    // Save sync history
+    await supabase
+      .from('sync_history')
+      .insert({
+        church_id: integration.church_id,
+        user_id: user.id,
+        integration_id: integrationId,
+        integration_type: 'google',
+        records_inserted: recordsInserted,
+        records_updated: recordsUpdated,
+        records_skipped: skippedCount,
+        status: 'success',
+        sync_type: syncType,
+      });
 
     console.log(`Sync completed: ${recordsInserted} inserted, ${recordsUpdated} updated, ${skippedCount} skipped`);
 

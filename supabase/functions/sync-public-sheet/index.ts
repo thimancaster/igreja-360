@@ -192,7 +192,8 @@ serve(async (req) => {
       );
     }
 
-    const { integrationId } = await req.json();
+    const body = await req.json();
+    const { integrationId, syncType = 'manual' } = body;
     
     if (!integrationId) {
       return new Response(
@@ -460,6 +461,21 @@ serve(async (req) => {
         records_synced: (integration.records_synced || 0) + recordsInserted,
       })
       .eq('id', integrationId);
+
+    // Save sync history
+    await supabase
+      .from('sync_history')
+      .insert({
+        church_id: integration.church_id,
+        user_id: user.id,
+        integration_id: integrationId,
+        integration_type: 'public_sheet',
+        records_inserted: recordsInserted,
+        records_updated: recordsUpdated,
+        records_skipped: skippedCount,
+        status: 'success',
+        sync_type: syncType,
+      });
 
     console.log(`[sync-public-sheet] Sync complete. Inserted: ${recordsInserted}, Updated: ${recordsUpdated}, Skipped: ${skippedCount}`);
 
