@@ -20,6 +20,7 @@ import { FinancialHealthGauge } from "@/components/dashboard/FinancialHealthGaug
 import { UpcomingPaymentsCalendar } from "@/components/dashboard/UpcomingPaymentsCalendar";
 import { QuickActionsBar } from "@/components/dashboard/QuickActionsBar";
 import { OverdueTransactionsCard } from "@/components/dashboard/OverdueTransactionsCard";
+import { InstallmentsDashboard } from "@/components/dashboard/InstallmentsDashboard";
 import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
 import { useSparklineData } from "@/hooks/useSparklineData";
 import { Card } from "@/components/ui/card";
@@ -172,6 +173,9 @@ export default function Dashboard() {
         <MonthlyComparisonChart data={evolutionData || []} isLoading={evolutionLoading} />
         <BalanceAreaChart data={evolutionData || []} isLoading={evolutionLoading} />
       </div>
+
+      {/* Dashboard de Parcelas */}
+      <InstallmentsDashboard />
 
       {/* Filtros */}
       <motion.div className="flex flex-wrap gap-4" initial={{
