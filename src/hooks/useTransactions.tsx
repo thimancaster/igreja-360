@@ -18,6 +18,7 @@ export interface Transaction {
   invoice_url: string | null;
   installment_number: number | null;
   total_installments: number | null;
+  installment_group_id: string | null;
   notes: string | null;
   origin: string | null;
   categories?: {
@@ -57,6 +58,9 @@ export function useTransactionStats() {
   return useQuery({
     queryKey: ["transaction-stats", user?.id],
     queryFn: async () => {
+      // First, update overdue transactions
+      await supabase.rpc('update_overdue_transactions');
+
       const { data: transactions, error } = await supabase
         .from("transactions")
         .select("amount, type, status, due_date, payment_date");
@@ -96,6 +100,10 @@ export function useTransactionStats() {
           }
         }
 
+        if (t.status === "Vencido") {
+          stats.totalOverdue += amount;
+        }
+
         if (t.status === "Pago") {
           stats.totalPaid += amount;
         }
@@ -104,5 +112,31 @@ export function useTransactionStats() {
       return stats;
     },
     enabled: !!user,
+  });
+}
+
+// Hook to get installment group details
+export function useInstallmentGroup(groupId: string | null) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["installment-group", groupId],
+    queryFn: async () => {
+      if (!groupId) return null;
+
+      const { data, error } = await supabase
+        .from("transactions")
+        .select(`
+          *,
+          categories (name, color),
+          ministries (name)
+        `)
+        .eq("installment_group_id", groupId)
+        .order("installment_number", { ascending: true });
+
+      if (error) throw error;
+      return data as Transaction[];
+    },
+    enabled: !!user && !!groupId,
   });
 }

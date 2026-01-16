@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { sanitizeText } from "@/lib/sanitize";
+import { addMonths, format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -23,9 +24,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Transaction } from "@/hooks/useTransactions";
 import { Tables } from "@/integrations/supabase/types";
 import { Upload, FileText, X, Camera } from "lucide-react";
+import { InstallmentPreview } from "./InstallmentPreview";
 
 interface TransactionDialogProps {
   open: boolean;
@@ -34,7 +37,7 @@ interface TransactionDialogProps {
   categories: Tables<'categories'>[];
   ministries: Tables<'ministries'>[];
   canEdit: boolean;
-  restrictToRevenue?: boolean; // Nova prop para restringir apenas a receitas
+  restrictToRevenue?: boolean;
 }
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -58,6 +61,10 @@ export function TransactionDialog({
   const [invoiceUrl, setInvoiceUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Installment state
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentCount, setInstallmentCount] = useState(2);
+  
   const getInitialFormData = (isRevenue: boolean) => ({
     description: "",
     category_id: "",
@@ -68,11 +75,28 @@ export function TransactionDialog({
     payment_date: isRevenue ? new Date().toISOString().split('T')[0] : "",
     status: isRevenue ? "Pago" : "Pendente",
     notes: "",
-    installment_number: "1",
-    total_installments: "1",
   });
 
   const [formData, setFormData] = useState(getInitialFormData(restrictToRevenue));
+
+  // Calculate installment value in real-time
+  const calculatedInstallmentValue = useMemo(() => {
+    if (isInstallment && installmentCount > 1 && formData.amount) {
+      const total = parseFloat(formData.amount);
+      if (!isNaN(total) && total > 0) {
+        return total / installmentCount;
+      }
+    }
+    return 0;
+  }, [formData.amount, installmentCount, isInstallment]);
+
+  // Get first due date for preview
+  const firstDueDate = useMemo(() => {
+    if (formData.due_date) {
+      return new Date(formData.due_date + 'T12:00:00');
+    }
+    return new Date();
+  }, [formData.due_date]);
 
   useEffect(() => {
     if (transaction) {
@@ -86,19 +110,20 @@ export function TransactionDialog({
         payment_date: transaction.payment_date || "",
         status: transaction.status,
         notes: "",
-        installment_number: String(transaction.installment_number || 1),
-        total_installments: String(transaction.total_installments || 1),
       });
       setInvoiceUrl(transaction.invoice_url || null);
       setSelectedFile(null);
+      setIsInstallment(false);
+      setInstallmentCount(2);
     } else {
       setFormData(getInitialFormData(restrictToRevenue));
       setInvoiceUrl(null);
       setSelectedFile(null);
+      setIsInstallment(false);
+      setInstallmentCount(2);
     }
   }, [transaction, open, restrictToRevenue]);
 
-  // When type changes to Receita, auto-set status and payment_date
   const handleTypeChange = (value: string) => {
     if (value === "Receita") {
       setFormData({ 
@@ -107,8 +132,9 @@ export function TransactionDialog({
         category_id: "",
         status: "Pago",
         payment_date: new Date().toISOString().split('T')[0],
-        due_date: "" // Clear due_date for revenue
+        due_date: ""
       });
+      setIsInstallment(false);
     } else {
       setFormData({ 
         ...formData, 
@@ -232,24 +258,20 @@ export function TransactionDialog({
         throw new Error("Igreja não encontrada");
       }
 
-      const dataToSave = {
-        description: validated.description,
-        category_id: formData.category_id || null,
-        ministry_id: formData.ministry_id || null,
-        type: validated.type,
-        amount: parseFloat(validated.amount),
-        due_date: validated.due_date || null,
-        payment_date: validated.status === "Pago" ? validated.payment_date || null : null,
-        status: validated.status,
-        notes: validated.notes || null,
-        church_id: profile.church_id,
-        created_by: user.id,
-        installment_number: parseInt(formData.installment_number) || 1,
-        total_installments: parseInt(formData.total_installments) || 1,
-      };
-
       if (transaction) {
-        // Upload invoice if there's a new file
+        // EDITING: Update single transaction
+        const dataToSave = {
+          description: validated.description,
+          category_id: formData.category_id || null,
+          ministry_id: formData.ministry_id || null,
+          type: validated.type,
+          amount: parseFloat(validated.amount),
+          due_date: validated.due_date || null,
+          payment_date: validated.status === "Pago" ? validated.payment_date || null : null,
+          status: validated.status,
+          notes: validated.notes || null,
+        };
+
         let finalInvoiceUrl = invoiceUrl;
         if (selectedFile) {
           finalInvoiceUrl = await uploadInvoice(transaction.id);
@@ -267,30 +289,97 @@ export function TransactionDialog({
           description: "Transação atualizada com sucesso!",
         });
       } else {
-        // Create transaction first, then upload invoice
-        const { data: newTransaction, error } = await supabase
-          .from("transactions")
-          .insert([dataToSave])
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        // Upload invoice if there's a file
-        if (selectedFile && newTransaction) {
-          const uploadedUrl = await uploadInvoice(newTransaction.id);
-          if (uploadedUrl) {
-            await supabase
-              .from("transactions")
-              .update({ invoice_url: uploadedUrl })
-              .eq("id", newTransaction.id);
+        // CREATING: Check if installment mode
+        const totalAmount = parseFloat(validated.amount);
+        
+        if (isInstallment && installmentCount > 1 && formData.type === "Despesa") {
+          // Create multiple installments
+          const groupId = crypto.randomUUID();
+          const installmentValue = totalAmount / installmentCount;
+          const baseDate = formData.due_date ? new Date(formData.due_date + 'T12:00:00') : new Date();
+          
+          const installments = [];
+          for (let i = 0; i < installmentCount; i++) {
+            const dueDate = addMonths(baseDate, i);
+            installments.push({
+              description: `${validated.description} (${i + 1}/${installmentCount})`,
+              category_id: formData.category_id || null,
+              ministry_id: formData.ministry_id || null,
+              type: validated.type,
+              amount: Math.round(installmentValue * 100) / 100, // Round to 2 decimal places
+              due_date: format(dueDate, 'yyyy-MM-dd'),
+              payment_date: null,
+              status: "Pendente",
+              notes: validated.notes || null,
+              church_id: profile.church_id,
+              created_by: user.id,
+              installment_number: i + 1,
+              total_installments: installmentCount,
+              installment_group_id: groupId,
+              origin: "Manual",
+            });
           }
-        }
 
-        toast({
-          title: "Sucesso",
-          description: "Transação criada com sucesso!",
-        });
+          // Handle rounding difference in last installment
+          const totalCalculated = installmentValue * installmentCount;
+          const difference = totalAmount - totalCalculated;
+          if (Math.abs(difference) > 0.01) {
+            installments[installmentCount - 1].amount = 
+              Math.round((installmentValue + difference) * 100) / 100;
+          }
+
+          const { error } = await supabase
+            .from("transactions")
+            .insert(installments);
+
+          if (error) throw error;
+
+          toast({
+            title: "Sucesso",
+            description: `${installmentCount} parcelas criadas com sucesso!`,
+          });
+        } else {
+          // Create single transaction
+          const dataToSave = {
+            description: validated.description,
+            category_id: formData.category_id || null,
+            ministry_id: formData.ministry_id || null,
+            type: validated.type,
+            amount: totalAmount,
+            due_date: validated.due_date || null,
+            payment_date: validated.status === "Pago" ? validated.payment_date || null : null,
+            status: validated.status,
+            notes: validated.notes || null,
+            church_id: profile.church_id,
+            created_by: user.id,
+            installment_number: 1,
+            total_installments: 1,
+            origin: "Manual",
+          };
+
+          const { data: newTransaction, error } = await supabase
+            .from("transactions")
+            .insert([dataToSave])
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          if (selectedFile && newTransaction) {
+            const uploadedUrl = await uploadInvoice(newTransaction.id);
+            if (uploadedUrl) {
+              await supabase
+                .from("transactions")
+                .update({ invoice_url: uploadedUrl })
+                .eq("id", newTransaction.id);
+            }
+          }
+
+          toast({
+            title: "Sucesso",
+            description: "Transação criada com sucesso!",
+          });
+        }
       }
 
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
@@ -324,6 +413,8 @@ export function TransactionDialog({
       fileInputRef.current.value = '';
     }
   };
+
+  const showInstallmentOption = !transaction && formData.type === "Despesa" && canEdit;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -361,13 +452,12 @@ export function TransactionDialog({
                 value={formData.status}
                 onValueChange={(value) => {
                   const updates: any = { status: value };
-                  // Auto-set payment_date when changing to Pago
                   if (value === "Pago" && !formData.payment_date) {
                     updates.payment_date = new Date().toISOString().split('T')[0];
                   }
                   setFormData({ ...formData, ...updates });
                 }}
-                disabled={!canEdit || formData.type === "Receita"} // Disable for Receita since it's always Pago
+                disabled={!canEdit || formData.type === "Receita" || isInstallment}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -391,6 +481,7 @@ export function TransactionDialog({
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder={isInstallment ? "Ex: Microfone Shure SM58" : "Descrição da transação"}
               required
               disabled={!canEdit}
             />
@@ -440,33 +531,37 @@ export function TransactionDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Valor (R$)</Label>
+              <Label htmlFor="amount">
+                {isInstallment ? "Valor Total (R$)" : "Valor (R$)"}
+              </Label>
               <Input
                 id="amount"
                 type="number"
                 step="0.01"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                placeholder={isInstallment ? "Ex: 3500.00" : "0.00"}
                 required
                 disabled={!canEdit}
               />
             </div>
 
-            {/* Hide due_date for Receita since it's auto-confirmed */}
             {formData.type !== "Receita" && (
               <div className="space-y-2">
-                <Label htmlFor="due_date">Data de Vencimento</Label>
+                <Label htmlFor="due_date">
+                  {isInstallment ? "Data da 1ª Parcela" : "Data de Vencimento"}
+                </Label>
                 <Input
                   id="due_date"
                   type="date"
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                   disabled={!canEdit}
+                  required={isInstallment}
                 />
               </div>
             )}
 
-            {/* For Receita, show Data de Entrada in the same grid */}
             {formData.type === "Receita" && (
               <div className="space-y-2">
                 <Label htmlFor="payment_date">Data de Entrada</Label>
@@ -481,8 +576,61 @@ export function TransactionDialog({
             )}
           </div>
 
-          {/* For Despesa, show payment_date only when status is Pago */}
-          {formData.type !== "Receita" && formData.status === "Pago" && (
+          {/* Installment Section - Only for new Despesa */}
+          {showInstallmentOption && (
+            <div className="border border-border rounded-lg p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="installment-toggle" className="text-base font-medium">
+                    Parcelar esta despesa
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Divide o valor total em parcelas mensais
+                  </p>
+                </div>
+                <Switch
+                  id="installment-toggle"
+                  checked={isInstallment}
+                  onCheckedChange={(checked) => {
+                    setIsInstallment(checked);
+                    if (checked) {
+                      setFormData({ ...formData, status: "Pendente" });
+                    }
+                  }}
+                />
+              </div>
+
+              {isInstallment && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="installment_count">Número de Parcelas</Label>
+                    <Input
+                      id="installment_count"
+                      type="number"
+                      min="2"
+                      max="60"
+                      value={installmentCount}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 2;
+                        setInstallmentCount(Math.min(60, Math.max(2, val)));
+                      }}
+                    />
+                  </div>
+
+                  {formData.amount && parseFloat(formData.amount) > 0 && formData.due_date && (
+                    <InstallmentPreview
+                      totalAmount={parseFloat(formData.amount)}
+                      installmentCount={installmentCount}
+                      firstDueDate={firstDueDate}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* For Despesa, show payment_date only when status is Pago and not installment */}
+          {formData.type !== "Receita" && formData.status === "Pago" && !isInstallment && (
             <div className="space-y-2">
               <Label htmlFor="payment_date">Data de Pagamento</Label>
               <Input
@@ -495,110 +643,86 @@ export function TransactionDialog({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Upload de Nota Fiscal - Only for non-installment */}
+          {!isInstallment && (
             <div className="space-y-2">
-              <Label htmlFor="installment_number">Parcela Atual</Label>
-              <Input
-                id="installment_number"
-                type="number"
-                min="1"
-                value={formData.installment_number}
-                onChange={(e) => setFormData({ ...formData, installment_number: e.target.value })}
-                disabled={!canEdit}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="total_installments">Total de Parcelas</Label>
-              <Input
-                id="total_installments"
-                type="number"
-                min="1"
-                value={formData.total_installments}
-                onChange={(e) => setFormData({ ...formData, total_installments: e.target.value })}
-                disabled={!canEdit}
-              />
-            </div>
-          </div>
-
-          {/* Upload de Nota Fiscal */}
-          <div className="space-y-2">
-            <Label>Nota Fiscal / Comprovante</Label>
-            <div className="border-2 border-dashed rounded-lg p-4 transition-colors hover:border-primary/50">
-              {selectedFile || invoiceUrl ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-primary" />
-                    <span className="text-sm truncate max-w-[200px]">
-                      {selectedFile?.name || "Arquivo anexado"}
-                    </span>
+              <Label>Nota Fiscal / Comprovante</Label>
+              <div className="border-2 border-dashed rounded-lg p-4 transition-colors hover:border-primary/50">
+                {selectedFile || invoiceUrl ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-primary" />
+                      <span className="text-sm truncate max-w-[200px]">
+                        {selectedFile?.name || "Arquivo anexado"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {invoiceUrl && !selectedFile && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(invoiceUrl, '_blank')}
+                        >
+                          Ver
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={removeFile}
+                        disabled={!canEdit}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {invoiceUrl && !selectedFile && (
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex gap-2">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(invoiceUrl, '_blank')}
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={!canEdit}
                       >
-                        Ver
+                        <Upload className="h-4 w-4 mr-2" />
+                        Anexar Arquivo
                       </Button>
-                    )}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={removeFile}
-                      disabled={!canEdit}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (fileInputRef.current) {
+                            fileInputRef.current.setAttribute('capture', 'environment');
+                            fileInputRef.current.click();
+                            fileInputRef.current.removeAttribute('capture');
+                          }
+                        }}
+                        disabled={!canEdit}
+                      >
+                        <Camera className="h-4 w-4 mr-2" />
+                        Tirar Foto
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      PDF, JPG ou PNG (máx. 5MB)
+                    </p>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={!canEdit}
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Anexar Arquivo
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (fileInputRef.current) {
-                          fileInputRef.current.setAttribute('capture', 'environment');
-                          fileInputRef.current.click();
-                          fileInputRef.current.removeAttribute('capture');
-                        }
-                      }}
-                      disabled={!canEdit}
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Tirar Foto
-                    </Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    PDF, JPG ou PNG (máx. 5MB)
-                  </p>
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="notes">Observações</Label>
@@ -616,7 +740,14 @@ export function TransactionDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={loading || uploadingFile || !canEdit}>
-              {loading || uploadingFile ? "Salvando..." : transaction ? "Atualizar" : "Criar"}
+              {loading || uploadingFile 
+                ? "Salvando..." 
+                : isInstallment 
+                  ? `Criar ${installmentCount} Parcelas` 
+                  : transaction 
+                    ? "Atualizar" 
+                    : "Criar"
+              }
             </Button>
           </DialogFooter>
         </form>
