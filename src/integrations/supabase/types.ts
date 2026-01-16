@@ -566,6 +566,7 @@ export type Database = {
           due_date: string | null
           external_id: string | null
           id: string
+          installment_group_id: string | null
           installment_number: number | null
           invoice_url: string | null
           ministry_id: string | null
@@ -587,6 +588,7 @@ export type Database = {
           due_date?: string | null
           external_id?: string | null
           id?: string
+          installment_group_id?: string | null
           installment_number?: number | null
           invoice_url?: string | null
           ministry_id?: string | null
@@ -608,6 +610,7 @@ export type Database = {
           due_date?: string | null
           external_id?: string | null
           id?: string
+          installment_group_id?: string | null
           installment_number?: number | null
           invoice_url?: string | null
           ministry_id?: string | null
@@ -698,6 +701,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_and_update_overdue: { Args: never; Returns: Json }
       cleanup_expired_oauth_sessions: { Args: never; Returns: undefined }
       get_decrypted_integration: {
         Args: { integration_id: string }
@@ -737,6 +741,7 @@ export type Database = {
         }
         Returns: string
       }
+      update_overdue_transactions: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "tesoureiro" | "pastor" | "lider" | "user"
