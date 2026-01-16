@@ -15,6 +15,43 @@ Deno.serve(async (req) => {
   
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Parse request body to check for action
+  let body: { action?: string } = {};
+  try {
+    body = await req.json();
+  } catch {
+    // No body or invalid JSON, continue with default behavior
+  }
+
+  // If action is update_overdue, just run the overdue check
+  if (body.action === 'update_overdue') {
+    console.log('Auto-sync: Running overdue transactions update...');
+    try {
+      const { data, error } = await supabase.rpc('check_and_update_overdue');
+      
+      if (error) {
+        console.error('Auto-sync: Error updating overdue transactions:', error);
+        return new Response(
+          JSON.stringify({ success: false, error: error.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Auto-sync: Overdue update completed:', data);
+      return new Response(
+        JSON.stringify({ success: true, ...data }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Auto-sync: Fatal error updating overdue:', error);
+      return new Response(
+        JSON.stringify({ success: false, error: errorMessage }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+
   console.log('Auto-sync: Starting automatic synchronization check...');
 
   try {
