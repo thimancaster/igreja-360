@@ -300,10 +300,14 @@ export default function Importacao() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    downloadImportTemplate();
-                    toast({ title: "Download iniciado", description: "O modelo de importação está sendo baixado." });
+                    try {
+                      await downloadImportTemplate();
+                      toast({ title: "Download concluído", description: "O modelo de importação foi baixado." });
+                    } catch (error) {
+                      toast({ title: "Erro", description: "Não foi possível baixar o modelo.", variant: "destructive" });
+                    }
                   }}
                   className="ml-4"
                 >

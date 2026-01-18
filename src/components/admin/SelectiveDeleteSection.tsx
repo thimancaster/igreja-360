@@ -153,7 +153,7 @@ export function SelectiveDeleteSection() {
           categoria: t.categories?.name || "",
           ministerio: t.ministries?.name || "",
         }));
-        exportToExcel(exportData, `backup_seletivo_${new Date().toISOString().split('T')[0]}`, "Backup");
+        await exportToExcel(exportData, `backup_seletivo_${new Date().toISOString().split('T')[0]}`, "Backup");
       }
 
       // Delete by IDs

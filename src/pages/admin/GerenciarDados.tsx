@@ -103,11 +103,10 @@ export default function GerenciarDados() {
         .select("*", { count: "exact", head: true })
         .eq("church_id", profile.church_id);
 
-      // Export backup if requested
       if (exportBackup) {
         const data = await fetchDataForBackup('transactions');
         if (data?.transactions && (data.transactions as unknown[]).length > 0) {
-          exportToExcel(data.transactions as Record<string, unknown>[], `backup_transacoes_${new Date().toISOString().split('T')[0]}`, "Transações");
+          await exportToExcel(data.transactions as Record<string, unknown>[], `backup_transacoes_${new Date().toISOString().split('T')[0]}`, "Transações");
         }
       }
       
@@ -147,7 +146,7 @@ export default function GerenciarDados() {
       if (exportBackup) {
         const data = await fetchDataForBackup('categories');
         if (data?.categories && (data.categories as unknown[]).length > 0) {
-          exportToExcel(data.categories as Record<string, unknown>[], `backup_categorias_${new Date().toISOString().split('T')[0]}`, "Categorias");
+          await exportToExcel(data.categories as Record<string, unknown>[], `backup_categorias_${new Date().toISOString().split('T')[0]}`, "Categorias");
         }
       }
       
@@ -191,7 +190,7 @@ export default function GerenciarDados() {
       if (exportBackup) {
         const data = await fetchDataForBackup('ministries');
         if (data?.ministries && (data.ministries as unknown[]).length > 0) {
-          exportToExcel(data.ministries as Record<string, unknown>[], `backup_ministerios_${new Date().toISOString().split('T')[0]}`, "Ministérios");
+          await exportToExcel(data.ministries as Record<string, unknown>[], `backup_ministerios_${new Date().toISOString().split('T')[0]}`, "Ministérios");
         }
       }
       
@@ -236,7 +235,7 @@ export default function GerenciarDados() {
             ...(data.ministries as Record<string, unknown>[] || []).map(m => ({ ...m, _tipo: "Ministério" })),
           ];
           if (allData.length > 0) {
-            exportToExcel(allData, `backup_completo_${new Date().toISOString().split('T')[0]}`, "Backup Completo");
+            await exportToExcel(allData, `backup_completo_${new Date().toISOString().split('T')[0]}`, "Backup Completo");
           }
         }
       }

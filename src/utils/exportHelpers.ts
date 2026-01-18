@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 /**
  * Exports an array of objects to an Excel file.
@@ -6,22 +6,42 @@ import * as XLSX from 'xlsx';
  * @param fileName The desired name for the file (without extension).
  * @param sheetName The name for the worksheet inside the Excel file.
  */
-export const exportToExcel = (data: any[], fileName: string, sheetName: string) => {
+export const exportToExcel = async (data: any[], fileName: string, sheetName: string) => {
   try {
     // Create a new workbook
-    const wb = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
     
-    // Convert the array of objects to a worksheet
-    const ws = XLSX.utils.json_to_sheet(data);
+    // Add a worksheet
+    const worksheet = workbook.addWorksheet(sheetName);
     
-    // Append the worksheet to the workbook
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    // Get headers from the first data object
+    if (data.length > 0) {
+      const headers = Object.keys(data[0]);
+      worksheet.columns = headers.map(header => ({
+        header,
+        key: header,
+        width: 15
+      }));
+      
+      // Add rows
+      data.forEach(row => {
+        worksheet.addRow(row);
+      });
+    }
     
     // Generate the file and trigger the download
-    XLSX.writeFile(wb, `${fileName}.xlsx`);
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${fileName}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (error) {
     console.error("Error exporting to Excel:", error);
-    // Optionally, you can throw the error or handle it with a toast notification from the calling component.
     throw new Error("Não foi possível exportar para Excel.");
   }
 };
@@ -29,93 +49,105 @@ export const exportToExcel = (data: any[], fileName: string, sheetName: string) 
 /**
  * Downloads a standardized import template for transactions.
  */
-export const downloadImportTemplate = () => {
+export const downloadImportTemplate = async () => {
   try {
-    const wb = XLSX.utils.book_new();
+    const workbook = new ExcelJS.Workbook();
     
-    // Define template headers and example data
-    const templateData = [
-      {
-        "Descrição": "Dízimo Mensal",
-        "Valor": 1500.00,
-        "Tipo": "Receita",
-        "Status": "Pago",
-        "Data de Vencimento": "2026-01-15",
-        "Data de Pagamento": "2026-01-10",
-        "Nº Parcela": 1,
-        "Total Parcelas": 1,
-        "Notas": "Dízimo do mês de janeiro"
-      },
-      {
-        "Descrição": "Aluguel do Salão",
-        "Valor": 2000.00,
-        "Tipo": "Despesa",
-        "Status": "Pendente",
-        "Data de Vencimento": "2026-01-20",
-        "Data de Pagamento": "",
-        "Nº Parcela": 1,
-        "Total Parcelas": 1,
-        "Notas": ""
-      },
-      {
-        "Descrição": "Compra de Equipamentos de Som",
-        "Valor": 500.00,
-        "Tipo": "Despesa",
-        "Status": "Pago",
-        "Data de Vencimento": "2026-01-25",
-        "Data de Pagamento": "2026-01-25",
-        "Nº Parcela": 1,
-        "Total Parcelas": 12,
-        "Notas": "Parcela 1 de 12 - Caixa de som"
-      },
+    // Add main data sheet
+    const dataSheet = workbook.addWorksheet("Modelo de Importação");
+    
+    // Define columns
+    dataSheet.columns = [
+      { header: "Descrição", key: "descricao", width: 35 },
+      { header: "Valor", key: "valor", width: 12 },
+      { header: "Tipo", key: "tipo", width: 10 },
+      { header: "Status", key: "status", width: 12 },
+      { header: "Data de Vencimento", key: "vencimento", width: 18 },
+      { header: "Data de Pagamento", key: "pagamento", width: 18 },
+      { header: "Nº Parcela", key: "parcela", width: 12 },
+      { header: "Total Parcelas", key: "totalParcelas", width: 14 },
+      { header: "Notas", key: "notas", width: 40 },
     ];
-
-    const ws = XLSX.utils.json_to_sheet(templateData);
-
-    // Set column widths for better readability
-    ws['!cols'] = [
-      { wch: 35 }, // Descrição
-      { wch: 12 }, // Valor
-      { wch: 10 }, // Tipo
-      { wch: 12 }, // Status
-      { wch: 18 }, // Data de Vencimento
-      { wch: 18 }, // Data de Pagamento
-      { wch: 12 }, // Nº Parcela
-      { wch: 14 }, // Total Parcelas
-      { wch: 40 }, // Notas
-    ];
-
-    XLSX.utils.book_append_sheet(wb, ws, "Modelo de Importação");
+    
+    // Add sample data rows
+    dataSheet.addRow({
+      descricao: "Dízimo Mensal",
+      valor: 1500.00,
+      tipo: "Receita",
+      status: "Pago",
+      vencimento: "2026-01-15",
+      pagamento: "2026-01-10",
+      parcela: 1,
+      totalParcelas: 1,
+      notas: "Dízimo do mês de janeiro"
+    });
+    
+    dataSheet.addRow({
+      descricao: "Aluguel do Salão",
+      valor: 2000.00,
+      tipo: "Despesa",
+      status: "Pendente",
+      vencimento: "2026-01-20",
+      pagamento: "",
+      parcela: 1,
+      totalParcelas: 1,
+      notas: ""
+    });
+    
+    dataSheet.addRow({
+      descricao: "Compra de Equipamentos de Som",
+      valor: 500.00,
+      tipo: "Despesa",
+      status: "Pago",
+      vencimento: "2026-01-25",
+      pagamento: "2026-01-25",
+      parcela: 1,
+      totalParcelas: 12,
+      notas: "Parcela 1 de 12 - Caixa de som"
+    });
 
     // Add instructions sheet
-    const instructionsData = [
-      { "Instruções para Importação": "" },
-      { "Instruções para Importação": "1. Preencha os dados nas colunas correspondentes" },
-      { "Instruções para Importação": "2. Mantenha os cabeçalhos exatamente como estão" },
-      { "Instruções para Importação": "" },
-      { "Instruções para Importação": "CAMPOS OBRIGATÓRIOS:" },
-      { "Instruções para Importação": "- Descrição: Texto descritivo da transação" },
-      { "Instruções para Importação": "- Valor: Número positivo (ex: 1500.00)" },
-      { "Instruções para Importação": "- Tipo: 'Receita' ou 'Despesa'" },
-      { "Instruções para Importação": "- Status: 'Pendente', 'Pago' ou 'Vencido'" },
-      { "Instruções para Importação": "" },
-      { "Instruções para Importação": "CAMPOS OPCIONAIS:" },
-      { "Instruções para Importação": "- Data de Vencimento: Formato AAAA-MM-DD (ex: 2026-01-15)" },
-      { "Instruções para Importação": "- Data de Pagamento: Formato AAAA-MM-DD (obrigatório se status = 'Pago')" },
-      { "Instruções para Importação": "- Nº Parcela: Número da parcela atual (padrão: 1)" },
-      { "Instruções para Importação": "- Total Parcelas: Total de parcelas (padrão: 1)" },
-      { "Instruções para Importação": "- Notas: Observações adicionais" },
-      { "Instruções para Importação": "" },
-      { "Instruções para Importação": "DICAS:" },
-      { "Instruções para Importação": "- Para compras parceladas, crie uma linha para cada parcela" },
-      { "Instruções para Importação": "- A categoria e ministério são definidos durante a importação" },
+    const instructionsSheet = workbook.addWorksheet("Instruções");
+    instructionsSheet.columns = [{ header: "Instruções para Importação", key: "instrucao", width: 70 }];
+    
+    const instructions = [
+      "",
+      "1. Preencha os dados nas colunas correspondentes",
+      "2. Mantenha os cabeçalhos exatamente como estão",
+      "",
+      "CAMPOS OBRIGATÓRIOS:",
+      "- Descrição: Texto descritivo da transação",
+      "- Valor: Número positivo (ex: 1500.00)",
+      "- Tipo: 'Receita' ou 'Despesa'",
+      "- Status: 'Pendente', 'Pago' ou 'Vencido'",
+      "",
+      "CAMPOS OPCIONAIS:",
+      "- Data de Vencimento: Formato AAAA-MM-DD (ex: 2026-01-15)",
+      "- Data de Pagamento: Formato AAAA-MM-DD (obrigatório se status = 'Pago')",
+      "- Nº Parcela: Número da parcela atual (padrão: 1)",
+      "- Total Parcelas: Total de parcelas (padrão: 1)",
+      "- Notas: Observações adicionais",
+      "",
+      "DICAS:",
+      "- Para compras parceladas, crie uma linha para cada parcela",
+      "- A categoria e ministério são definidos durante a importação"
     ];
+    
+    instructions.forEach(instruction => {
+      instructionsSheet.addRow({ instrucao: instruction });
+    });
 
-    const wsInstructions = XLSX.utils.json_to_sheet(instructionsData);
-    wsInstructions['!cols'] = [{ wch: 70 }];
-    XLSX.utils.book_append_sheet(wb, wsInstructions, "Instruções");
-
-    XLSX.writeFile(wb, "modelo_importacao_igreja360.xlsx");
+    // Generate and download the file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "modelo_importacao_igreja360.xlsx";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (error) {
     console.error("Error generating import template:", error);
     throw new Error("Não foi possível gerar o modelo de importação.");
