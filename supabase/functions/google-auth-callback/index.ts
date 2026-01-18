@@ -114,9 +114,22 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in google-auth-callback:', error);
     
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Map errors to safe error codes instead of exposing raw error messages
+    const errorMessage = error instanceof Error ? error.message : '';
+    let errorCode = 'auth_failed';
+    
+    if (errorMessage.includes('No authorization code')) {
+      errorCode = 'missing_code';
+    } else if (errorMessage.includes('state')) {
+      errorCode = 'invalid_state';
+    } else if (errorMessage.includes('exchange')) {
+      errorCode = 'token_exchange_failed';
+    } else if (errorMessage.includes('environment')) {
+      errorCode = 'config_error';
+    }
+    
     const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://igreja-360-hub.lovable.app';
-    const errorUrl = `${appBaseUrl}/app/integracoes?oauth_error=${encodeURIComponent(errorMessage)}`;
+    const errorUrl = `${appBaseUrl}/app/integracoes?oauth_error_code=${errorCode}`;
 
     return new Response(null, {
       status: 302,

@@ -520,7 +520,7 @@ serve(async (req) => {
 
       if (insertError) {
         console.error('Insert error:', insertError);
-        throw new Error(`Failed to insert transactions: ${insertError.message}`);
+        throw new Error('Falha ao importar transações. Verifique os dados e tente novamente.');
       }
       recordsInserted = insertedData?.length || 0;
     }
@@ -583,9 +583,21 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Error in sync-sheet:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Check for known safe error messages that can be returned to client
+    const safeMessages = [
+      'Falha ao importar transações',
+      'Rate limit exceeded',
+      'Sheet exceeds maximum',
+      'Validation failed'
+    ];
+    const errorMessage = error instanceof Error ? error.message : '';
+    const isSafeMessage = safeMessages.some(msg => errorMessage.includes(msg));
+    
     return new Response(
-      JSON.stringify({ error: 'Sync operation failed', details: errorMessage }),
+      JSON.stringify({ 
+        error: 'Falha na sincronização', 
+        details: isSafeMessage ? errorMessage : 'Erro interno. Tente novamente mais tarde.'
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

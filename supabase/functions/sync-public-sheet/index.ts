@@ -425,7 +425,7 @@ serve(async (req) => {
           .eq('id', integrationId);
           
         return new Response(
-          JSON.stringify({ success: false, error: `Erro ao importar: ${insertError.message}` }),
+          JSON.stringify({ success: false, error: 'Erro ao processar dados da planilha. Verifique os dados e tente novamente.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -496,7 +496,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error instanceof Error ? error.message : 'Erro interno do servidor' 
+        error: 'Erro interno do servidor. Tente novamente mais tarde.' 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
