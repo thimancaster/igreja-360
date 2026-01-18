@@ -90,7 +90,7 @@ export default function Relatorios() {
   };
 
   // Excel exports
-  const handleExportExpenses = () => {
+  const handleExportExpenses = async () => {
     if (!expensesData || expensesData.length === 0) {
       toast({ title: "Nenhum dado para exportar", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
@@ -99,14 +99,14 @@ export default function Relatorios() {
       const dataToExport = expensesData.map(item => ({ 'Categoria': item.name, 'Valor': item.value }));
       const total = expensesData.reduce((sum, item) => sum + item.value, 0);
       dataToExport.push({ 'Categoria': 'TOTAL', 'Valor': total });
-      exportToExcel(dataToExport, `Despesas_por_Categoria_${format(new Date(), "yyyy-MM-dd")}`, 'Despesas');
+      await exportToExcel(dataToExport, `Despesas_por_Categoria_${format(new Date(), "yyyy-MM-dd")}`, 'Despesas');
       toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
     } catch (error: any) {
       toast({ title: "Erro na Exportação", description: error.message, variant: "destructive" });
     }
   };
 
-  const handleExportRevenue = () => {
+  const handleExportRevenue = async () => {
     if (!revenueData || revenueData.length === 0) {
       toast({ title: "Nenhum dado para exportar", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
@@ -115,14 +115,14 @@ export default function Relatorios() {
       const dataToExport = revenueData.map(item => ({ 'Ministério': item.name, 'Valor': item.value }));
       const total = revenueData.reduce((sum, item) => sum + item.value, 0);
       dataToExport.push({ 'Ministério': 'TOTAL', 'Valor': total });
-      exportToExcel(dataToExport, `Receitas_por_Ministerio_${format(new Date(), "yyyy-MM-dd")}`, 'Receitas');
+      await exportToExcel(dataToExport, `Receitas_por_Ministerio_${format(new Date(), "yyyy-MM-dd")}`, 'Receitas');
       toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
     } catch (error: any) {
       toast({ title: "Erro na Exportação", description: error.message, variant: "destructive" });
     }
   };
 
-  const handleExportCashFlow = () => {
+  const handleExportCashFlow = async () => {
     if (!cashFlowData || cashFlowData.length === 0) {
       toast({ title: "Nenhum dado para exportar", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
@@ -135,7 +135,7 @@ export default function Relatorios() {
         'Valor': item.value,
         'Saldo': item.balance,
       }));
-      exportToExcel(dataToExport, `Fluxo_de_Caixa_${format(new Date(), "yyyy-MM-dd")}`, 'Fluxo de Caixa');
+      await exportToExcel(dataToExport, `Fluxo_de_Caixa_${format(new Date(), "yyyy-MM-dd")}`, 'Fluxo de Caixa');
       toast({ title: "Exportação Concluída", description: "O arquivo Excel foi baixado." });
     } catch (error: any) {
       toast({ title: "Erro na Exportação", description: error.message, variant: "destructive" });

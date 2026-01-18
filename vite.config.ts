@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => ({
           // Charts - large library
           'vendor-recharts': ['recharts'],
           // Excel processing - large library
-          'vendor-xlsx': ['xlsx'],
+          'vendor-exceljs': ['exceljs'],
           // Animation
           'vendor-framer': ['framer-motion'],
           // Query client

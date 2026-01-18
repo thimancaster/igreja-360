@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { z } from 'zod';
 import { transactionImportSchema, ProcessedTransaction } from '@/types/import';
 
@@ -10,27 +10,38 @@ import { transactionImportSchema, ProcessedTransaction } from '@/types/import';
 export const readSpreadsheet = (file: File): Promise<{ headers: string[]; rows: any[][] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = event.target?.result;
-        if (!data) {
+        if (!data || !(data instanceof ArrayBuffer)) {
           throw new Error('Could not read file data.');
         }
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
-        const headers = json[0] || [];
-        const rows = json.slice(1);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data);
+        
+        const worksheet = workbook.worksheets[0];
+        if (!worksheet) {
+          throw new Error('No worksheet found in the file.');
+        }
+        
+        const rows: any[][] = [];
+        worksheet.eachRow((row, rowNumber) => {
+          const rowValues = row.values as any[];
+          // ExcelJS row.values starts at index 1, so we slice from index 1
+          rows.push(rowValues.slice(1));
+        });
+        
+        const headers = rows[0]?.map(h => String(h ?? '')) || [];
+        const dataRows = rows.slice(1);
 
-        resolve({ headers, rows });
+        resolve({ headers, rows: dataRows });
       } catch (error) {
         reject(new Error('Failed to parse the spreadsheet file.'));
       }
     };
     reader.onerror = () => reject(new Error('Failed to read the file.'));
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   });
 };
 
@@ -59,6 +70,13 @@ export const parseAmount = (value: any): number | null => {
  */
 export const parseDate = (value: any): string | null => {
   if (!value) return null;
+
+  // Handle ExcelJS Date objects
+  if (value instanceof Date) {
+    if (!isNaN(value.getTime())) {
+      return value.toISOString().split('T')[0];
+    }
+  }
 
   if (typeof value === 'number') {
     // Handle Excel serial date
