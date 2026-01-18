@@ -77,7 +77,30 @@ export default function Integracoes() {
     const handleOAuthCallback = async () => {
       const sessionId = searchParams.get('oauth_session');
       const oauthError = searchParams.get('oauth_error');
+      const oauthErrorCode = searchParams.get('oauth_error_code');
 
+      // Handle new error code format (more secure - no internal details exposed)
+      if (oauthErrorCode) {
+        const errorMessages: Record<string, string> = {
+          'missing_code': 'Código de autorização não recebido. Tente novamente.',
+          'invalid_state': 'Parâmetro de estado inválido. Tente novamente.',
+          'token_exchange_failed': 'Falha ao trocar tokens com o Google. Tente novamente.',
+          'config_error': 'Erro de configuração do servidor. Contate o suporte.',
+          'auth_failed': 'Falha na autenticação com o Google. Tente novamente.',
+        };
+        
+        const message = errorMessages[oauthErrorCode] || 'Erro desconhecido na autenticação.';
+        
+        toast({
+          title: "Erro na autenticação",
+          description: message,
+          variant: "destructive",
+        });
+        setSearchParams({});
+        return;
+      }
+
+      // Handle legacy error format (for backwards compatibility)
       if (oauthError) {
         const decodedError = decodeURIComponent(oauthError);
         
@@ -101,7 +124,7 @@ export default function Integracoes() {
         } else {
           toast({
             title: "Erro na autenticação",
-            description: decodedError,
+            description: "Falha na autenticação. Tente novamente.",
             variant: "destructive",
           });
         }
