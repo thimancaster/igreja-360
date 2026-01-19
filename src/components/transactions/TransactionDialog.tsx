@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { sanitizeText } from "@/lib/sanitize";
 import { addMonths, format } from "date-fns";
+import { invalidateAllTransactionQueries } from "@/lib/queryKeys";
 import {
   Dialog,
   DialogContent,
@@ -382,8 +383,7 @@ export function TransactionDialog({
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
+      invalidateAllTransactionQueries(queryClient);
       onOpenChange(false);
     } catch (error: any) {
       if (error instanceof z.ZodError) {

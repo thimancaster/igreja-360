@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { DueTransaction } from "@/hooks/useDueTransactionAlerts";
+import { invalidateAllTransactionQueries } from "@/lib/queryKeys";
 
 interface DayTransactionsDialogProps {
   open: boolean;
@@ -53,10 +54,7 @@ export const DayTransactionsDialog: React.FC<DayTransactionsDialogProps> = ({
       if (error) throw error;
 
       toast.success("Transação marcada como paga!");
-      queryClient.invalidateQueries({ queryKey: ["due-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["overdue-transactions"] });
+      invalidateAllTransactionQueries(queryClient);
     } catch (error: any) {
       toast.error("Erro ao atualizar transação: " + error.message);
     } finally {

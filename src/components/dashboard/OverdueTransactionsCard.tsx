@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { invalidateAllTransactionQueries } from "@/lib/queryKeys";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("pt-BR", {
@@ -38,10 +39,7 @@ export const OverdueTransactionsCard: React.FC = () => {
       if (error) throw error;
 
       toast.success("Transação marcada como paga!");
-      queryClient.invalidateQueries({ queryKey: ["overdue-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["due-transactions"] });
+      invalidateAllTransactionQueries(queryClient);
     } catch (error: any) {
       toast.error("Erro ao atualizar transação: " + error.message);
     } finally {

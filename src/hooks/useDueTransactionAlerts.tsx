@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { differenceInDays, parseISO } from "date-fns";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 
 export interface DueTransaction {
   id: string;
@@ -19,7 +20,7 @@ export function useDueTransactionAlerts(daysAhead: number = 7) {
   const { user, profile } = useAuth();
 
   return useQuery({
-    queryKey: ["due-transaction-alerts", user?.id, daysAhead],
+    queryKey: [QUERY_KEYS.dueTransactionAlerts, profile?.church_id, daysAhead],
     queryFn: async () => {
       if (!user?.id || !profile?.church_id) {
         return [];
@@ -56,5 +57,6 @@ export function useDueTransactionAlerts(daysAhead: number = 7) {
       return transactionsWithDays;
     },
     enabled: !!user?.id && !!profile?.church_id,
+    staleTime: 1000 * 60 * 2, // 2 minutos
   });
 }

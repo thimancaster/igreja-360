@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 
 export interface Transaction {
   id: string;
@@ -31,10 +32,10 @@ export interface Transaction {
 }
 
 export function useTransactions() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   return useQuery({
-    queryKey: ["transactions", user?.id],
+    queryKey: [QUERY_KEYS.transactions, profile?.church_id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("transactions")
@@ -48,15 +49,16 @@ export function useTransactions() {
       if (error) throw error;
       return data as Transaction[];
     },
-    enabled: !!user,
+    enabled: !!user && !!profile?.church_id,
+    staleTime: 1000 * 60 * 2, // 2 minutos
   });
 }
 
 export function useTransactionStats() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   return useQuery({
-    queryKey: ["transaction-stats", user?.id],
+    queryKey: [QUERY_KEYS.transactionStats, profile?.church_id],
     queryFn: async () => {
       // First, update overdue transactions
       await supabase.rpc('update_overdue_transactions');
@@ -66,10 +68,6 @@ export function useTransactionStats() {
         .select("amount, type, status, due_date, payment_date");
 
       if (error) throw error;
-
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
 
       const stats = {
         totalPayable: 0,
@@ -83,8 +81,6 @@ export function useTransactionStats() {
 
       transactions?.forEach((t) => {
         const amount = Number(t.amount);
-        const dueDate = t.due_date ? new Date(t.due_date) : null;
-        const paymentDate = t.payment_date ? new Date(t.payment_date) : null;
 
         if (t.type === "Receita") {
           stats.balance += amount;
@@ -92,18 +88,18 @@ export function useTransactionStats() {
           stats.balance -= amount;
         }
 
-        if (t.status === "Pendente" && t.type === "Despesa") {
-          stats.totalPayable += amount;
-          
-          if (dueDate && dueDate < now) {
-            stats.totalOverdue += amount;
-          }
-        }
-
+        // CORREÇÃO: Lógica unificada sem duplicação
+        // Vencido = apenas transações com status "Vencido"
         if (t.status === "Vencido") {
           stats.totalOverdue += amount;
         }
+        
+        // Pendente = transações pendentes (despesas a pagar)
+        if (t.status === "Pendente" && t.type === "Despesa") {
+          stats.totalPayable += amount;
+        }
 
+        // Pago = todas as transações pagas
         if (t.status === "Pago") {
           stats.totalPaid += amount;
         }
@@ -111,7 +107,8 @@ export function useTransactionStats() {
 
       return stats;
     },
-    enabled: !!user,
+    enabled: !!user && !!profile?.church_id,
+    staleTime: 1000 * 60 * 2, // 2 minutos
   });
 }
 
@@ -120,7 +117,7 @@ export function useInstallmentGroup(groupId: string | null) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ["installment-group", groupId],
+    queryKey: [QUERY_KEYS.installmentGroup, groupId],
     queryFn: async () => {
       if (!groupId) return null;
 
