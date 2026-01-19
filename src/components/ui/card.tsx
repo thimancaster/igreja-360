@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+import { motion, HTMLMotionProps } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const cardVariants = cva(
@@ -22,16 +23,41 @@ const cardVariants = cva(
 
 export interface CardProps
   extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof cardVariants> {}
+    VariantProps<typeof cardVariants> {
+  interactive?: boolean;
+  hoverLift?: boolean;
+  tapScale?: boolean;
+}
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(cardVariants({ variant, className }))}
-      {...props}
-    />
-  )
+  ({ className, variant, interactive = false, hoverLift = false, tapScale = false, ...props }, ref) => {
+    // If interactive features are enabled, use motion.div
+    if (interactive || hoverLift || tapScale) {
+      return (
+        <motion.div
+          ref={ref}
+          className={cn(cardVariants({ variant, className }))}
+          whileHover={hoverLift ? { 
+            y: -4,
+            transition: { type: "spring", stiffness: 300, damping: 20 }
+          } : undefined}
+          whileTap={tapScale ? { 
+            scale: 0.98,
+            transition: { type: "spring", stiffness: 400, damping: 17 }
+          } : undefined}
+          {...(props as any)}
+        />
+      );
+    }
+
+    return (
+      <div
+        ref={ref}
+        className={cn(cardVariants({ variant, className }))}
+        {...props}
+      />
+    );
+  }
 );
 Card.displayName = "Card";
 
