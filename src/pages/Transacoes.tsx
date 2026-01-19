@@ -35,9 +35,11 @@ import { TablePagination } from "@/components/TablePagination";
 import { useTableFilters } from "@/hooks/useTableFilters";
 import { SearchInput } from "@/components/ui/search-input";
 import { SortableTableHeader } from "@/components/ui/sortable-table-header";
+import { useTransactionsRealtime } from "@/hooks/useTransactionsRealtime";
 
 export default function Transacoes() {
   const { user } = useAuth();
+  useTransactionsRealtime(); // Realtime updates
   const { data: transactions, isLoading } = useTransactions();
   const { data: categoriesAndMinistries, isLoading: filtersLoading } = useCategoriesAndMinistries();
   const { 
