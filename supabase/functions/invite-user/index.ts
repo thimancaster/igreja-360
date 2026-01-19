@@ -6,6 +6,8 @@ interface InviteRequest {
   fullName: string;
   role: string;
   churchId: string;
+  directRegistration?: boolean;
+  temporaryPassword?: string;
 }
 
 Deno.serve(async (req) => {
@@ -61,11 +63,19 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const { email, fullName, role, churchId }: InviteRequest = await req.json();
+    const { email, fullName, role, churchId, directRegistration, temporaryPassword }: InviteRequest = await req.json();
 
     if (!email || !fullName || !role || !churchId) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate password for direct registration
+    if (directRegistration && (!temporaryPassword || temporaryPassword.length < 8)) {
+      return new Response(
+        JSON.stringify({ error: "Senha temporária deve ter no mínimo 8 caracteres" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -118,7 +128,68 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Create new user with invite
+    // Handle direct registration (create user without email confirmation)
+    if (directRegistration && temporaryPassword) {
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password: temporaryPassword,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          full_name: fullName,
+        },
+      });
+
+      if (createError) {
+        console.error("Error creating user directly:", createError);
+        return new Response(
+          JSON.stringify({ error: `Erro ao criar usuário: ${createError.message}` }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (!newUser?.user) {
+        return new Response(
+          JSON.stringify({ error: "Falha ao criar usuário" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Wait for trigger to create profile
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Update profile with church_id
+      await supabaseAdmin
+        .from("profiles")
+        .update({ 
+          church_id: churchId,
+          full_name: fullName 
+        })
+        .eq("id", newUser.user.id);
+
+      // Update role if not default
+      if (role !== "user") {
+        await supabaseAdmin
+          .from("user_roles")
+          .delete()
+          .eq("user_id", newUser.user.id);
+
+        await supabaseAdmin
+          .from("user_roles")
+          .insert({ user_id: newUser.user.id, role });
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Usuário cadastrado com sucesso!",
+          userId: newUser.user.id,
+          directRegistration: true
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create new user with invite (email confirmation required)
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
@@ -144,10 +215,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // The handle_new_user trigger creates profile with default role
-    // We need to update it with church_id and correct role
-    
-    // Wait a moment for the trigger to execute
+    // Wait for trigger to create profile
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // Update profile with church_id
@@ -159,7 +227,7 @@ Deno.serve(async (req) => {
       })
       .eq("id", newUser.user.id);
 
-    // Update role (replace default 'user' role with specified role)
+    // Update role if not default
     if (role !== "user") {
       await supabaseAdmin
         .from("user_roles")

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Settings, History, RefreshCw, Clock, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,6 +13,7 @@ import { useAppSettings } from '@/hooks/useAppSettings';
 import { useSyncHistory, SyncHistoryEntry } from '@/hooks/useSyncHistory';
 import { format, formatDistanceToNow, addHours } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { pageVariants, pageTransition } from '@/lib/pageAnimations';
 
 const INTERVAL_OPTIONS = [
   { value: 1, label: '1 hora' },
@@ -75,9 +77,16 @@ export default function ConfiguracoesSistema() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex-1 space-y-6 p-6"
+    >
       <div>
-        <h1 className="text-3xl font-bold flex items-center gap-3">
+        <h1 className="text-3xl font-bold flex items-center gap-3 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
           <Settings className="h-8 w-8" />
           Configurações do Sistema
         </h1>
@@ -301,6 +310,6 @@ export default function ConfiguracoesSistema() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }

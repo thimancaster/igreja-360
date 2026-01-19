@@ -109,7 +109,7 @@ export const FinancialHealthGauge: React.FC = () => {
   const strokeDashoffset = circumference - (health.score / 100) * circumference;
 
   return (
-    <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-card via-card to-muted/30">
+    <Card variant="glass" className="relative overflow-hidden border-0 bg-gradient-to-br from-card via-card to-muted/30 hover-lift">
       {/* Animated background glow */}
       <motion.div
         className={`absolute inset-0 bg-gradient-to-br ${health.bgGradient} opacity-60`}

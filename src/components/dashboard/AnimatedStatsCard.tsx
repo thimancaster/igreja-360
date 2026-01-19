@@ -95,10 +95,13 @@ export const AnimatedStatsCard = ({
         transition: { duration: 0.2 }
       }}
     >
-      <Card className={cn(
-        'overflow-hidden border transition-all duration-300 hover:shadow-lg',
-        variantStyles[variant]
-      )}>
+      <Card 
+        variant="glass"
+        className={cn(
+          'overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1',
+          variantStyles[variant]
+        )}
+      >
         <CardContent className="p-6">
           <div className="flex items-start justify-between">
             <div className="space-y-2 flex-1">

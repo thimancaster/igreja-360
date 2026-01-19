@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -46,7 +47,8 @@ import { Building2, Plus, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Tables } from "@/integrations/supabase/types";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
-import { useRole } from "@/hooks/useRole"; // Importar useRole
+import { useRole } from "@/hooks/useRole";
+import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 
 type Ministry = Tables<'ministries'>;
 
@@ -203,10 +205,17 @@ export default function GerenciarMinisterios() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex-1 space-y-6 p-6"
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gerenciar Ministérios</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Gerenciar Ministérios</h1>
           <p className="text-muted-foreground mt-1">Adicione, edite e remova os ministérios da sua igreja.</p>
         </div>
         <Button onClick={handleAddMinistry} className="gap-2" disabled={!canManageMinistries}>
@@ -340,6 +349,6 @@ export default function GerenciarMinisterios() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </motion.div>
   );
 }

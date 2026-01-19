@@ -97,11 +97,12 @@ export const TodaysDueCard: React.FC = () => {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, scale: 0.95, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      whileHover={{ y: -4 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className="border-destructive/30 bg-gradient-to-br from-destructive/5 to-destructive/10 overflow-hidden">
+      <Card variant="glass" className="border-destructive/30 bg-gradient-to-br from-destructive/5 to-destructive/10 overflow-hidden">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center justify-between text-lg">
             <div className="flex items-center gap-2">

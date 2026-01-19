@@ -45,7 +45,7 @@ export function AppSidebar() {
   // Mostrar menu admin apenas para admin
   const canAccessAdmin = isAdmin;
   const menuItems = canAccessAdmin ? [...baseMenuItems.slice(0, 5), adminMenuItem, baseMenuItems[5]] : baseMenuItems;
-  return <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+  return <Sidebar collapsible="icon" className="border-r border-sidebar-border glass-sidebar">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shadow-glow px-[10px] py-[10px] mx-[10px] my-0 pr-[10px] pb-[10px] pt-[10px] pl-[10px] gap-[10px]">
