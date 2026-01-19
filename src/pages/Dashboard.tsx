@@ -26,10 +26,14 @@ import { useSparklineData } from "@/hooks/useSparklineData";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
 import { useAutoUpdateOverdue } from "@/hooks/useAutoUpdateOverdue";
+import { useTransactionsRealtime } from "@/hooks/useTransactionsRealtime";
 
 export default function Dashboard() {
   // Hook para atualização automática de status vencidos
   useAutoUpdateOverdue();
+  
+  // Hook para atualizações em tempo real via Supabase Realtime
+  useTransactionsRealtime();
 
   const [filters, setFilters] = useState({
     period: "mes-atual",
