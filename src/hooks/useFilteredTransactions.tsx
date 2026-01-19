@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 
 export interface TransactionFilters {
   period: string;
@@ -25,7 +26,7 @@ export function useFilteredTransactions(filters: TransactionFilters) {
   const { user, profile } = useAuth();
 
   return useQuery({
-    queryKey: ["filtered-transactions", user?.id, filters],
+    queryKey: [QUERY_KEYS.filteredTransactions, profile?.church_id, filters],
     queryFn: async () => {
       if (!user?.id || !profile?.church_id) {
         throw new Error("User not authenticated");

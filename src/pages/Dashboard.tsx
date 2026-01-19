@@ -25,8 +25,12 @@ import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
 import { useSparklineData } from "@/hooks/useSparklineData";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
+import { useAutoUpdateOverdue } from "@/hooks/useAutoUpdateOverdue";
 
 export default function Dashboard() {
+  // Hook para atualização automática de status vencidos
+  useAutoUpdateOverdue();
+
   const [filters, setFilters] = useState({
     period: "mes-atual",
     ministryId: "todos",

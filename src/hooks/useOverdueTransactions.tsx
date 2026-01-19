@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { format, differenceInDays } from "date-fns";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 
 export interface OverdueTransaction {
   id: string;
@@ -18,12 +19,14 @@ export function useOverdueTransactions() {
   const { profile } = useAuth();
 
   return useQuery({
-    queryKey: ["overdue-transactions", profile?.church_id],
+    queryKey: [QUERY_KEYS.overdueTransactions, profile?.church_id],
     queryFn: async (): Promise<OverdueTransaction[]> => {
       if (!profile?.church_id) return [];
 
       const today = format(new Date(), "yyyy-MM-dd");
       
+      // CORREÇÃO: Buscar transações com status "Vencido" OU 
+      // status "Pendente" com due_date no passado (ainda não atualizadas pelo RPC)
       const { data, error } = await supabase
         .from("transactions")
         .select(`
@@ -32,12 +35,12 @@ export function useOverdueTransactions() {
           amount,
           due_date,
           type,
+          status,
           categories(name),
           ministries(name)
         `)
         .eq("church_id", profile.church_id)
-        .eq("status", "Pendente")
-        .lt("due_date", today)
+        .or(`status.eq.Vencido,and(status.eq.Pendente,due_date.lt.${today})`)
         .order("due_date", { ascending: true });
 
       if (error) {
@@ -57,5 +60,6 @@ export function useOverdueTransactions() {
       }));
     },
     enabled: !!profile?.church_id,
+    staleTime: 1000 * 60 * 2, // 2 minutos
   });
 }

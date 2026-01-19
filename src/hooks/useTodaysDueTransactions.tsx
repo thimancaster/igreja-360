@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 
 interface TodaysDueTransaction {
   id: string;
@@ -16,7 +17,7 @@ export function useTodaysDueTransactions() {
   const { user, profile } = useAuth();
 
   return useQuery({
-    queryKey: ["todays-due-transactions", user?.id],
+    queryKey: [QUERY_KEYS.todaysDueTransactions, profile?.church_id],
     queryFn: async () => {
       if (!user?.id || !profile?.church_id) {
         return [];
@@ -55,5 +56,6 @@ export function useTodaysDueTransactions() {
       return transactions;
     },
     enabled: !!user?.id && !!profile?.church_id,
+    staleTime: 1000 * 60 * 2, // 2 minutos
   });
 }

@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
+import { invalidateAllTransactionQueries } from "@/lib/queryKeys";
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("pt-BR", {
@@ -40,10 +41,7 @@ export const TodaysDueCard: React.FC = () => {
         description: "A transação foi marcada como paga.",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["todays-due-transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["due-transaction-alerts"] });
-      queryClient.invalidateQueries({ queryKey: ["transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
+      invalidateAllTransactionQueries(queryClient);
     } catch (error) {
       toast({
         title: "Erro",
