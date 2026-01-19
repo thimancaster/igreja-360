@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,7 @@ import { User, Building2 } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatCNPJ, validateCNPJ } from "@/lib/cnpjUtils";
+import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 
 type ProfileRow = Tables<'profiles'>;
 type ChurchRow = Tables<'churches'>;
@@ -184,9 +186,16 @@ export default function Configuracoes() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex-1 space-y-6 p-6"
+    >
       <div>
-        <h1 className="text-3xl font-bold">Configurações</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Configurações</h1>
         <p className="text-muted-foreground mt-1">Configure suas preferências e dados do sistema</p>
       </div>
 
@@ -376,6 +385,6 @@ export default function Configuracoes() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </motion.div>
   );
 }

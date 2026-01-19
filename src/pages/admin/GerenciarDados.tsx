@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,6 +14,7 @@ import { ConfirmDeleteDialog } from "@/components/admin/ConfirmDeleteDialog";
 import { AuditLogViewer } from "@/components/admin/AuditLogViewer";
 import { SelectiveDeleteSection } from "@/components/admin/SelectiveDeleteSection";
 import { exportToExcel } from "@/utils/exportHelpers";
+import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 
 type DataType = 'transactions' | 'categories' | 'ministries' | 'all';
 
@@ -370,9 +372,16 @@ export default function GerenciarDados() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex-1 space-y-6 p-6"
+    >
       <div>
-        <h1 className="text-3xl font-bold">Gerenciar Dados</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Gerenciar Dados</h1>
         <p className="text-muted-foreground mt-1">
           Exclua ou limpe dados do banco de dados da sua igreja
         </p>
@@ -508,6 +517,6 @@ export default function GerenciarDados() {
         onConfirm={handleConfirmDelete}
         isLoading={isPending}
       />
-    </div>
+    </motion.div>
   );
 }

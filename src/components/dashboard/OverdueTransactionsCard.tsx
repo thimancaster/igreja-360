@@ -80,7 +80,7 @@ export const OverdueTransactionsCard: React.FC = () => {
   }
 
   return (
-    <Card className="border-destructive/30 bg-destructive/5">
+    <Card variant="glass" className="border-destructive/30 bg-destructive/5 hover-lift">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between text-lg">
           <span className="flex items-center gap-2 text-destructive">

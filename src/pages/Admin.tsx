@@ -1,12 +1,21 @@
+import { motion } from "framer-motion";
 import { Users, Building2, ChevronRight, Home, Tag, Database, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 
 export default function Admin() {
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex-1 space-y-6 p-6"
+    >
       <div>
-        <h1 className="text-3xl font-bold">Administração</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Administração</h1>
         <p className="text-muted-foreground mt-1">Gerencie usuários, igrejas, ministérios e categorias</p>
       </div>
 
@@ -101,6 +110,6 @@ export default function Admin() {
           </Card>
         </Link>
       </div>
-    </div>
+    </motion.div>
   );
 }

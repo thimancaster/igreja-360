@@ -1,5 +1,6 @@
 // src/pages/admin/GerenciarIgreja.tsx
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRole } from '@/hooks/useRole';
@@ -14,6 +15,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
 import { Tables, TablesUpdate } from '@/integrations/supabase/types';
 import { formatCNPJ, validateCNPJ } from '@/lib/cnpjUtils';
+import { pageVariants, pageTransition } from '@/lib/pageAnimations';
 
 type Church = Tables<'churches'>;
 type ChurchUpdateData = TablesUpdate<'churches'>;
@@ -122,8 +124,15 @@ const GerenciarIgreja = () => {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Gerenciar Igreja</h1>
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="container mx-auto p-6"
+    >
+      <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Gerenciar Igreja</h1>
 
       {isAdmin && !churchData && (
          <Alert variant="default" className="mb-6">
@@ -176,7 +185,7 @@ const GerenciarIgreja = () => {
           </CardContent>
         </Card>
       )}
-    </div>
+    </motion.div>
   );
 };
 

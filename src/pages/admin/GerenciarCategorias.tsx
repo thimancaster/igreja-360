@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRole } from "@/hooks/useRole";
 import { useCategoriesAndMinistries } from "@/hooks/useCategoriesAndMinistries";
@@ -46,6 +47,7 @@ import {
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 
 interface CategoryFormData {
   name: string;
@@ -208,10 +210,17 @@ export default function GerenciarCategorias() {
   }
 
   return (
-    <div className="flex-1 space-y-6 p-6">
+    <motion.div
+      variants={pageVariants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={pageTransition}
+      className="flex-1 space-y-6 p-6"
+    >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Gerenciar Categorias</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">Gerenciar Categorias</h1>
           <p className="text-muted-foreground mt-1">
             Crie e gerencie categorias para organizar transações
           </p>
@@ -411,6 +420,6 @@ export default function GerenciarCategorias() {
           </Table>
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   );
 }
