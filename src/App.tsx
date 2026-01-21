@@ -39,6 +39,7 @@ const CreateChurchPage = lazy(() => import('@/pages/CreateChurch'));
 const ChurchConfirmation = lazy(() => import('@/pages/ChurchConfirmation'));
 const SelectChurch = lazy(() => import('@/pages/SelectChurch'));
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
+const FAQPage = lazy(() => import('@/pages/FAQPage'));
 
 const App: React.FC = () => {
   return (
@@ -53,6 +54,7 @@ const App: React.FC = () => {
                 {/* Rotas Públicas */}
                 <Route path="/auth" element={<AuthPage />} />
                 <Route path="/landing" element={<LandingPage />} />
+                <Route path="/faq" element={<FAQPage />} />
 
                 {/* Rota raiz: redireciona dependendo do auth */}
                 <Route path="/" element={<AuthRedirect />} /> 
