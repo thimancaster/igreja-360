@@ -100,7 +100,7 @@ serve(async (req) => {
     console.log('Created encrypted OAuth session:', sessionId);
 
     // Redirect back to app with session ID
-    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://igreja-360-hub.lovable.app';
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://igreja-360.lovable.app';
     const redirectUrl = `${appBaseUrl}/app/integracoes?oauth_session=${sessionId}`;
 
     return new Response(null, {
@@ -128,7 +128,7 @@ serve(async (req) => {
       errorCode = 'config_error';
     }
     
-    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://igreja-360-hub.lovable.app';
+    const appBaseUrl = Deno.env.get('APP_BASE_URL') || 'https://igreja-360.lovable.app';
     const errorUrl = `${appBaseUrl}/app/integracoes?oauth_error_code=${errorCode}`;
 
     return new Response(null, {
