@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { startOfMonth, subMonths, format, parseISO } from 'date-fns';
+import { startOfMonth, startOfQuarter, startOfYear, subMonths, subQuarters, subYears, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+export type PeriodFilter = '3m' | '6m' | '12m' | 'quarter' | 'year';
 
 interface MonthlyData {
   month: string;
@@ -12,15 +14,52 @@ interface MonthlyData {
   balance: number;
 }
 
-export const useEvolutionData = (months: number = 6) => {
+const getDateRangeForPeriod = (period: PeriodFilter): { startDate: string; months: number } => {
+  const now = new Date();
+  
+  switch (period) {
+    case '3m':
+      return {
+        startDate: format(subMonths(startOfMonth(now), 2), 'yyyy-MM-dd'),
+        months: 3,
+      };
+    case '6m':
+      return {
+        startDate: format(subMonths(startOfMonth(now), 5), 'yyyy-MM-dd'),
+        months: 6,
+      };
+    case '12m':
+      return {
+        startDate: format(subMonths(startOfMonth(now), 11), 'yyyy-MM-dd'),
+        months: 12,
+      };
+    case 'quarter':
+      return {
+        startDate: format(startOfQuarter(subQuarters(now, 1)), 'yyyy-MM-dd'),
+        months: 6,
+      };
+    case 'year':
+      return {
+        startDate: format(startOfYear(now), 'yyyy-MM-dd'),
+        months: 12,
+      };
+    default:
+      return {
+        startDate: format(subMonths(startOfMonth(now), 5), 'yyyy-MM-dd'),
+        months: 6,
+      };
+  }
+};
+
+export const useEvolutionData = (period: PeriodFilter = '6m') => {
   const { profile } = useAuth();
 
   return useQuery({
-    queryKey: ['evolution-data', profile?.church_id, months],
+    queryKey: ['evolution-data', profile?.church_id, period],
     queryFn: async (): Promise<MonthlyData[]> => {
       if (!profile?.church_id) return [];
 
-      const startDate = format(subMonths(startOfMonth(new Date()), months - 1), 'yyyy-MM-dd');
+      const { startDate, months } = getDateRangeForPeriod(period);
       
       const { data: transactions, error } = await supabase
         .from('transactions')
