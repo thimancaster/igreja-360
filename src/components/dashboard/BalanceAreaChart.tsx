@@ -2,7 +2,9 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Wallet } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Wallet, Calendar } from 'lucide-react';
+import { type PeriodFilter } from '@/hooks/useEvolutionData';
 
 interface DataPoint {
   month: string;
@@ -13,6 +15,8 @@ interface DataPoint {
 interface BalanceAreaChartProps {
   data: DataPoint[];
   isLoading?: boolean;
+  period: PeriodFilter;
+  onPeriodChange: (period: PeriodFilter) => void;
 }
 
 const chartConfig = {
@@ -22,7 +26,15 @@ const chartConfig = {
   },
 };
 
-export const BalanceAreaChart = ({ data, isLoading }: BalanceAreaChartProps) => {
+const PERIOD_LABELS: Record<PeriodFilter, string> = {
+  '3m': 'Últimos 3 meses',
+  '6m': 'Últimos 6 meses',
+  '12m': 'Últimos 12 meses',
+  'quarter': 'Este trimestre',
+  'year': 'Este ano',
+};
+
+export const BalanceAreaChart = ({ data, isLoading, period, onPeriodChange }: BalanceAreaChartProps) => {
   if (isLoading) {
     return (
       <Card>
@@ -52,16 +64,31 @@ export const BalanceAreaChart = ({ data, isLoading }: BalanceAreaChartProps) => 
     >
       <Card className="h-full overflow-hidden border-border/50 bg-gradient-to-br from-card to-card/80">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <motion.div
-              initial={{ scale: 0, rotate: -90 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.7, type: 'spring' }}
-            >
-              <Wallet className="h-5 w-5 text-primary" />
-            </motion.div>
-            Evolução do Saldo
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <motion.div
+                initial={{ scale: 0, rotate: -90 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.7, type: 'spring' }}
+              >
+                <Wallet className="h-5 w-5 text-primary" />
+              </motion.div>
+              Evolução do Saldo
+            </CardTitle>
+            <Select value={period} onValueChange={(value) => onPeriodChange(value as PeriodFilter)}>
+              <SelectTrigger className="w-[160px] h-8 text-xs">
+                <Calendar className="h-3 w-3 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(PERIOD_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="h-[250px] w-full">

@@ -1,10 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 import { corsHeaders } from "../_shared/cors.ts";
 
 interface ResetPasswordRequest {
   userId: string;
   newPassword: string;
 }
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 Deno.serve(async (req) => {
   // Handle CORS preflight
@@ -97,7 +100,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Get target user email for audit log
+    // Get target user email for audit log and notification
     const { data: targetUserData } = await supabaseAdmin.auth.admin.getUserById(userId);
     const targetEmail = targetUserData?.user?.email || 'Unknown';
 
@@ -107,6 +110,62 @@ Deno.serve(async (req) => {
       .select("full_name, church_id")
       .eq("id", caller.id)
       .single();
+
+    // Get church name for email
+    let churchName = "sua organização";
+    if (callerProfile?.church_id) {
+      const { data: church } = await supabaseAdmin
+        .from("churches")
+        .select("name")
+        .eq("id", callerProfile.church_id)
+        .single();
+      if (church?.name) {
+        churchName = church.name;
+      }
+    }
+
+    // Send email notification to user
+    if (targetEmail && targetEmail !== 'Unknown') {
+      try {
+        await resend.emails.send({
+          from: "Igreja 360 <noreply@resend.dev>",
+          to: [targetEmail],
+          subject: "Sua senha foi alterada",
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h1 style="color: #333; border-bottom: 2px solid #4f46e5; padding-bottom: 10px;">
+                Alerta de Segurança
+              </h1>
+              <p style="font-size: 16px; color: #555;">
+                Olá,
+              </p>
+              <p style="font-size: 16px; color: #555;">
+                Sua senha foi redefinida por um administrador de <strong>${churchName}</strong>.
+              </p>
+              <div style="background-color: #f8f9fa; border-left: 4px solid #4f46e5; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; color: #333;">
+                  <strong>Data:</strong> ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+                </p>
+                <p style="margin: 10px 0 0 0; color: #333;">
+                  <strong>Alterado por:</strong> ${callerProfile?.full_name || caller.email}
+                </p>
+              </div>
+              <p style="font-size: 16px; color: #555;">
+                Se você não solicitou esta alteração ou não reconhece esta atividade, entre em contato 
+                imediatamente com o administrador da sua organização.
+              </p>
+              <p style="font-size: 14px; color: #888; margin-top: 30px;">
+                Este é um email automático. Por favor, não responda.
+              </p>
+            </div>
+          `,
+        });
+        console.log("Email notification sent to:", targetEmail);
+      } catch (emailError) {
+        console.error("Error sending email notification:", emailError);
+        // Don't fail the request if email fails
+      }
+    }
 
     // Log the password reset action to audit_logs
     if (callerProfile?.church_id) {
@@ -120,6 +179,7 @@ Deno.serve(async (req) => {
           target_user_id: userId,
           target_user_email: targetEmail,
           reset_by: caller.email,
+          notification_sent: targetEmail !== 'Unknown',
         },
       });
     }
@@ -128,6 +188,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: "Senha atualizada com sucesso!",
+        emailSent: targetEmail !== 'Unknown',
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

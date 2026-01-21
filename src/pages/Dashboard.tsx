@@ -21,7 +21,7 @@ import { UpcomingPaymentsCalendar } from "@/components/dashboard/UpcomingPayment
 import { QuickActionsBar } from "@/components/dashboard/QuickActionsBar";
 import { OverdueTransactionsCard } from "@/components/dashboard/OverdueTransactionsCard";
 import { InstallmentsDashboard } from "@/components/dashboard/InstallmentsDashboard";
-import { useEvolutionData, useTrendData } from "@/hooks/useEvolutionData";
+import { useEvolutionData, useTrendData, type PeriodFilter } from "@/hooks/useEvolutionData";
 import { useSparklineData } from "@/hooks/useSparklineData";
 import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
@@ -42,6 +42,8 @@ export default function Dashboard() {
     status: "todos-status"
   });
   const [searchTerm, setSearchTerm] = useState("");
+  const [evolutionPeriod, setEvolutionPeriod] = useState<PeriodFilter>("6m");
+  
   const {
     data: transactions,
     isLoading: transactionsLoading
@@ -56,7 +58,7 @@ export default function Dashboard() {
   const {
     data: evolutionData,
     isLoading: evolutionLoading
-  } = useEvolutionData(6);
+  } = useEvolutionData(evolutionPeriod);
   const {
     data: trendData
   } = useTrendData();
@@ -196,7 +198,7 @@ export default function Dashboard() {
 
       <div className="grid gap-6 md:grid-cols-2">
         <MonthlyComparisonChart data={evolutionData || []} isLoading={evolutionLoading} />
-        <BalanceAreaChart data={evolutionData || []} isLoading={evolutionLoading} />
+        <BalanceAreaChart data={evolutionData || []} isLoading={evolutionLoading} period={evolutionPeriod} onPeriodChange={setEvolutionPeriod} />
       </div>
 
       {/* Dashboard de Parcelas */}
