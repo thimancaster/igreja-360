@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
-// Interface that matches the current database schema with OAuth 2.0
+// Interface that matches the current database schema with encrypted OAuth tokens
 export interface GoogleIntegration {
   id: string;
   church_id: string;
@@ -14,8 +14,8 @@ export interface GoogleIntegration {
   updated_at: string;
   sheet_id: string;
   sheet_name: string;
-  access_token: string | null;
-  refresh_token: string | null;
+  // Tokens are stored encrypted in *_enc columns, not exposed here
+  has_tokens: boolean;
 }
 
 // Removendo a interface GoogleSheet, pois não listaremos mais planilhas via API do Drive
@@ -34,12 +34,25 @@ export const useIntegrations = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("google_integrations")
-        .select("*")
+        .select("id, church_id, user_id, column_mapping, last_sync_at, created_at, updated_at, sheet_id, sheet_name, access_token_enc, refresh_token_enc")
         .eq("user_id", user?.id)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as unknown as GoogleIntegration[];
+      
+      // Map to interface, checking if tokens exist
+      return data.map(item => ({
+        id: item.id,
+        church_id: item.church_id,
+        user_id: item.user_id,
+        column_mapping: item.column_mapping as Record<string, string>,
+        last_sync_at: item.last_sync_at,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        sheet_id: item.sheet_id,
+        sheet_name: item.sheet_name,
+        has_tokens: !!(item.access_token_enc && item.refresh_token_enc),
+      })) as GoogleIntegration[];
     },
     enabled: !!user?.id,
   });
@@ -58,16 +71,14 @@ export const useIntegrations = () => {
       accessToken: string;
       refreshToken: string;
     }) => {
-      // First, create the integration without tokens
+      // First, create the integration without tokens (encrypted columns only)
       const insertData = {
         user_id: user?.id,
         church_id: params.churchId,
         sheet_id: params.sheetId,
         sheet_name: params.sheetName,
         column_mapping: params.columnMapping,
-        // Don't store plaintext tokens - they'll be encrypted via RPC
-        access_token: null,
-        refresh_token: null,
+        // Encrypted token columns will be populated via RPC
       };
       
       const { data: newIntegration, error: insertError } = await supabase
