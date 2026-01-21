@@ -36,7 +36,7 @@ const LandingPage: React.FC = () => {
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight max-w-4xl mx-auto bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
               Igreja360: A Visão Completa da Gestão Financeira da Sua Igreja.
             </h1>
-            <p className="mt-6 text-lg md:text-xl max-w-3xl mx-auto text-sky-900">
+            <p className="mt-6 text-lg md:text-xl max-w-3xl mx-auto text-card-foreground">
               Menos tempo com planilhas, mais tempo para o ministério. O Igreja360 organiza suas finanças de forma automática e intuitiva.
             </p>
             <Button asChild size="lg" className="mt-10 text-lg px-8 py-6 shadow-lg hover:shadow-xl transition-all duration-300">
