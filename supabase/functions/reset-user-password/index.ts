@@ -97,6 +97,33 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Get target user email for audit log
+    const { data: targetUserData } = await supabaseAdmin.auth.admin.getUserById(userId);
+    const targetEmail = targetUserData?.user?.email || 'Unknown';
+
+    // Get caller profile info for audit log
+    const { data: callerProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("full_name, church_id")
+      .eq("id", caller.id)
+      .single();
+
+    // Log the password reset action to audit_logs
+    if (callerProfile?.church_id) {
+      await supabaseAdmin.from("audit_logs").insert({
+        church_id: callerProfile.church_id,
+        user_id: caller.id,
+        user_name: callerProfile.full_name || caller.email,
+        action: "password_reset",
+        entity_type: "user",
+        details: {
+          target_user_id: userId,
+          target_user_email: targetEmail,
+          reset_by: caller.email,
+        },
+      });
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 

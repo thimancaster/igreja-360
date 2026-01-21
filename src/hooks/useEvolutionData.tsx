@@ -41,7 +41,7 @@ export const useEvolutionData = (months: number = 6) => {
         monthlyMap.set(monthKey, { revenue: 0, expenses: 0 });
       }
 
-      // Aggregate transactions
+      // Aggregate transactions (case-insensitive type comparison)
       transactions?.forEach((t) => {
         const date = t.payment_date || t.due_date;
         if (!date) return;
@@ -50,9 +50,10 @@ export const useEvolutionData = (months: number = 6) => {
         const current = monthlyMap.get(monthKey);
         
         if (current) {
-          if (t.type === 'receita') {
+          const typeNormalized = t.type?.toLowerCase();
+          if (typeNormalized === 'receita') {
             current.revenue += Number(t.amount);
-          } else {
+          } else if (typeNormalized === 'despesa') {
             current.expenses += Number(t.amount);
           }
         }
@@ -108,10 +109,10 @@ export const useTrendData = () => {
         .gte('payment_date', lastMonthStart)
         .lt('payment_date', lastMonthEnd);
 
-      const currentRevenue = currentData?.filter(t => t.type === 'receita').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const currentExpenses = currentData?.filter(t => t.type === 'despesa').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const lastRevenue = lastData?.filter(t => t.type === 'receita').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
-      const lastExpenses = lastData?.filter(t => t.type === 'despesa').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const currentRevenue = currentData?.filter(t => t.type?.toLowerCase() === 'receita').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const currentExpenses = currentData?.filter(t => t.type?.toLowerCase() === 'despesa').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const lastRevenue = lastData?.filter(t => t.type?.toLowerCase() === 'receita').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+      const lastExpenses = lastData?.filter(t => t.type?.toLowerCase() === 'despesa').reduce((sum, t) => sum + Number(t.amount), 0) || 0;
 
       const revenueTrend = lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0;
       const expensesTrend = lastExpenses > 0 ? ((currentExpenses - lastExpenses) / lastExpenses) * 100 : 0;
