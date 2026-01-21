@@ -27,6 +27,7 @@ import { Card } from "@/components/ui/card";
 import { SearchInput } from "@/components/ui/search-input";
 import { useAutoUpdateOverdue } from "@/hooks/useAutoUpdateOverdue";
 import { useTransactionsRealtime } from "@/hooks/useTransactionsRealtime";
+import { TiltCard, StaggerContainer, StaggerItem } from "@/components/ui/motion-primitives";
 
 export default function Dashboard() {
   // Hook para atualização automática de status vencidos
@@ -132,45 +133,61 @@ export default function Dashboard() {
       {/* Calendário de Vencimentos Interativo */}
       <UpcomingPaymentsCalendar />
 
-      {/* Cards de Destaque com Animação e Sparklines */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Cards de Destaque com Animação, Sparklines e TiltCard 3D */}
+      <StaggerContainer className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" staggerDelay={0.1}>
         {statsLoading ? <>
-            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 w-full" />)}
+            {[...Array(4)].map((_, i) => <StaggerItem key={i}><Skeleton className="h-32 w-full" /></StaggerItem>)}
           </> : <>
-            <AnimatedStatsCard 
-              title="Contas a Pagar" 
-              value={stats?.totalPayable || 0} 
-              icon={<DollarSign className="h-5 w-5" />} 
-              variant="warning" 
-              delay={0}
-              sparklineData={sparklineData?.expensesData}
-            />
-            <AnimatedStatsCard 
-              title="Contas Pagas" 
-              value={stats?.totalPaid || 0} 
-              trend={trendData?.revenueTrend} 
-              icon={<TrendingUp className="h-5 w-5" />} 
-              variant="success" 
-              delay={1}
-              sparklineData={sparklineData?.revenueData}
-            />
-            <AnimatedStatsCard 
-              title="Contas Vencidas" 
-              value={stats?.totalOverdue || 0} 
-              icon={<TrendingDown className="h-5 w-5" />} 
-              variant="danger" 
-              delay={2}
-            />
-            <AnimatedStatsCard 
-              title="Saldo Total" 
-              value={stats?.balance || 0} 
-              icon={<Wallet className="h-5 w-5" />} 
-              variant="default" 
-              delay={3}
-              sparklineData={sparklineData?.balanceData}
-            />
+            <StaggerItem>
+              <TiltCard tiltAmount={8} className="h-full">
+                <AnimatedStatsCard 
+                  title="Contas a Pagar" 
+                  value={stats?.totalPayable || 0} 
+                  icon={<DollarSign className="h-5 w-5" />} 
+                  variant="warning" 
+                  delay={0}
+                  sparklineData={sparklineData?.expensesData}
+                />
+              </TiltCard>
+            </StaggerItem>
+            <StaggerItem>
+              <TiltCard tiltAmount={8} className="h-full">
+                <AnimatedStatsCard 
+                  title="Contas Pagas" 
+                  value={stats?.totalPaid || 0} 
+                  trend={trendData?.revenueTrend} 
+                  icon={<TrendingUp className="h-5 w-5" />} 
+                  variant="success" 
+                  delay={1}
+                  sparklineData={sparklineData?.revenueData}
+                />
+              </TiltCard>
+            </StaggerItem>
+            <StaggerItem>
+              <TiltCard tiltAmount={8} className="h-full">
+                <AnimatedStatsCard 
+                  title="Contas Vencidas" 
+                  value={stats?.totalOverdue || 0} 
+                  icon={<TrendingDown className="h-5 w-5" />} 
+                  variant="danger" 
+                  delay={2}
+                />
+              </TiltCard>
+            </StaggerItem>
+            <StaggerItem>
+              <TiltCard tiltAmount={8} className="h-full">
+                <AnimatedStatsCard 
+                  title="Saldo Total" 
+                  value={stats?.balance || 0} 
+                  icon={<Wallet className="h-5 w-5" />} 
+                  variant="default" 
+                  delay={3}
+                  sparklineData={sparklineData?.balanceData}
+                />
+              </TiltCard>
+            </StaggerItem>
           </>}
-      </div>
+      </StaggerContainer>
 
       {/* Gráficos Interativos */}
       <div className="grid gap-6 lg:grid-cols-1">
@@ -249,7 +266,7 @@ export default function Dashboard() {
       duration: 0.5,
       delay: 0.7
     }}>
-        <Card className="overflow-hidden border-border/50">
+        <Card className="overflow-hidden border-border/50" hoverLift tapScale>
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold flex items-center gap-2">

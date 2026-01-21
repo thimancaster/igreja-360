@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Users, Pencil, Trash2, MoreHorizontal, Building2, Search, UserPlus } from "lucide-react";
+import { Users, Pencil, Trash2, MoreHorizontal, Building2, Search, UserPlus, Key } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Database } from "@/integrations/supabase/types";
@@ -16,6 +16,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useRole } from "@/hooks/useRole";
 import { AssignUserDialog } from "@/components/users/AssignUserDialog";
 import { InviteUserDialog } from "@/components/users/InviteUserDialog";
+import { ResetPasswordDialog } from "@/components/users/ResetPasswordDialog";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -31,6 +32,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,9 +67,11 @@ const ROLE_LABELS: Record<AppRole, string> = {
 export default function GerenciarUsuarios() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [resetPasswordDialogOpen, setResetPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<ProfileWithDetails | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<ProfileWithDetails | null>(null);
+  const [userToResetPassword, setUserToResetPassword] = useState<ProfileWithDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"all" | "church">("church");
 
@@ -254,6 +258,27 @@ export default function GerenciarUsuarios() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      if (!canManage) throw new Error("Você não tem permissão para alterar senhas.");
+
+      const { data, error } = await supabase.functions.invoke("reset-user-password", {
+        body: { userId, newPassword },
+      });
+
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success(data?.message || "Senha atualizada com sucesso!");
+    },
+    onError: (error) => {
+      toast.error(`Erro ao atualizar senha: ${error.message}`);
+    },
+  });
+
   const handleEditUser = (profileItem: ProfileWithDetails) => {
     setSelectedUser(profileItem);
     setDialogOpen(true);
@@ -262,6 +287,15 @@ export default function GerenciarUsuarios() {
   const handleDeleteUser = (profileItem: ProfileWithDetails) => {
     setUserToDelete(profileItem);
     setDeleteDialogOpen(true);
+  };
+
+  const handleResetPassword = (profileItem: ProfileWithDetails) => {
+    setUserToResetPassword(profileItem);
+    setResetPasswordDialogOpen(true);
+  };
+
+  const handleResetPasswordSubmit = async (userId: string, newPassword: string) => {
+    await resetPasswordMutation.mutateAsync({ userId, newPassword });
   };
 
   const handleDialogSubmit = async (data: { userId: string; fullName: string; role: AppRole; churchId: string | null }) => {
@@ -435,6 +469,11 @@ export default function GerenciarUsuarios() {
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Editar
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleResetPassword(profileItem)}>
+                                <Key className="h-4 w-4 mr-2" />
+                                Gerar Nova Senha
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem 
                                 onClick={() => handleDeleteUser(profileItem)}
                                 className="text-destructive"
@@ -484,6 +523,16 @@ export default function GerenciarUsuarios() {
         churches={churches || []}
         onSubmit={handleDialogSubmit}
         isLoading={updateUserMutation.isPending}
+      />
+
+      {/* Reset Password Dialog */}
+      <ResetPasswordDialog
+        open={resetPasswordDialogOpen}
+        onOpenChange={setResetPasswordDialogOpen}
+        userName={userToResetPassword?.full_name || "Usuário"}
+        userId={userToResetPassword?.id || ""}
+        onSubmit={handleResetPasswordSubmit}
+        isLoading={resetPasswordMutation.isPending}
       />
 
       {/* Delete Confirmation Dialog */}
