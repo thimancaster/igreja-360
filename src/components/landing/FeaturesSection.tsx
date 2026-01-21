@@ -72,40 +72,40 @@ const features = [
 
 export const FeaturesSection = () => {
   return (
-    <section className="py-24 relative">
-      <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/20 to-background" />
+    <section className="py-16 md:py-24 relative">
+      <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/15 to-background" />
       
-      <div className="container mx-auto px-4 relative z-10">
+      <div className="container mx-auto px-4 sm:px-6 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-10 md:mb-16"
         >
-          <span className="text-sm font-medium text-primary uppercase tracking-wider">Recursos</span>
-          <h2 className="text-3xl md:text-4xl font-bold mt-4 mb-6">
+          <span className="text-xs md:text-sm font-medium text-primary uppercase tracking-wider">Recursos</span>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mt-3 md:mt-4 mb-4 md:mb-6">
             Tudo que você precisa{" "}
             <span className="gradient-text">em um só lugar</span>
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto px-2">
             Ferramentas completas para simplificar a gestão financeira da sua igreja.
           </p>
         </motion.div>
 
-        <StaggerContainer className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StaggerContainer className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
           {features.map((feature, index) => (
             <StaggerItem key={feature.title}>
               <MotionCard
                 hoverLift
                 glowOnHover
-                className="glass-card p-6 h-full border border-white/5 hover:border-primary/20 transition-all duration-300 group"
+                className="glass-card p-4 md:p-6 h-full border border-border/50 hover:border-primary/30 transition-all duration-300 group"
               >
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
-                  <feature.icon className="w-6 h-6 text-white" />
+                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-3 md:mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
+                  <feature.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+                <h3 className="text-sm md:text-lg font-semibold mb-1.5 md:mb-2">{feature.title}</h3>
+                <p className="text-xs md:text-sm text-muted-foreground leading-relaxed">
                   {feature.description}
                 </p>
               </MotionCard>
