@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +39,19 @@ import { SortableTableHeader } from "@/components/ui/sortable-table-header";
 import { useTransactionsRealtime } from "@/hooks/useTransactionsRealtime";
 import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 
+// Stagger animation variants for table rows
+const rowVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    x: 0,
+    transition: {
+      delay: i * 0.05,
+      duration: 0.3,
+      ease: "easeOut" as const,
+    },
+  }),
+};
 export default function Transacoes() {
   const { user } = useAuth();
   useTransactionsRealtime(); // Realtime updates
@@ -293,66 +306,75 @@ export default function Transacoes() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pagination.paginatedData.length > 0 ? (
-                pagination.paginatedData.map((transaction) => (
-                  <TableRow key={transaction.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{transaction.description}</TableCell>
-                    <TableCell>{transaction.categories?.name || "-"}</TableCell>
-                    <TableCell>{transaction.ministries?.name || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={getTypeVariant(transaction.type)}>
-                        {transaction.type}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className={transaction.type === "Receita" ? "text-success" : ""}>
-                      {formatCurrency(Number(transaction.amount))}
-                    </TableCell>
-                    <TableCell>
-                      {transaction.payment_date 
-                        ? formatDate(transaction.payment_date)
-                        : transaction.due_date 
-                        ? formatDate(transaction.due_date)
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(transaction.status)}>
-                        {transaction.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex gap-2 justify-end">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleEdit(transaction)}
-                          disabled={!canManageTransactions && transaction.created_by !== user?.id}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            setTransactionToDelete(transaction.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                          disabled={!canManageTransactions}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+              <AnimatePresence mode="wait">
+                {pagination.paginatedData.length > 0 ? (
+                  pagination.paginatedData.map((transaction, index) => (
+                    <motion.tr
+                      key={transaction.id}
+                      custom={index}
+                      variants={rowVariants}
+                      initial="hidden"
+                      animate="visible"
+                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                    >
+                      <TableCell className="font-medium">{transaction.description}</TableCell>
+                      <TableCell>{transaction.categories?.name || "-"}</TableCell>
+                      <TableCell>{transaction.ministries?.name || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={getTypeVariant(transaction.type)}>
+                          {transaction.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={transaction.type === "Receita" ? "text-success" : ""}>
+                        {formatCurrency(Number(transaction.amount))}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.payment_date 
+                          ? formatDate(transaction.payment_date)
+                          : transaction.due_date 
+                          ? formatDate(transaction.due_date)
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(transaction.status)}>
+                          {transaction.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleEdit(transaction)}
+                            disabled={!canManageTransactions && transaction.created_by !== user?.id}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              setTransactionToDelete(transaction.id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            disabled={!canManageTransactions}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </motion.tr>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                      {searchTerm 
+                        ? "Nenhuma transação encontrada para esta busca."
+                        : "Nenhuma transação encontrada. Clique em \"Nova Transação\" para começar."}
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
-                    {searchTerm 
-                      ? "Nenhuma transação encontrada para esta busca."
-                      : "Nenhuma transação encontrada. Clique em \"Nova Transação\" para começar."}
-                  </TableCell>
-                </TableRow>
-              )}
+                )}
+              </AnimatePresence>
             </TableBody>
           </Table>
           <TablePagination
