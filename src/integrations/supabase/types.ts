@@ -741,6 +741,7 @@ export type Database = {
         }
         Returns: string
       }
+      trigger_auto_sync_overdue: { Args: never; Returns: undefined }
       update_overdue_transactions: { Args: never; Returns: undefined }
     }
     Enums: {
