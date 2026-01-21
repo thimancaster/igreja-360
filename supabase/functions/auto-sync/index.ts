@@ -5,9 +5,30 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Generic error response to prevent information leakage
+const unauthorizedResponse = () => new Response(
+  JSON.stringify({ success: false, error: 'Unauthorized' }),
+  { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+);
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Authentication: Validate secret key
+  const autoSyncSecret = Deno.env.get('AUTO_SYNC_SECRET_KEY');
+  if (!autoSyncSecret) {
+    console.error('Auto-sync: AUTO_SYNC_SECRET_KEY not configured');
+    return unauthorizedResponse();
+  }
+
+  const authHeader = req.headers.get('Authorization');
+  const providedToken = authHeader?.replace('Bearer ', '');
+  
+  if (!providedToken || providedToken !== autoSyncSecret) {
+    console.warn('Auto-sync: Invalid or missing authorization token');
+    return unauthorizedResponse();
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
