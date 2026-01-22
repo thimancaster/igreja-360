@@ -67,8 +67,8 @@ serve(async (req) => {
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.text();
-      console.error('Token exchange failed:', errorData);
-      throw new Error(`Failed to exchange code for token: ${errorData}`);
+      console.error('Token exchange failed:', errorData); // Server-side only
+      throw new Error('Failed to exchange authorization code'); // Generic message
     }
 
     const tokens = await tokenResponse.json();
