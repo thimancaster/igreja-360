@@ -27,8 +27,24 @@ interface CreatePublicIntegrationData {
   columnMapping: Record<string, string>;
 }
 
+interface SyncResponse {
+  success: boolean;
+  recordsInserted: number;
+  recordsUpdated: number;
+  recordsSkipped: number;
+  errors?: number;
+  message?: string;
+  error?: string;
+  details?: Array<{
+    row: number;
+    action: string;
+    description: string;
+    reason?: string;
+  }>;
+}
+
 export function usePublicSheetIntegrations() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   // Fetch all public sheet integrations
@@ -90,9 +106,9 @@ export function usePublicSheetIntegrations() {
     },
   });
 
-  // Sync integration
+  // Sync integration with improved feedback
   const syncIntegration = useMutation({
-    mutationFn: async (integrationId: string) => {
+    mutationFn: async (integrationId: string): Promise<SyncResponse> => {
       const { data, error } = await supabase.functions.invoke("sync-public-sheet", {
         body: { integrationId },
       });
@@ -100,21 +116,43 @@ export function usePublicSheetIntegrations() {
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || "Erro desconhecido");
 
-      return data;
+      return data as SyncResponse;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["public-sheet-integrations"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
       queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sync-history"] });
       
       const inserted = data.recordsInserted || 0;
       const updated = data.recordsUpdated || 0;
       const skipped = data.recordsSkipped || 0;
+      const errors = data.errors || 0;
       
-      toast({
-        title: "Sincronização concluída",
-        description: `${inserted} nova(s), ${updated} atualizada(s), ${skipped} ignorada(s).`,
-      });
+      // Build detailed message
+      const parts: string[] = [];
+      if (inserted > 0) parts.push(`${inserted} nova(s)`);
+      if (updated > 0) parts.push(`${updated} atualizada(s)`);
+      if (skipped > 0) parts.push(`${skipped} ignorada(s)`);
+      if (errors > 0) parts.push(`${errors} erro(s)`);
+      
+      const description = parts.length > 0 
+        ? parts.join(', ') + '.'
+        : 'Nenhuma alteração necessária.';
+      
+      // Show appropriate toast based on results
+      if (inserted === 0 && updated === 0 && skipped > 0) {
+        toast({
+          title: "Sincronização concluída",
+          description: `${skipped} transação(ões) já existia(m) no sistema. Nenhuma duplicata criada.`,
+        });
+      } else {
+        toast({
+          title: errors > 0 ? "Sincronização parcial" : "Sincronização concluída",
+          description,
+          variant: errors > 0 ? "destructive" : "default",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({

@@ -14,7 +14,18 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ColumnMapping, ImportPreviewRow, ProcessedTransaction } from "@/types/import";
-import { readSpreadsheet, parseAmount, parseDate, normalizeType, normalizeStatus, validateTransaction } from "@/utils/importHelpers";
+import { 
+  readSpreadsheet, 
+  parseAmount, 
+  parseDate, 
+  normalizeType, 
+  normalizeStatus, 
+  validateTransaction,
+  createImportExternalId,
+  buildDeduplicationSets,
+  filterDuplicateTransactions,
+  type ExistingTransactionForDupe
+} from "@/utils/importHelpers";
 import { downloadImportTemplate } from "@/utils/exportHelpers";
 import { useRole } from "@/hooks/useRole";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -171,25 +182,33 @@ export default function Importacao() {
       if (uploadError) throw uploadError;
       uploadRecord = uploadData;
 
-      const transactionsToInsert: ProcessedTransaction[] = [];
-      const errors: { row: number; error: string }[] = [];
+      // First, process all rows to get valid transactions
+      const transactionsToValidate: Array<{
+        transaction: Partial<ProcessedTransaction>;
+        rowIndex: number;
+      }> = [];
+      const validationErrors: { row: number; error: string }[] = [];
 
       for (let i = 0; i < dataRows.length; i++) {
         const row = dataRows[i];
-        const mappedRow: any = {};
+        const mappedRow: Record<string, unknown> = {};
         (Object.keys(columnMapping) as (keyof ColumnMapping)[]).forEach(key => {
           const header = columnMapping[key];
           if (header) mappedRow[key] = row[headers.indexOf(header)];
         });
 
+        const type = normalizeType(String(mappedRow.type || '')) || "Despesa";
+        const dueDate = parseDate(mappedRow.due_date);
+        const paymentDate = parseDate(mappedRow.payment_date);
+
         const processed: Partial<ProcessedTransaction> = {
-          description: mappedRow.description || "",
+          description: String(mappedRow.description || '').trim(),
           amount: parseAmount(mappedRow.amount) || 0,
-          type: normalizeType(mappedRow.type) || "Despesa",
-          status: normalizeStatus(mappedRow.status) || "Pendente",
-          due_date: parseDate(mappedRow.due_date),
-          payment_date: parseDate(mappedRow.payment_date),
-          notes: mappedRow.notes || null,
+          type,
+          status: type === 'Receita' ? 'Pago' : (normalizeStatus(String(mappedRow.status || '')) || "Pendente"),
+          due_date: type === 'Receita' ? null : dueDate,
+          payment_date: type === 'Receita' ? (dueDate || paymentDate || new Date().toISOString().split('T')[0]) : paymentDate,
+          notes: mappedRow.notes ? String(mappedRow.notes) : null,
           category_id: selectedCategoryId,
           ministry_id: selectedMinistryId,
           church_id: profile.church_id,
@@ -197,47 +216,77 @@ export default function Importacao() {
           origin: 'Importação de Planilha',
         };
 
+        // Add external_id for deduplication
+        if (processed.description && processed.amount && processed.type) {
+          (processed as Record<string, unknown>).external_id = createImportExternalId(
+            processed.description,
+            processed.amount,
+            processed.due_date || null,
+            processed.type
+          );
+        }
+
         const validation = validateTransaction(processed);
         if (validation.success) {
-          transactionsToInsert.push(validation.data as ProcessedTransaction);
+          transactionsToValidate.push({ 
+            transaction: validation.data as ProcessedTransaction, 
+            rowIndex: i + 2 
+          });
         } else {
-          errors.push({ row: i + 2, error: validation.error?.errors[0].message || "Erro desconhecido" });
+          validationErrors.push({ row: i + 2, error: validation.error?.errors[0].message || "Erro desconhecido" });
         }
-        setProgress(((i + 1) / dataRows.length) * 50);
+        setProgress(((i + 1) / dataRows.length) * 30);
       }
 
-      if (errors.length > 0) {
-        throw new Error(`${errors.length} linha(s) com erro. Primeira na Linha ${errors[0].row}: ${errors[0].error}`);
+      if (validationErrors.length > 0 && transactionsToValidate.length === 0) {
+        throw new Error(`${validationErrors.length} linha(s) com erro. Primeira na Linha ${validationErrors[0].row}: ${validationErrors[0].error}`);
       }
 
-      if (transactionsToInsert.length === 0) {
+      if (transactionsToValidate.length === 0) {
         throw new Error("Nenhuma transação válida para importar.");
       }
 
-      // Check for duplicates before inserting
-      const descriptions = transactionsToInsert.map(t => t.description);
-      const { data: existingTransactions } = await supabase
-        .from("transactions")
-        .select("description, amount, payment_date, due_date")
-        .eq("church_id", profile.church_id)
-        .in("description", descriptions);
+      setProgress(40);
 
-      // Filter out duplicates
-      const nonDuplicates = transactionsToInsert.filter(t => 
-        !existingTransactions?.some(e => 
-          e.description === t.description && 
-          Number(e.amount) === t.amount && 
-          (e.payment_date === t.payment_date || e.due_date === t.due_date)
-        )
+      // Fetch ALL existing transactions for intelligent deduplication
+      const { data: existingTransactions, error: fetchError } = await supabase
+        .from("transactions")
+        .select("id, description, amount, type, due_date, payment_date, external_id")
+        .eq("church_id", profile.church_id);
+
+      if (fetchError) throw fetchError;
+
+      setProgress(50);
+
+      // Build deduplication sets using content hash
+      const { existingHashes, existingByExternalId } = buildDeduplicationSets(
+        (existingTransactions || []) as ExistingTransactionForDupe[]
       );
 
-      if (nonDuplicates.length === 0) {
-        throw new Error("Todas as transações já existem no sistema. Nenhuma transação foi importada.");
+      // Extract transactions for filtering
+      const transactionsForFilter = transactionsToValidate.map(t => ({
+        ...(t.transaction as ProcessedTransaction),
+        due_date: (t.transaction as ProcessedTransaction).due_date || null
+      }));
+
+      // Filter duplicates using content hash
+      const { toImport, duplicates, batchDuplicates } = filterDuplicateTransactions(
+        transactionsForFilter,
+        existingHashes,
+        existingByExternalId
+      );
+
+      setProgress(60);
+
+      if (toImport.length === 0) {
+        const totalDupes = duplicates.length + batchDuplicates.length;
+        throw new Error(`Todas as ${totalDupes} transações já existem no sistema ou são duplicadas. Nenhuma transação foi importada.`);
       }
 
       setProgress(75);
 
-      const { error: insertError } = await supabase.from("transactions").insert(nonDuplicates);
+      // Insert non-duplicate transactions
+      const { error: insertError } = await supabase.from("transactions").insert(toImport);
       if (insertError) throw insertError;
 
       // Update upload record with success
@@ -245,16 +294,25 @@ export default function Importacao() {
         .from("sheet_uploads")
         .update({
           status: "Concluído",
-          records_imported: nonDuplicates.length,
+          records_imported: toImport.length,
         })
         .eq("id", uploadRecord.id);
 
       setProgress(100);
 
-      const skippedCount = transactionsToInsert.length - nonDuplicates.length;
-      const message = skippedCount > 0 
-        ? `${nonDuplicates.length} transações importadas. ${skippedCount} duplicatas ignoradas.`
-        : `${nonDuplicates.length} transações importadas com sucesso.`;
+      const skippedCount = duplicates.length;
+      const batchDupeCount = batchDuplicates.length;
+      
+      let message = `${toImport.length} transações importadas com sucesso.`;
+      if (skippedCount > 0) {
+        message += ` ${skippedCount} duplicatas ignoradas.`;
+      }
+      if (batchDupeCount > 0) {
+        message += ` ${batchDupeCount} repetidas no arquivo.`;
+      }
+      if (validationErrors.length > 0) {
+        message += ` ${validationErrors.length} com erro de validação.`;
+      }
       
       toast({ title: "Sucesso!", description: message });
 
@@ -263,18 +321,18 @@ export default function Importacao() {
       queryClient.invalidateQueries({ queryKey: ["sheet-uploads"] });
       navigate("/app/dashboard");
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Update upload record with error
       if (uploadRecord) {
         await supabase
           .from("sheet_uploads")
           .update({
             status: "Erro",
-            error_details: error.message,
+            error_details: error instanceof Error ? error.message : 'Erro desconhecido',
           })
           .eq("id", uploadRecord.id);
       }
-      toast({ title: "Erro na Importação", description: error.message, variant: "destructive" });
+      toast({ title: "Erro na Importação", description: error instanceof Error ? error.message : 'Erro desconhecido', variant: "destructive" });
     } finally {
       setImporting(false);
     }
