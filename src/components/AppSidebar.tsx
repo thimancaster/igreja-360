@@ -1,7 +1,8 @@
-import { LayoutDashboard, ArrowLeftRight, Upload, Sheet, FileText, Settings, Users } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Upload, Sheet, FileText, Settings, Users, Heart, UserCircle } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
 import { useRole } from "@/hooks/useRole";
+
 const baseMenuItems = [{
   title: "Dashboard",
   url: "/app/dashboard",
@@ -10,6 +11,14 @@ const baseMenuItems = [{
   title: "Transações",
   url: "/app/transacoes",
   icon: ArrowLeftRight
+}, {
+  title: "Membros",
+  url: "/app/membros",
+  icon: UserCircle
+}, {
+  title: "Contribuições",
+  url: "/app/contribuicoes",
+  icon: Heart
 }, {
   title: "Importação",
   url: "/app/importacao",
@@ -27,6 +36,7 @@ const baseMenuItems = [{
   url: "/app/configuracoes",
   icon: Settings
 }];
+
 const adminMenuItem = {
   title: "Administração",
   url: "/app/admin",
@@ -44,7 +54,7 @@ export function AppSidebar() {
 
   // Mostrar menu admin apenas para admin
   const canAccessAdmin = isAdmin;
-  const menuItems = canAccessAdmin ? [...baseMenuItems.slice(0, 5), adminMenuItem, baseMenuItems[5]] : baseMenuItems;
+  const menuItems = canAccessAdmin ? [...baseMenuItems.slice(0, 7), adminMenuItem, baseMenuItems[7]] : baseMenuItems;
   return <Sidebar collapsible="icon" className="border-r border-sidebar-border glass-sidebar">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-2">

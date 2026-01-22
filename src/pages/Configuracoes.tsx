@@ -11,11 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { User, Building2 } from "lucide-react";
+import { User, Building2, Bell } from "lucide-react";
 import { Tables } from "@/integrations/supabase/types";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { formatCNPJ, validateCNPJ } from "@/lib/cnpjUtils";
 import { pageVariants, pageTransition } from "@/lib/pageAnimations";
+import { NotificationSettings } from "@/components/pwa/NotificationSettings";
 
 type ProfileRow = Tables<'profiles'>;
 type ChurchRow = Tables<'churches'>;
@@ -209,6 +210,10 @@ export default function Configuracoes() {
             <Building2 className="h-4 w-4" />
             Igreja
           </TabsTrigger>
+          <TabsTrigger value="notificacoes" className="gap-2">
+            <Bell className="h-4 w-4" />
+            Notificações
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="perfil">
@@ -383,6 +388,10 @@ export default function Configuracoes() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="notificacoes">
+          <NotificationSettings />
         </TabsContent>
       </Tabs>
     </motion.div>
