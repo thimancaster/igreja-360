@@ -18,12 +18,15 @@ import { AdminRoute } from '@/components/AdminRoute';
 import { AppSidebar } from '@/components/AppSidebar';
 import { AppHeader } from '@/components/AppHeader';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 
 // Lazy loading para reduzir bundle inicial - páginas carregadas sob demanda
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const AuthPage = lazy(() => import('@/pages/Auth'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 const Transacoes = lazy(() => import('@/pages/Transacoes'));
+const Membros = lazy(() => import('@/pages/Membros'));
+const Contribuicoes = lazy(() => import('@/pages/Contribuicoes'));
 const Integracoes = lazy(() => import('@/pages/Integracoes'));
 const Importacao = lazy(() => import('@/pages/Importacao'));
 const Relatorios = lazy(() => import('@/pages/Relatorios'));
@@ -47,6 +50,7 @@ const App: React.FC = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <InstallPrompt />
         <BrowserRouter>
           <AuthProvider>
             <Suspense fallback={<div className="flex h-screen w-full items-center justify-center"><LoadingSpinner size="lg" /></div>}>
@@ -72,6 +76,8 @@ const App: React.FC = () => {
                             <Routes>
                               <Route path="dashboard" element={<Dashboard />} />
                               <Route path="transacoes" element={<Transacoes />} />
+                              <Route path="membros" element={<Membros />} />
+                              <Route path="contribuicoes" element={<Contribuicoes />} />
                               <Route path="importacao" element={<Importacao />} />
                               <Route path="integracoes" element={<Integracoes />} />
                               <Route path="relatorios" element={<Relatorios />} />
