@@ -1,28 +1,42 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+import {
+  createContentHash,
+  createExternalId,
+  normalizeString,
+  amountsAreEqual,
+  createSyncStats,
+  logSyncAction,
+  type SyncStats
+} from "../_shared/deduplication.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Extract sheet ID from URL
-function extractSheetId(url: string): string | null {
-  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
+interface ExistingTransaction {
+  id: string;
+  description: string;
+  amount: number;
+  type: string;
+  status: string;
+  due_date: string | null;
+  payment_date: string | null;
+  external_id: string | null;
+  category_id: string | null;
+  ministry_id: string | null;
+  notes: string | null;
 }
 
 // Parse value from Google's visualization format
-function parseGvizValue(cell: any): any {
-  if (!cell) return null;
-  if (cell.v !== undefined) return cell.v;
-  if (cell.f !== undefined) return cell.f;
+function parseGvizValue(cell: unknown): unknown {
+  if (!cell || typeof cell !== 'object') return null;
+  const c = cell as { v?: unknown; f?: string };
+  if (c.v !== undefined) return c.v;
+  if (c.f !== undefined) return c.f;
   return null;
 }
 
 // Parse numeric value (handles Brazilian currency format)
-function parseNumericValue(value: any): number {
-  if (typeof value === 'number') return value;
+function parseNumericValue(value: unknown): number {
+  if (typeof value === 'number') return Math.abs(value);
   if (typeof value !== 'string') return 0;
   
   // Remove currency symbols and spaces
@@ -30,7 +44,6 @@ function parseNumericValue(value: any): number {
   
   // Handle Brazilian format (1.234,56 -> 1234.56)
   if (cleaned.includes(',')) {
-    // Check if it's Brazilian format (comma as decimal separator)
     if (cleaned.match(/\.\d{3}/)) {
       // Has thousand separator with dots
       cleaned = cleaned.replace(/\./g, '').replace(',', '.');
@@ -45,7 +58,7 @@ function parseNumericValue(value: any): number {
 }
 
 // Parse date (handles various formats)
-function parseDate(value: any): string | null {
+function parseDate(value: unknown): string | null {
   if (!value) return null;
   
   // If it's already a Date object from Google
@@ -67,15 +80,15 @@ function parseDate(value: any): string | null {
     if (isoMatch) {
       return value.split('T')[0];
     }
-  }
-  
-  // Handle Google's Date(year, month, day) format
-  if (typeof value === 'string' && value.startsWith('Date(')) {
-    const match = value.match(/Date\((\d+),(\d+),(\d+)/);
-    if (match) {
-      const [, year, month, day] = match;
-      const m = parseInt(month) + 1; // Month is 0-indexed
-      return `${year}-${m.toString().padStart(2, '0')}-${day.padStart(2, '0')}`;
+    
+    // Handle Google's Date(year, month, day) format
+    if (value.startsWith('Date(')) {
+      const match = value.match(/Date\((\d+),(\d+),(\d+)/);
+      if (match) {
+        const [, year, month, day] = match;
+        const m = parseInt(month) + 1; // Month is 0-indexed
+        return `${year}-${m.toString().padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
     }
   }
   
@@ -83,7 +96,7 @@ function parseDate(value: any): string | null {
 }
 
 // Determine transaction type
-function parseType(value: any): string {
+function parseType(value: unknown): 'Receita' | 'Despesa' {
   if (!value) return 'Despesa';
   
   const str = String(value).toLowerCase().trim();
@@ -96,13 +109,25 @@ function parseType(value: any): string {
 }
 
 // Determine status - For Receita, always return Pago
-function parseStatus(value: any, type: string): string {
+function parseStatus(value: unknown, type: string, paymentDate: string | null, dueDate: string | null): string {
   // Receitas are always confirmed/paid
   if (type === 'Receita') {
     return 'Pago';
   }
   
-  if (!value) return 'Pendente';
+  // If has payment date, it's paid
+  if (paymentDate) {
+    return 'Pago';
+  }
+  
+  if (!value) {
+    // Infer from due date
+    if (dueDate) {
+      const today = new Date().toISOString().split('T')[0];
+      return dueDate < today ? 'Vencido' : 'Pendente';
+    }
+    return 'Pendente';
+  }
   
   const str = String(value).toLowerCase().trim();
   
@@ -118,46 +143,128 @@ function parseStatus(value: any, type: string): string {
 }
 
 // Sanitize string
-function sanitizeString(value: any): string {
+function sanitizeString(value: unknown): string {
   if (!value) return '';
   return String(value).trim().slice(0, 500);
 }
 
-// Create external_id for row tracking
-function createExternalId(sheetId: string, rowIndex: number): string {
-  return `public_${sheetId}_row_${rowIndex}`;
-}
-
-// Create a unique hash for transaction deduplication (fallback)
-function createTransactionHash(description: string, amount: number, dueDate: string | null, type: string): string {
-  const normalized = `${description.toLowerCase().trim()}|${amount}|${dueDate || ''}|${type}`;
-  return btoa(unescape(encodeURIComponent(normalized)));
-}
-
-// Detect changes between existing and incoming transaction
-function detectChanges(
-  existing: { description: string; amount: number; due_date: string | null; type: string; status: string },
-  incoming: { description: string; amount: number; due_date: string | null; type: string; status: string }
-): Record<string, any> {
-  const changes: Record<string, any> = {};
+/**
+ * Determines the action to take based on content-based deduplication
+ * Priority:
+ * 1. Match by content hash (same description, amount, due_date, type)
+ * 2. If matched, check if any fields changed → update
+ * 3. If no match → insert
+ */
+function determineTransactionAction(
+  incoming: {
+    description: string;
+    amount: number;
+    type: string;
+    due_date: string | null;
+    payment_date: string | null;
+    status: string;
+    category_id: string | null;
+    ministry_id: string | null;
+    notes: string | null;
+  },
+  incomingExternalId: string,
+  existingByExternalId: Map<string, ExistingTransaction>,
+  existingByContentHash: Map<string, ExistingTransaction>
+): { action: 'insert' | 'update' | 'skip'; existingId?: string; changes?: Record<string, unknown>; reason: string } {
   
-  if (existing.description !== incoming.description) {
-    changes.description = incoming.description;
-  }
-  if (Math.abs(existing.amount - incoming.amount) > 0.01) {
-    changes.amount = incoming.amount;
-  }
-  if (existing.due_date !== incoming.due_date) {
-    changes.due_date = incoming.due_date;
-  }
-  if (existing.type !== incoming.type) {
-    changes.type = incoming.type;
-  }
-  if (existing.status !== incoming.status) {
-    changes.status = incoming.status;
+  // Step 1: Check by external_id first (fastest path)
+  const byExtId = existingByExternalId.get(incomingExternalId);
+  if (byExtId) {
+    // Check for meaningful changes
+    const changes: Record<string, unknown> = {};
+    
+    if (normalizeString(incoming.description) !== normalizeString(byExtId.description)) {
+      changes.description = incoming.description;
+    }
+    if (!amountsAreEqual(incoming.amount, byExtId.amount)) {
+      changes.amount = incoming.amount;
+    }
+    if (incoming.due_date !== byExtId.due_date) {
+      changes.due_date = incoming.due_date;
+    }
+    if (incoming.payment_date !== byExtId.payment_date) {
+      changes.payment_date = incoming.payment_date;
+    }
+    if (incoming.status.toLowerCase() !== byExtId.status.toLowerCase()) {
+      changes.status = incoming.status;
+    }
+    if (incoming.category_id !== byExtId.category_id && incoming.category_id) {
+      changes.category_id = incoming.category_id;
+    }
+    if (incoming.ministry_id !== byExtId.ministry_id && incoming.ministry_id) {
+      changes.ministry_id = incoming.ministry_id;
+    }
+    if (normalizeString(incoming.notes) !== normalizeString(byExtId.notes) && incoming.notes) {
+      changes.notes = incoming.notes;
+    }
+    
+    if (Object.keys(changes).length > 0) {
+      return { action: 'update', existingId: byExtId.id, changes, reason: 'Dados alterados' };
+    }
+    return { action: 'skip', existingId: byExtId.id, reason: 'Já existe, sem alterações' };
   }
   
-  return changes;
+  // Step 2: Check by content hash (handles new external_id format or legacy data)
+  const contentHash = createContentHash(incoming.description, incoming.amount, incoming.due_date, incoming.type);
+  const byHash = existingByContentHash.get(contentHash);
+  
+  if (byHash) {
+    // Found by hash - update external_id to new format and check for other changes
+    const changes: Record<string, unknown> = { external_id: incomingExternalId };
+    
+    if (incoming.payment_date !== byHash.payment_date && incoming.payment_date) {
+      changes.payment_date = incoming.payment_date;
+    }
+    if (incoming.status.toLowerCase() !== byHash.status.toLowerCase()) {
+      changes.status = incoming.status;
+    }
+    if (incoming.category_id !== byHash.category_id && incoming.category_id) {
+      changes.category_id = incoming.category_id;
+    }
+    if (incoming.ministry_id !== byHash.ministry_id && incoming.ministry_id) {
+      changes.ministry_id = incoming.ministry_id;
+    }
+    if (normalizeString(incoming.notes) !== normalizeString(byHash.notes) && incoming.notes) {
+      changes.notes = incoming.notes;
+    }
+    
+    // If only external_id changed, just update silently and skip
+    if (Object.keys(changes).length === 1) {
+      return { action: 'update', existingId: byHash.id, changes, reason: 'Atualizando ID externo' };
+    }
+    
+    return { action: 'update', existingId: byHash.id, changes, reason: 'Encontrado por hash, atualizando dados' };
+  }
+  
+  // Step 3: Check for similar transactions (fuzzy match to prevent near-duplicates)
+  for (const [, existing] of existingByContentHash) {
+    const sameAmount = amountsAreEqual(incoming.amount, existing.amount);
+    const sameDate = incoming.due_date === existing.due_date;
+    const sameType = incoming.type.toLowerCase() === existing.type.toLowerCase();
+    
+    // If same amount, date, and type, check description similarity
+    if (sameAmount && sameDate && sameType) {
+      const descA = normalizeString(incoming.description);
+      const descB = normalizeString(existing.description);
+      
+      // Simple similarity check: one contains the other or very similar
+      if (descA === descB || descA.includes(descB) || descB.includes(descA)) {
+        return { 
+          action: 'skip', 
+          existingId: existing.id, 
+          reason: `Similar: "${existing.description}"` 
+        };
+      }
+    }
+  }
+  
+  // Step 4: No match found, insert new
+  return { action: 'insert', reason: 'Nova transação' };
 }
 
 serve(async (req) => {
@@ -221,7 +328,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[sync-public-sheet] Syncing integration ${integrationId} for sheet ${integration.sheet_id}`);
+    console.log(`[sync-public-sheet] Starting sync for integration ${integrationId}, sheet ${integration.sheet_id}`);
 
     // Update sync status
     await supabase
@@ -266,7 +373,7 @@ serve(async (req) => {
 
     // Build column index map
     const colIndexMap: Record<string, number> = {};
-    table.cols.forEach((col: any, index: number) => {
+    table.cols.forEach((col: { label?: string; id?: string }, index: number) => {
       const label = col.label || col.id || `Coluna ${col.id}`;
       Object.entries(columnMapping).forEach(([field, mappedCol]) => {
         if (mappedCol === label) {
@@ -275,147 +382,155 @@ serve(async (req) => {
       });
     });
 
-    console.log(`[sync-public-sheet] Column mapping:`, colIndexMap);
+    console.log(`[sync-public-sheet] Column mapping resolved:`, colIndexMap);
 
-    // Fetch existing transactions from this origin for intelligent sync
+    // Fetch ALL existing transactions for this church (not just from this origin)
+    // This prevents duplicates across different import methods
     const { data: existingTransactions } = await supabase
       .from('transactions')
-      .select('id, description, amount, due_date, type, status, external_id')
-      .eq('church_id', integration.church_id)
-      .eq('origin', 'Planilha Pública');
+      .select('id, description, amount, due_date, payment_date, type, status, external_id, category_id, ministry_id, notes')
+      .eq('church_id', integration.church_id);
 
-    // Create maps for deduplication
-    const existingByExternalId = new Map<string, any>();
-    const existingByHash = new Map<string, { id: string; status: string }>();
+    // Build lookup maps using content-based hashing
+    const existingByExternalId = new Map<string, ExistingTransaction>();
+    const existingByContentHash = new Map<string, ExistingTransaction>();
     
-    (existingTransactions || []).forEach((t: any) => {
+    (existingTransactions || []).forEach((t: ExistingTransaction) => {
+      // Map by external_id
       if (t.external_id) {
         existingByExternalId.set(t.external_id, t);
       }
-      const hash = createTransactionHash(t.description, t.amount, t.due_date, t.type);
-      existingByHash.set(hash, { id: t.id, status: t.status });
+      
+      // Map by content hash (only keep first occurrence to avoid issues)
+      const hash = createContentHash(t.description, t.amount, t.due_date, t.type);
+      if (!existingByContentHash.has(hash)) {
+        existingByContentHash.set(hash, t);
+      }
     });
 
-    console.log(`[sync-public-sheet] Found ${existingByExternalId.size} by external_id, ${existingByHash.size} by hash`);
+    console.log(`[sync-public-sheet] Found ${existingTransactions?.length || 0} existing transactions`);
+    console.log(`[sync-public-sheet] Indexed: ${existingByExternalId.size} by external_id, ${existingByContentHash.size} by content hash`);
 
     // Process rows
-    const newTransactions: any[] = [];
-    const updatesToMake: { id: string; changes: Record<string, any> }[] = [];
-    let skippedCount = 0;
-    const changesDetected = { description: 0, amount: 0, status: 0, due_date: 0, type: 0 };
+    const stats = createSyncStats();
+    const toInsert: Record<string, unknown>[] = [];
+    const toUpdate: { id: string; changes: Record<string, unknown> }[] = [];
     const rows = table.rows || [];
 
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       const row = rows[rowIndex];
       const cells = row.c || [];
       
-      // Get values based on mapping
-      const getValue = (field: string) => {
-        const idx = colIndexMap[field];
-        if (idx === undefined) return null;
-        return parseGvizValue(cells[idx]);
-      };
+      try {
+        // Get values based on mapping
+        const getValue = (field: string) => {
+          const idx = colIndexMap[field];
+          if (idx === undefined) return null;
+          return parseGvizValue(cells[idx]);
+        };
 
-      const description = sanitizeString(getValue('description'));
-      const amount = parseNumericValue(getValue('amount'));
-      const type = parseType(getValue('type'));
-      const dueDate = parseDate(getValue('due_date'));
-      const rawStatus = getValue('status');
-      const status = parseStatus(rawStatus, type);
+        const description = sanitizeString(getValue('description'));
+        const amount = parseNumericValue(getValue('amount'));
+        const type = parseType(getValue('type'));
+        const dueDateRaw = parseDate(getValue('due_date'));
+        const paymentDateRaw = parseDate(getValue('payment_date'));
+        const rawStatus = getValue('status');
 
-      // Skip invalid rows
-      if (!description || amount <= 0) {
-        continue;
-      }
-
-      // For Receita, use payment_date instead of due_date
-      const paymentDate = type === 'Receita' ? (dueDate || new Date().toISOString().split('T')[0]) : null;
-      const finalDueDate = type === 'Receita' ? null : dueDate;
-
-      // Create external_id for this row
-      const externalId = createExternalId(integration.sheet_id, rowIndex);
-
-      // Priority 1: Check by external_id
-      const existingByExtId = existingByExternalId.get(externalId);
-      if (existingByExtId) {
-        // Found by external_id - check ALL changes
-        const changes = detectChanges(
-          {
-            description: existingByExtId.description,
-            amount: Number(existingByExtId.amount),
-            due_date: existingByExtId.due_date,
-            type: existingByExtId.type,
-            status: existingByExtId.status,
-          },
-          { description, amount, due_date: finalDueDate, type, status }
-        );
-
-        if (Object.keys(changes).length > 0) {
-          // Track what changed
-          if (changes.description) changesDetected.description++;
-          if (changes.amount) changesDetected.amount++;
-          if (changes.status) changesDetected.status++;
-          if (changes.due_date) changesDetected.due_date++;
-          if (changes.type) changesDetected.type++;
-          
-          if (paymentDate && type === 'Receita') {
-            changes.payment_date = paymentDate;
-          }
-          
-          updatesToMake.push({ id: existingByExtId.id, changes });
-        } else {
-          skippedCount++;
-        }
-        continue;
-      }
-
-      // Priority 2: Check by hash (for legacy data without external_id)
-      const hash = createTransactionHash(description, amount, finalDueDate, type);
-      const existingByHashData = existingByHash.get(hash);
-      
-      if (existingByHashData) {
-        // Found by hash - only update status and add external_id
-        const changes: Record<string, any> = { external_id: externalId };
-        if (existingByHashData.status !== status) {
-          changes.status = status;
-          changesDetected.status++;
+        // Skip invalid rows
+        if (!description || description.length < 2) {
+          continue;
         }
         
-        if (Object.keys(changes).length > 1 || existingByHashData.status !== status) {
-          updatesToMake.push({ id: existingByHashData.id, changes });
-        } else {
-          // Just add external_id for future syncs
-          updatesToMake.push({ id: existingByHashData.id, changes: { external_id: externalId } });
-          skippedCount++;
+        if (amount <= 0) {
+          logSyncAction(stats, rowIndex + 2, 'skip', description, 'Valor inválido');
+          continue;
         }
-        continue;
-      }
 
-      // Priority 3: New transaction
-      newTransactions.push({
-        church_id: integration.church_id,
-        description,
-        amount,
-        type,
-        due_date: finalDueDate,
-        payment_date: paymentDate,
-        status,
-        origin: 'Planilha Pública',
-        created_by: user.id,
-        external_id: externalId,
-      });
+        // For Receita, use payment_date instead of due_date
+        const paymentDate = type === 'Receita' ? (dueDateRaw || paymentDateRaw || new Date().toISOString().split('T')[0]) : paymentDateRaw;
+        const dueDate = type === 'Receita' ? null : dueDateRaw;
+        const status = parseStatus(rawStatus, type, paymentDate, dueDate);
+
+        // Create CONTENT-BASED external_id (not row-based!)
+        const contentHash = createContentHash(description, amount, dueDate, type);
+        const externalId = createExternalId(integration.sheet_id, contentHash);
+
+        // Prepare transaction data
+        const transactionData = {
+          description,
+          amount,
+          type,
+          due_date: dueDate,
+          payment_date: paymentDate,
+          status,
+          category_id: null as string | null,
+          ministry_id: null as string | null,
+          notes: null as string | null
+        };
+
+        // Determine action using intelligent deduplication
+        const result = determineTransactionAction(
+          transactionData,
+          externalId,
+          existingByExternalId,
+          existingByContentHash
+        );
+
+        if (result.action === 'insert') {
+          toInsert.push({
+            church_id: integration.church_id,
+            ...transactionData,
+            origin: 'Planilha Pública',
+            created_by: user.id,
+            external_id: externalId
+          });
+          logSyncAction(stats, rowIndex + 2, 'insert', description, result.reason);
+          
+          // Add to content hash map to prevent duplicates in same batch
+          existingByContentHash.set(contentHash, {
+            id: 'pending',
+            ...transactionData,
+            external_id: externalId
+          });
+          
+        } else if (result.action === 'update' && result.existingId) {
+          // Only count as update if more than just external_id changed
+          const meaningfulChanges = Object.keys(result.changes || {}).filter(k => k !== 'external_id');
+          
+          if (meaningfulChanges.length > 0) {
+            toUpdate.push({
+              id: result.existingId,
+              changes: { ...result.changes, updated_at: new Date().toISOString() }
+            });
+            logSyncAction(stats, rowIndex + 2, 'update', description, result.reason);
+          } else if (result.changes?.external_id) {
+            // Silently update external_id for future syncs
+            toUpdate.push({
+              id: result.existingId,
+              changes: { external_id: result.changes.external_id }
+            });
+            logSyncAction(stats, rowIndex + 2, 'skip', description, 'Apenas ID externo atualizado');
+          } else {
+            logSyncAction(stats, rowIndex + 2, 'skip', description, result.reason);
+          }
+          
+        } else {
+          logSyncAction(stats, rowIndex + 2, 'skip', description, result.reason);
+        }
+        
+      } catch (rowError) {
+        console.error(`[sync-public-sheet] Error processing row ${rowIndex + 2}:`, rowError);
+        logSyncAction(stats, rowIndex + 2, 'error', `Linha ${rowIndex + 2}`, String(rowError));
+      }
     }
 
-    console.log(`[sync-public-sheet] Processing: ${newTransactions.length} new, ${updatesToMake.length} updates, ${skippedCount} skipped`);
-    console.log(`[sync-public-sheet] Changes detected:`, changesDetected);
+    console.log(`[sync-public-sheet] Processing: ${toInsert.length} inserts, ${toUpdate.length} updates, ${stats.skipped} skipped`);
 
-    // Insert new transactions
-    let recordsInserted = 0;
-    if (newTransactions.length > 0) {
-      const { error: insertError, data: insertedData } = await supabase
+    // Insert new transactions in batch
+    if (toInsert.length > 0) {
+      const { error: insertError } = await supabase
         .from('transactions')
-        .insert(newTransactions)
-        .select();
+        .insert(toInsert);
 
       if (insertError) {
         console.error('[sync-public-sheet] Insert error:', insertError);
@@ -425,17 +540,15 @@ serve(async (req) => {
           .eq('id', integrationId);
           
         return new Response(
-          JSON.stringify({ success: false, error: 'Erro ao processar dados da planilha. Verifique os dados e tente novamente.' }),
+          JSON.stringify({ success: false, error: 'Erro ao inserir transações: ' + insertError.message }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      recordsInserted = insertedData?.length || 0;
     }
 
     // Update existing transactions
-    let recordsUpdated = 0;
-    for (const update of updatesToMake) {
+    let updateErrors = 0;
+    for (const update of toUpdate) {
       if (Object.keys(update.changes).length === 0) continue;
       
       const { error } = await supabase
@@ -443,22 +556,24 @@ serve(async (req) => {
         .update(update.changes)
         .eq('id', update.id);
       
-      if (!error) {
-        // Only count as updated if more than just external_id changed
-        const significantChanges = Object.keys(update.changes).filter(k => k !== 'external_id');
-        if (significantChanges.length > 0) {
-          recordsUpdated++;
-        }
+      if (error) {
+        console.error(`[sync-public-sheet] Update error for ${update.id}:`, error);
+        updateErrors++;
       }
     }
+
+    // Calculate final stats (subtract silent external_id updates from update count)
+    const meaningfulUpdates = toUpdate.filter(u => 
+      Object.keys(u.changes).filter(k => k !== 'external_id').length > 0
+    ).length;
 
     // Update integration status
     await supabase
       .from('public_sheet_integrations')
       .update({
-        sync_status: 'success',
+        sync_status: stats.errors > 0 || updateErrors > 0 ? 'partial' : 'success',
         last_sync_at: new Date().toISOString(),
-        records_synced: (integration.records_synced || 0) + recordsInserted,
+        records_synced: toInsert.length + meaningfulUpdates
       })
       .eq('id', integrationId);
 
@@ -470,23 +585,25 @@ serve(async (req) => {
         user_id: user.id,
         integration_id: integrationId,
         integration_type: 'public_sheet',
-        records_inserted: recordsInserted,
-        records_updated: recordsUpdated,
-        records_skipped: skippedCount,
-        status: 'success',
+        records_inserted: toInsert.length,
+        records_updated: meaningfulUpdates,
+        records_skipped: stats.skipped,
+        status: stats.errors > 0 || updateErrors > 0 ? 'partial' : 'success',
         sync_type: syncType,
+        error_message: stats.errors > 0 ? `${stats.errors + updateErrors} erros durante sincronização` : null
       });
 
-    console.log(`[sync-public-sheet] Sync complete. Inserted: ${recordsInserted}, Updated: ${recordsUpdated}, Skipped: ${skippedCount}`);
+    console.log(`[sync-public-sheet] Sync complete. Inserted: ${toInsert.length}, Updated: ${meaningfulUpdates}, Skipped: ${stats.skipped}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        recordsInserted,
-        recordsUpdated,
-        recordsSkipped: skippedCount,
-        changesDetected,
-        message: `${recordsInserted} novas transações, ${recordsUpdated} atualizadas, ${skippedCount} ignoradas.`,
+        recordsInserted: toInsert.length,
+        recordsUpdated: meaningfulUpdates,
+        recordsSkipped: stats.skipped,
+        errors: stats.errors + updateErrors,
+        message: `${toInsert.length} novas transações, ${meaningfulUpdates} atualizadas, ${stats.skipped} ignoradas.`,
+        details: stats.details.slice(0, 50) // Return first 50 details for debugging
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -496,7 +613,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: 'Erro interno do servidor. Tente novamente mais tarde.' 
+        error: 'Erro interno do servidor: ' + (error instanceof Error ? error.message : 'Erro desconhecido')
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

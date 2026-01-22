@@ -14,19 +14,28 @@ export interface GoogleIntegration {
   updated_at: string;
   sheet_id: string;
   sheet_name: string;
-  // Tokens are stored encrypted in *_enc columns, not exposed here
   has_tokens: boolean;
 }
 
-// Removendo a interface GoogleSheet, pois não listaremos mais planilhas via API do Drive
-// Removendo o tipo UserCredentials, pois não armazenaremos mais tokens OAuth
+interface SyncResponse {
+  success: boolean;
+  recordsInserted: number;
+  recordsUpdated: number;
+  recordsSkipped: number;
+  errors?: number;
+  message?: string;
+  error?: string;
+  details?: Array<{
+    row: number;
+    action: string;
+    description: string;
+    reason?: string;
+  }>;
+}
 
 export const useIntegrations = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-
-  // Removendo a query para credentials, pois não usaremos mais tokens OAuth
-  // const { data: credentials, isLoading: credentialsLoading } = useQuery(...)
 
   // Fetch integrations
   const { data: integrations, isLoading } = useQuery({
@@ -40,7 +49,6 @@ export const useIntegrations = () => {
 
       if (error) throw error;
       
-      // Map to interface, checking if tokens exist
       return data.map(item => ({
         id: item.id,
         church_id: item.church_id,
@@ -57,10 +65,6 @@ export const useIntegrations = () => {
     enabled: !!user?.id,
   });
 
-  // Removendo startOAuth mutation
-  // Removendo disconnectGoogle mutation
-  // Removendo listSheets mutation
-
   // Create integration with encrypted token storage
   const createIntegration = useMutation({
     mutationFn: async (params: {
@@ -71,14 +75,12 @@ export const useIntegrations = () => {
       accessToken: string;
       refreshToken: string;
     }) => {
-      // First, create the integration without tokens (encrypted columns only)
       const insertData = {
         user_id: user?.id,
         church_id: params.churchId,
         sheet_id: params.sheetId,
         sheet_name: params.sheetName,
         column_mapping: params.columnMapping,
-        // Encrypted token columns will be populated via RPC
       };
       
       const { data: newIntegration, error: insertError } = await supabase
@@ -89,7 +91,6 @@ export const useIntegrations = () => {
 
       if (insertError) throw insertError;
 
-      // Now store tokens encrypted using the secure RPC function
       const { error: encryptError } = await supabase.rpc(
         'store_encrypted_integration_tokens',
         {
@@ -100,7 +101,6 @@ export const useIntegrations = () => {
       );
 
       if (encryptError) {
-        // Rollback: delete the integration if token encryption fails
         await supabase.from("google_integrations").delete().eq('id', newIntegration.id);
         throw new Error('Falha ao criptografar tokens OAuth');
       }
@@ -121,30 +121,53 @@ export const useIntegrations = () => {
     },
   });
 
-  // Sync integration
+  // Sync integration with improved feedback
   const syncIntegration = useMutation({
-    mutationFn: async (integrationId: string) => {
-      // A Edge Function 'sync-sheet' agora buscará a sheet_url e a column_mapping
-      // diretamente da tabela google_integrations usando o integrationId.
+    mutationFn: async (integrationId: string): Promise<SyncResponse> => {
       const { data, error } = await supabase.functions.invoke("sync-sheet", {
         body: { integrationId },
       });
 
       if (error) throw error;
-      return data;
+      if (!data?.success && data?.error) throw new Error(data.error);
+      
+      return data as SyncResponse;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["google-integrations"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["transaction-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["sync-history"] });
       
       const inserted = data.recordsInserted || 0;
       const updated = data.recordsUpdated || 0;
       const skipped = data.recordsSkipped || 0;
+      const errors = data.errors || 0;
       
-      toast({
-        title: "Sincronização concluída",
-        description: `${inserted} nova(s), ${updated} atualizada(s), ${skipped} ignorada(s).`,
-      });
+      // Build detailed message
+      const parts: string[] = [];
+      if (inserted > 0) parts.push(`${inserted} nova(s)`);
+      if (updated > 0) parts.push(`${updated} atualizada(s)`);
+      if (skipped > 0) parts.push(`${skipped} ignorada(s)`);
+      if (errors > 0) parts.push(`${errors} erro(s)`);
+      
+      const description = parts.length > 0 
+        ? parts.join(', ') + '.'
+        : 'Nenhuma alteração necessária.';
+      
+      // Show appropriate toast based on results
+      if (inserted === 0 && updated === 0 && skipped > 0) {
+        toast({
+          title: "Sincronização concluída",
+          description: `${skipped} transação(ões) já existia(m) no sistema. Nenhuma duplicata criada.`,
+        });
+      } else {
+        toast({
+          title: errors > 0 ? "Sincronização parcial" : "Sincronização concluída",
+          description,
+          variant: errors > 0 ? "destructive" : "default",
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -183,11 +206,7 @@ export const useIntegrations = () => {
 
   return {
     integrations,
-    isLoading: isLoading, // credentialsLoading removido
-    // credentials removido
-    // startOAuth removido
-    // disconnectGoogle removido
-    // listSheets removido
+    isLoading,
     createIntegration,
     syncIntegration,
     deleteIntegration,

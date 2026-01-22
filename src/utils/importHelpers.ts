@@ -3,11 +3,185 @@ import { z } from 'zod';
 import { transactionImportSchema, ProcessedTransaction } from '@/types/import';
 
 /**
+ * Normalizes a string for consistent comparison
+ */
+function normalizeForHash(str: string | null | undefined): string {
+  if (!str) return '';
+  return str
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .replace(/\s+/g, ' ');
+}
+
+/**
+ * Creates a content-based hash from transaction data
+ * This is the same algorithm used in the Edge Functions for consistency
+ */
+export function createContentHash(
+  description: string,
+  amount: number,
+  dueDate: string | null,
+  type: string
+): string {
+  const normalizedDesc = normalizeForHash(description);
+  const normalizedAmount = Math.abs(Number(amount) || 0).toFixed(2);
+  const normalizedDate = dueDate || '';
+  const normalizedType = type.toLowerCase().trim();
+  
+  const content = `${normalizedDesc}|${normalizedAmount}|${normalizedDate}|${normalizedType}`;
+  
+  try {
+    return btoa(unescape(encodeURIComponent(content)))
+      .replace(/[+/=]/g, '')
+      .substring(0, 20);
+  } catch {
+    return content.replace(/[^a-z0-9]/gi, '').substring(0, 20);
+  }
+}
+
+/**
+ * Creates an external_id for imported transactions
+ * Format: import_{contentHash}
+ */
+export function createImportExternalId(
+  description: string,
+  amount: number,
+  dueDate: string | null,
+  type: string
+): string {
+  const hash = createContentHash(description, amount, dueDate, type);
+  return `import_${hash}`;
+}
+
+/**
+ * Checks if two amounts are effectively equal (handles floating point issues)
+ */
+export function amountsAreEqual(a: number, b: number): boolean {
+  return Math.abs(Number(a) - Number(b)) < 0.01;
+}
+
+/**
+ * Interface for existing transaction when checking duplicates
+ */
+export interface ExistingTransactionForDupe {
+  id: string;
+  description: string;
+  amount: number;
+  type: string;
+  due_date: string | null;
+  payment_date: string | null;
+  external_id: string | null;
+}
+
+/**
+ * Checks if an incoming transaction is a duplicate of an existing one
+ * Uses content hash as the primary deduplication method
+ */
+export function isTransactionDuplicate(
+  incoming: {
+    description: string;
+    amount: number;
+    type: string;
+    due_date: string | null;
+  },
+  existingHashes: Set<string>,
+  existingByExternalId: Set<string>
+): boolean {
+  const hash = createContentHash(
+    incoming.description,
+    incoming.amount,
+    incoming.due_date,
+    incoming.type
+  );
+  
+  const externalId = createImportExternalId(
+    incoming.description,
+    incoming.amount,
+    incoming.due_date,
+    incoming.type
+  );
+  
+  return existingHashes.has(hash) || existingByExternalId.has(externalId);
+}
+
+/**
+ * Builds lookup sets from existing transactions for efficient deduplication
+ */
+export function buildDeduplicationSets(
+  existingTransactions: ExistingTransactionForDupe[]
+): {
+  existingHashes: Set<string>;
+  existingByExternalId: Set<string>;
+} {
+  const existingHashes = new Set<string>();
+  const existingByExternalId = new Set<string>();
+  
+  for (const tx of existingTransactions) {
+    const hash = createContentHash(tx.description, tx.amount, tx.due_date, tx.type);
+    existingHashes.add(hash);
+    
+    if (tx.external_id) {
+      existingByExternalId.add(tx.external_id);
+    }
+  }
+  
+  return { existingHashes, existingByExternalId };
+}
+
+/**
+ * Filters out duplicate transactions from import batch
+ * Also detects intra-batch duplicates
+ */
+export function filterDuplicateTransactions<T extends {
+  description: string;
+  amount: number;
+  type: string;
+  due_date: string | null;
+}>(
+  incoming: T[],
+  existingHashes: Set<string>,
+  existingByExternalId: Set<string>
+): {
+  toImport: T[];
+  duplicates: T[];
+  batchDuplicates: T[];
+} {
+  const toImport: T[] = [];
+  const duplicates: T[] = [];
+  const batchDuplicates: T[] = [];
+  const batchHashes = new Set<string>();
+  
+  for (const tx of incoming) {
+    const hash = createContentHash(tx.description, tx.amount, tx.due_date, tx.type);
+    const externalId = createImportExternalId(tx.description, tx.amount, tx.due_date, tx.type);
+    
+    // Check if already exists in database
+    if (existingHashes.has(hash) || existingByExternalId.has(externalId)) {
+      duplicates.push(tx);
+      continue;
+    }
+    
+    // Check if duplicate within this batch
+    if (batchHashes.has(hash)) {
+      batchDuplicates.push(tx);
+      continue;
+    }
+    
+    batchHashes.add(hash);
+    toImport.push(tx);
+  }
+  
+  return { toImport, duplicates, batchDuplicates };
+}
+
+/**
  * Reads an Excel or CSV file and returns its headers and rows.
  * @param file The file to read.
  * @returns A promise that resolves to an object with headers and rows.
  */
-export const readSpreadsheet = (file: File): Promise<{ headers: string[]; rows: any[][] }> => {
+export const readSpreadsheet = (file: File): Promise<{ headers: string[]; rows: unknown[][] }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -25,9 +199,9 @@ export const readSpreadsheet = (file: File): Promise<{ headers: string[]; rows: 
           throw new Error('No worksheet found in the file.');
         }
         
-        const rows: any[][] = [];
-        worksheet.eachRow((row, rowNumber) => {
-          const rowValues = row.values as any[];
+        const rows: unknown[][] = [];
+        worksheet.eachRow((row) => {
+          const rowValues = row.values as unknown[];
           // ExcelJS row.values starts at index 1, so we slice from index 1
           rows.push(rowValues.slice(1));
         });
@@ -50,17 +224,26 @@ export const readSpreadsheet = (file: File): Promise<{ headers: string[]; rows: 
  * @param value The value to parse.
  * @returns The parsed number or null if invalid.
  */
-export const parseAmount = (value: any): number | null => {
+export const parseAmount = (value: unknown): number | null => {
   if (typeof value === 'number') {
-    return value;
+    return Math.abs(value);
   }
   if (typeof value !== 'string') {
     return null;
   }
-  const cleaned = value.replace(/[^0-9,.-]/g, '').trim();
-  const standardized = cleaned.replace(/\./g, '').replace(',', '.');
-  const number = parseFloat(standardized);
-  return isNaN(number) ? null : number;
+  
+  // Remove currency symbols and spaces
+  let cleaned = value.replace(/[R$\s]/g, '').trim();
+  
+  // Handle Brazilian format (1.234,56 -> 1234.56)
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+  } else if (cleaned.includes(',')) {
+    cleaned = cleaned.replace(',', '.');
+  }
+  
+  const number = parseFloat(cleaned);
+  return isNaN(number) ? null : Math.abs(number);
 };
 
 /**
@@ -68,7 +251,7 @@ export const parseAmount = (value: any): number | null => {
  * @param value The value to parse.
  * @returns The ISO date string or null if invalid.
  */
-export const parseDate = (value: any): string | null => {
+export const parseDate = (value: unknown): string | null => {
   if (!value) return null;
 
   // Handle ExcelJS Date objects
@@ -88,20 +271,24 @@ export const parseDate = (value: any): string | null => {
   }
 
   if (typeof value === 'string') {
-    const date = new Date(value);
-    // Check if it's a valid date string that JS can parse
-    if (!isNaN(date.getTime())) {
-        return date.toISOString().split('T')[0];
+    // Try DD/MM/YYYY format first
+    const brMatch = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (brMatch) {
+      const [, day, month, year] = brMatch;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
     
-    // Handle DD/MM/YYYY and DD-MM-YYYY
-    const parts = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
-    if (parts) {
-      const isoDate = `${parts[3]}-${parts[2].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
-      const parsedDate = new Date(isoDate);
-      if (!isNaN(parsedDate.getTime())) {
-        return isoDate;
-      }
+    // Try YYYY-MM-DD format
+    const isoMatch = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (isoMatch) {
+      const [, year, month, day] = isoMatch;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+    
+    // Fallback to Date constructor
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
     }
   }
   
@@ -116,12 +303,18 @@ export const parseDate = (value: any): string | null => {
 export const normalizeType = (value: string): 'Receita' | 'Despesa' | null => {
   if (typeof value !== 'string') return null;
   const lower = value.toLowerCase().trim();
-  if (['receita', 'entrada', 'crédito', 'credit'].includes(lower)) {
-    return 'Receita';
+  
+  const receitaTerms = ['receita', 'entrada', 'crédito', 'credito', 'credit', 'income', 'revenue'];
+  const despesaTerms = ['despesa', 'saída', 'saida', 'débito', 'debito', 'debit', 'gasto', 'pagamento', 'expense'];
+  
+  for (const term of receitaTerms) {
+    if (lower.includes(term)) return 'Receita';
   }
-  if (['despesa', 'saída', 'débito', 'debit'].includes(lower)) {
-    return 'Despesa';
+  
+  for (const term of despesaTerms) {
+    if (lower.includes(term)) return 'Despesa';
   }
+  
   return null;
 };
 
@@ -133,6 +326,7 @@ export const normalizeType = (value: string): 'Receita' | 'Despesa' | null => {
 export const normalizeStatus = (value: string): 'Pendente' | 'Pago' | 'Vencido' | null => {
   if (typeof value !== 'string') return null;
   const lower = value.toLowerCase().trim();
+  
   if (['pendente', 'pending', 'aberto', 'a pagar', 'a receber'].includes(lower)) {
     return 'Pendente';
   }
