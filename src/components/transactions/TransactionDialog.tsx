@@ -186,11 +186,13 @@ export function TransactionDialog({
 
       if (uploadError) throw uploadError;
 
-      const { data: urlData } = supabase.storage
+      // Use signed URLs for private bucket access
+      const { data: urlData, error: urlError } = await supabase.storage
         .from('invoices')
-        .getPublicUrl(fileName);
+        .createSignedUrl(fileName, 86400); // 24 hour expiry
 
-      return urlData.publicUrl;
+      if (urlError) throw urlError;
+      return urlData.signedUrl;
     } catch (error: any) {
       console.error('Error uploading invoice:', error);
       toast({

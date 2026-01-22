@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
       if (createError) {
         console.error("Error creating user directly:", createError);
         return new Response(
-          JSON.stringify({ error: `Erro ao criar usuário: ${createError.message}` }),
+          JSON.stringify({ error: "Falha ao criar usuário. Por favor, tente novamente." }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
     if (createError) {
       console.error("Error creating user:", createError);
       return new Response(
-        JSON.stringify({ error: `Erro ao criar usuário: ${createError.message}` }),
+        JSON.stringify({ error: "Falha ao criar usuário. Por favor, tente novamente." }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -250,9 +250,8 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error("Error in invite-user function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Ocorreu um erro inesperado. Por favor, tente novamente." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
