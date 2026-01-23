@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { corsHeaders } from "../_shared/cors.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 interface ResetPasswordRequest {
   userId: string;
@@ -10,6 +10,9 @@ interface ResetPasswordRequest {
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -197,7 +200,7 @@ Deno.serve(async (req) => {
     console.error("Error in reset-user-password function:", error);
     return new Response(
       JSON.stringify({ error: "Ocorreu um erro inesperado. Por favor, tente novamente." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...getCorsHeaders(req.headers.get("origin")), "Content-Type": "application/json" } }
     );
   }
 });
