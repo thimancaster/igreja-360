@@ -163,14 +163,14 @@ export default function Integracoes() {
           return;
         }
 
-        // Fetch decrypted tokens using secure RPC function
-        const { data: decryptedTokens, error: decryptError } = await supabase.rpc(
-          'get_decrypted_oauth_session',
-          { session_id: sessionId }
+        // Fetch decrypted tokens using secure edge function (ownership validated server-side)
+        const { data: tokenResponse, error: tokenError } = await supabase.functions.invoke(
+          'get-oauth-session',
+          { body: { session_id: sessionId } }
         );
 
-        if (decryptError || !decryptedTokens || decryptedTokens.length === 0) {
-          logger.error('Failed to decrypt OAuth tokens:', decryptError);
+        if (tokenError || !tokenResponse?.success) {
+          logger.error('Failed to decrypt OAuth tokens:', tokenError || tokenResponse?.error);
           toast({
             title: "Erro",
             description: "Não foi possível recuperar os tokens OAuth. Tente novamente.",
@@ -183,8 +183,8 @@ export default function Integracoes() {
         // SECURITY: Store tokens in React state (memory only)
         // Tokens are encrypted at rest in database and decrypted only when needed
         setOauthTokens({
-          accessToken: decryptedTokens[0].access_token,
-          refreshToken: decryptedTokens[0].refresh_token || null,
+          accessToken: tokenResponse.access_token,
+          refreshToken: tokenResponse.refresh_token || null,
         });
 
         // Delete session from database after retrieving tokens
