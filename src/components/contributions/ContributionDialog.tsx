@@ -46,10 +46,12 @@ export function ContributionDialog({ open, onOpenChange, defaultMemberId }: Cont
   const { data: members } = useMembers();
   const createContribution = useCreateContribution();
 
+  const ANONYMOUS_VALUE = "anonymous";
+
   const form = useForm<ContributionFormSchema>({
     resolver: zodResolver(contributionSchema),
     defaultValues: {
-      member_id: defaultMemberId || '',
+      member_id: defaultMemberId ?? ANONYMOUS_VALUE,
       amount: 0,
       contribution_date: new Date(),
       contribution_type: 'dizimo',
@@ -64,7 +66,7 @@ export function ContributionDialog({ open, onOpenChange, defaultMemberId }: Cont
     const formData: ContributionFormData = {
       amount: data.amount,
       contribution_type: data.contribution_type,
-      member_id: data.member_id || null,
+      member_id: !data.member_id || data.member_id === ANONYMOUS_VALUE ? null : data.member_id,
       contribution_date: format(data.contribution_date, 'yyyy-MM-dd'),
       campaign_name: data.campaign_name,
       notes: data.notes,
@@ -145,7 +147,7 @@ export function ContributionDialog({ open, onOpenChange, defaultMemberId }: Cont
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Anônimo</SelectItem>
+                      <SelectItem value={ANONYMOUS_VALUE}>Anônimo</SelectItem>
                       {members?.filter(m => m.status === 'active').map(member => (
                         <SelectItem key={member.id} value={member.id}>
                           {member.full_name}
