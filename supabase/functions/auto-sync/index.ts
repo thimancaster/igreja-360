@@ -1,17 +1,16 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 // Generic error response to prevent information leakage
-const unauthorizedResponse = () => new Response(
+const unauthorizedResponse = (origin: string | null) => new Response(
   JSON.stringify({ success: false, error: 'Unauthorized' }),
-  { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  { status: 401, headers: { ...getCorsHeaders(origin), 'Content-Type': 'application/json' } }
 );
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -20,7 +19,7 @@ Deno.serve(async (req) => {
   const autoSyncSecret = Deno.env.get('AUTO_SYNC_SECRET_KEY');
   if (!autoSyncSecret) {
     console.error('Auto-sync: AUTO_SYNC_SECRET_KEY not configured');
-    return unauthorizedResponse();
+    return unauthorizedResponse(origin);
   }
 
   const authHeader = req.headers.get('Authorization');
@@ -28,7 +27,7 @@ Deno.serve(async (req) => {
   
   if (!providedToken || providedToken !== autoSyncSecret) {
     console.warn('Auto-sync: Invalid or missing authorization token');
-    return unauthorizedResponse();
+    return unauthorizedResponse(origin);
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
