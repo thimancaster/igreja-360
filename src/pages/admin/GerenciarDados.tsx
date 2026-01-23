@@ -13,6 +13,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { ConfirmDeleteDialog } from "@/components/admin/ConfirmDeleteDialog";
 import { AuditLogViewer } from "@/components/admin/AuditLogViewer";
 import { SelectiveDeleteSection } from "@/components/admin/SelectiveDeleteSection";
+import { DuplicateCleanupSection } from "@/components/admin/DuplicateCleanupSection";
 import { exportToExcel } from "@/utils/exportHelpers";
 import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 
@@ -389,6 +390,9 @@ export default function GerenciarDados() {
 
       {/* Selective Delete Section */}
       <SelectiveDeleteSection />
+
+      {/* Duplicate Cleanup Section */}
+      <DuplicateCleanupSection />
 
       <Card className="border-destructive/50">
         <CardHeader>
