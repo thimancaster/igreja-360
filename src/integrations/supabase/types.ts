@@ -946,22 +946,8 @@ export type Database = {
           phone: string
         }[]
       }
-      get_decrypted_integration: {
-        Args: { integration_id: string }
-        Returns: {
-          access_token: string
-          refresh_token: string
-        }[]
-      }
       get_decrypted_integration_v2: {
         Args: { integration_id: string; requesting_user_id: string }
-        Returns: {
-          access_token: string
-          refresh_token: string
-        }[]
-      }
-      get_decrypted_oauth_session: {
-        Args: { session_id: string }
         Returns: {
           access_token: string
           refresh_token: string
