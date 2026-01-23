@@ -277,9 +277,12 @@ serve(async (req) => {
 
     console.log(`[sync-sheet] Starting sync for integration ${integrationId} by user ${user.id}`);
 
-    // Get decrypted OAuth tokens from database
+    // Get decrypted OAuth tokens from database (using v2 function with ownership check)
     const { data: tokenData, error: tokenError } = await supabase
-      .rpc('get_decrypted_integration', { integration_id: integrationId });
+      .rpc('get_decrypted_integration_v2', { 
+        integration_id: integrationId,
+        requesting_user_id: user.id 
+      });
 
     if (tokenError || !tokenData || tokenData.length === 0) {
       console.error('Failed to get OAuth tokens:', tokenError);
