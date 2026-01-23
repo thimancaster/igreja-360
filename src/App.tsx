@@ -7,7 +7,6 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { SidebarProvider } from '@/components/ui/sidebar';
 import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AuthRedirect } from '@/components/AuthRedirect';
@@ -15,8 +14,7 @@ import { AuthRedirect } from '@/components/AuthRedirect';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AdminRoute } from '@/components/AdminRoute';
 
-import { AppSidebar } from '@/components/AppSidebar';
-import { AppHeader } from '@/components/AppHeader';
+import { AppLayout } from '@/components/AppLayout';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { InstallPrompt } from '@/components/pwa/InstallPrompt';
 
@@ -64,39 +62,22 @@ const App: React.FC = () => {
                 <Route path="/" element={<AuthRedirect />} /> 
 
                 {/* Rotas protegidas com layout (sidebar + header) */}
-                <Route
-                  path="/app/*"
-                  element={
-                    <ProtectedRoute>
-                      <SidebarProvider defaultOpen={true}>
-                        <div className="flex min-h-screen w-full">
-                          <AppSidebar />
-                          <div className="flex-1 flex flex-col">
-                            <AppHeader />
-                            <Routes>
-                              <Route path="dashboard" element={<Dashboard />} />
-                              <Route path="transacoes" element={<Transacoes />} />
-                              <Route path="membros" element={<Membros />} />
-                              <Route path="contribuicoes" element={<Contribuicoes />} />
-                              <Route path="importacao" element={<Importacao />} />
-                              <Route path="integracoes" element={<Integracoes />} />
-                              <Route path="relatorios" element={<Relatorios />} />
-                              <Route path="admin" element={<AdminRoute><Admin /></AdminRoute>} />
-                              <Route path="admin/usuarios" element={<AdminRoute><GerenciarUsuarios /></AdminRoute>} />
-                              <Route path="admin/ministerios" element={<AdminRoute><GerenciarMinisterios /></AdminRoute>} />
-                              <Route path="admin/igreja" element={<AdminRoute><GerenciarIgreja /></AdminRoute>} />
-                              <Route path="admin/categorias" element={<AdminRoute><GerenciarCategorias /></AdminRoute>} />
-                              <Route path="admin/dados" element={<AdminRoute><GerenciarDados /></AdminRoute>} />
-                              <Route path="admin/configuracoes-sistema" element={<AdminRoute><ConfiguracoesSistema /></AdminRoute>} />
-                              <Route path="configuracoes" element={<Configuracoes />} />
-                              <Route path="*" element={<NotFound />} />
-                            </Routes>
-                          </div>
-                        </div>
-                      </SidebarProvider>
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/app/dashboard" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/transacoes" element={<ProtectedRoute><AppLayout><Transacoes /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/membros" element={<ProtectedRoute><AppLayout><Membros /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/contribuicoes" element={<ProtectedRoute><AppLayout><Contribuicoes /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/importacao" element={<ProtectedRoute><AppLayout><Importacao /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/integracoes" element={<ProtectedRoute><AppLayout><Integracoes /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/relatorios" element={<ProtectedRoute><AppLayout><Relatorios /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/admin" element={<ProtectedRoute><AdminRoute><AppLayout><Admin /></AppLayout></AdminRoute></ProtectedRoute>} />
+                <Route path="/app/admin/usuarios" element={<ProtectedRoute><AdminRoute><AppLayout><GerenciarUsuarios /></AppLayout></AdminRoute></ProtectedRoute>} />
+                <Route path="/app/admin/ministerios" element={<ProtectedRoute><AdminRoute><AppLayout><GerenciarMinisterios /></AppLayout></AdminRoute></ProtectedRoute>} />
+                <Route path="/app/admin/igreja" element={<ProtectedRoute><AdminRoute><AppLayout><GerenciarIgreja /></AppLayout></AdminRoute></ProtectedRoute>} />
+                <Route path="/app/admin/categorias" element={<ProtectedRoute><AdminRoute><AppLayout><GerenciarCategorias /></AppLayout></AdminRoute></ProtectedRoute>} />
+                <Route path="/app/admin/dados" element={<ProtectedRoute><AdminRoute><AppLayout><GerenciarDados /></AppLayout></AdminRoute></ProtectedRoute>} />
+                <Route path="/app/admin/configuracoes-sistema" element={<ProtectedRoute><AdminRoute><AppLayout><ConfiguracoesSistema /></AppLayout></AdminRoute></ProtectedRoute>} />
+                <Route path="/app/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/*" element={<ProtectedRoute><AppLayout><NotFound /></AppLayout></ProtectedRoute>} />
 
                 {/* Rotas de fluxo de criação/seleção (fora do layout principal) */}
                 <Route path="/create-church" element={<ProtectedRoute><CreateChurchPage /></ProtectedRoute>} />
