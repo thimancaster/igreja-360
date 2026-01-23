@@ -15,17 +15,19 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Authentication: Validate secret key
+  // Authentication: Accept either service role key or legacy secret
+  // This allows both cron jobs (via service role) and legacy systems to work
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const autoSyncSecret = Deno.env.get('AUTO_SYNC_SECRET_KEY');
-  if (!autoSyncSecret) {
-    console.error('Auto-sync: AUTO_SYNC_SECRET_KEY not configured');
-    return unauthorizedResponse(origin);
-  }
-
+  
   const authHeader = req.headers.get('Authorization');
   const providedToken = authHeader?.replace('Bearer ', '');
   
-  if (!providedToken || providedToken !== autoSyncSecret) {
+  // Validate authorization - accept service role key OR auto-sync secret
+  const isServiceRole = providedToken && serviceRoleKey && providedToken === serviceRoleKey;
+  const isAutoSyncSecret = providedToken && autoSyncSecret && providedToken === autoSyncSecret;
+  
+  if (!providedToken || (!isServiceRole && !isAutoSyncSecret)) {
     console.warn('Auto-sync: Invalid or missing authorization token');
     return unauthorizedResponse(origin);
   }
