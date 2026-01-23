@@ -4,7 +4,6 @@ import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Home } from "lucide-react";
-import { Link } from "react-router-dom"; // Importar Link para o botão de voltar
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -55,11 +54,14 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               <Button onClick={() => window.location.reload()} className="w-full">
                 Recarregar Página
               </Button>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/">
-                  <Home className="mr-2 h-4 w-4" />
-                  Ir para a Página Inicial
-                </Link>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => window.location.assign("/")}
+              >
+                <Home className="mr-2 h-4 w-4" />
+                Ir para a Página Inicial
               </Button>
               {this.state.error && (
                 <details className="mt-4 text-sm text-muted-foreground text-left p-2 border rounded-md bg-muted">
