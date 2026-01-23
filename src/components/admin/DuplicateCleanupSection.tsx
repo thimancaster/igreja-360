@@ -9,11 +9,23 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Copy, Search, Trash2, RefreshCw, AlertTriangle, CheckCircle2, Receipt, Users, Wallet } from "lucide-react";
+import { Copy, Search, Trash2, RefreshCw, AlertTriangle, CheckCircle2, Receipt, Users, Wallet, Merge, Info } from "lucide-react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type EntityType = "transactions" | "members" | "contributions";
 
@@ -104,6 +116,11 @@ export function DuplicateCleanupSection() {
   const [activeTab, setActiveTab] = useState<EntityType>("transactions");
   const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
   const [isScanning, setIsScanning] = useState(false);
+  
+  // Merge-specific state
+  const [selectedMasterMembers, setSelectedMasterMembers] = useState<Record<string, string>>({});
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [pendingMergeGroup, setPendingMergeGroup] = useState<DuplicateMemberGroup | null>(null);
 
   // Fetch transactions duplicates
   const { data: transactionGroups, isLoading: loadingTransactions, refetch: refetchTransactions } = useQuery({
@@ -315,6 +332,106 @@ export function DuplicateCleanupSection() {
     });
   };
 
+  // Merge members mutation
+  const mergeMembersMutation = useMutation({
+    mutationFn: async ({ masterId, duplicateIds }: { masterId: string; duplicateIds: string[] }) => {
+      if (!profile?.church_id) throw new Error("Igreja não encontrada");
+      if (duplicateIds.length === 0) throw new Error("Nenhuma duplicata para mesclar");
+
+      // 1. Transfer all contributions from duplicates to master
+      const { error: contribError } = await supabase
+        .from("contributions")
+        .update({ member_id: masterId })
+        .in("member_id", duplicateIds);
+
+      if (contribError) throw new Error("Erro ao transferir contribuições: " + contribError.message);
+
+      // 2. Transfer all transactions from duplicates to master
+      const { error: txError } = await supabase
+        .from("transactions")
+        .update({ member_id: masterId })
+        .in("member_id", duplicateIds);
+
+      if (txError) throw new Error("Erro ao transferir transações: " + txError.message);
+
+      // 3. Get existing ministry links for master to avoid duplicates
+      const { data: masterMinistries } = await supabase
+        .from("member_ministries")
+        .select("ministry_id")
+        .eq("member_id", masterId);
+
+      const masterMinistryIds = new Set(masterMinistries?.map(m => m.ministry_id) || []);
+
+      // 4. Get ministry links from duplicates
+      const { data: duplicateMinistries } = await supabase
+        .from("member_ministries")
+        .select("ministry_id, role, joined_at")
+        .in("member_id", duplicateIds);
+
+      // 5. Add unique ministry links to master
+      if (duplicateMinistries && duplicateMinistries.length > 0) {
+        const newMinistryLinks = duplicateMinistries
+          .filter(m => !masterMinistryIds.has(m.ministry_id))
+          .map(m => ({
+            member_id: masterId,
+            ministry_id: m.ministry_id,
+            role: m.role,
+            joined_at: m.joined_at,
+          }));
+
+        if (newMinistryLinks.length > 0) {
+          const { error: ministryInsertError } = await supabase
+            .from("member_ministries")
+            .insert(newMinistryLinks);
+
+          if (ministryInsertError) {
+            console.error("Erro ao transferir ministérios:", ministryInsertError);
+            // Continue even if this fails - not critical
+          }
+        }
+      }
+
+      // 6. Delete ministry links from duplicates
+      const { error: deleteMinistryError } = await supabase
+        .from("member_ministries")
+        .delete()
+        .in("member_id", duplicateIds);
+
+      if (deleteMinistryError) {
+        console.error("Erro ao remover vínculos de ministério:", deleteMinistryError);
+      }
+
+      // 7. Delete duplicate members
+      const { error: deleteError } = await supabase
+        .from("members")
+        .delete()
+        .in("id", duplicateIds);
+
+      if (deleteError) throw new Error("Erro ao excluir duplicatas: " + deleteError.message);
+
+      // 8. Log audit action
+      await logAuditAction("MERGE_MEMBERS", "members", duplicateIds.length + 1, {
+        master_id: masterId,
+        merged_ids: duplicateIds,
+      });
+
+      return duplicateIds.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["members"] });
+      queryClient.invalidateQueries({ queryKey: ["duplicate-members"] });
+      queryClient.invalidateQueries({ queryKey: ["contributions"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["audit-logs"] });
+      setSelectedMasterMembers({});
+      toast.success(`${count} membro(s) mesclado(s) com sucesso! Contribuições e vínculos foram transferidos.`);
+    },
+    onError: (error) => {
+      toast.error("Erro ao mesclar membros: " + error.message);
+    },
+  });
+
   const deleteTransactionsMutation = createDeleteMutation("transactions");
   const deleteMembersMutation = createDeleteMutation("members");
   const deleteContributionsMutation = createDeleteMutation("contributions");
@@ -382,6 +499,7 @@ export function DuplicateCleanupSection() {
   const handleScan = async () => {
     setIsScanning(true);
     setSelectedForDeletion(new Set());
+    setSelectedMasterMembers({});
     
     switch (activeTab) {
       case "transactions": await refetchTransactions(); break;
@@ -396,6 +514,32 @@ export function DuplicateCleanupSection() {
   const handleTabChange = (value: string) => {
     setActiveTab(value as EntityType);
     setSelectedForDeletion(new Set());
+    setSelectedMasterMembers({});
+  };
+
+  // Handle merge button click for a group
+  const handleMergeClick = (group: DuplicateMemberGroup) => {
+    const masterId = selectedMasterMembers[group.key];
+    if (!masterId) {
+      toast.error("Selecione o membro principal antes de mesclar");
+      return;
+    }
+    setPendingMergeGroup(group);
+    setMergeDialogOpen(true);
+  };
+
+  // Confirm merge
+  const confirmMerge = () => {
+    if (!pendingMergeGroup) return;
+    
+    const masterId = selectedMasterMembers[pendingMergeGroup.key];
+    const duplicateIds = pendingMergeGroup.items
+      .filter(m => m.id !== masterId)
+      .map(m => m.id);
+
+    mergeMembersMutation.mutate({ masterId, duplicateIds });
+    setMergeDialogOpen(false);
+    setPendingMergeGroup(null);
   };
 
   const currentData = getCurrentData();
@@ -432,333 +576,417 @@ export function DuplicateCleanupSection() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Copy className="h-5 w-5" />
-          Limpeza de Duplicatas
-        </CardTitle>
-        <CardDescription>
-          Identifique e remova registros duplicados do banco de dados em transações, membros e contribuições.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="transactions" className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Transações</span>
-            </TabsTrigger>
-            <TabsTrigger value="members" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Membros</span>
-            </TabsTrigger>
-            <TabsTrigger value="contributions" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              <span className="hidden sm:inline">Contribuições</span>
-            </TabsTrigger>
-          </TabsList>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Copy className="h-5 w-5" />
+            Limpeza de Duplicatas
+          </CardTitle>
+          <CardDescription>
+            Identifique e remova registros duplicados do banco de dados em transações, membros e contribuições.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="transactions" className="flex items-center gap-2">
+                <Wallet className="h-4 w-4" />
+                <span className="hidden sm:inline">Transações</span>
+              </TabsTrigger>
+              <TabsTrigger value="members" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Membros</span>
+              </TabsTrigger>
+              <TabsTrigger value="contributions" className="flex items-center gap-2">
+                <Receipt className="h-4 w-4" />
+                <span className="hidden sm:inline">Contribuições</span>
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Action buttons (shared across all tabs) */}
-          <div className="flex flex-wrap gap-2 mt-4">
-            <Button
-              onClick={handleScan}
-              disabled={currentLoading || isScanning}
-              variant="outline"
-            >
-              {isScanning ? (
-                <LoadingSpinner size="sm" className="mr-2" />
-              ) : (
-                <Search className="h-4 w-4 mr-2" />
-              )}
-              Buscar Duplicatas
-            </Button>
+            {/* Action buttons (shared across all tabs) */}
+            <div className="flex flex-wrap gap-2 mt-4">
+              <Button
+                onClick={handleScan}
+                disabled={currentLoading || isScanning}
+                variant="outline"
+              >
+                {isScanning ? (
+                  <LoadingSpinner size="sm" className="mr-2" />
+                ) : (
+                  <Search className="h-4 w-4 mr-2" />
+                )}
+                Buscar Duplicatas
+              </Button>
 
-            {currentData && currentData.length > 0 && (
-              <>
-                <Button
-                  onClick={autoSelectDuplicates}
-                  variant="outline"
-                  disabled={currentMutation.isPending}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Auto-Selecionar
-                </Button>
-
-                <Button
-                  onClick={() => setSelectedForDeletion(new Set())}
-                  variant="ghost"
-                  disabled={selectedForDeletion.size === 0}
-                >
-                  Limpar Seleção
-                </Button>
-              </>
-            )}
-          </div>
-
-          {/* Results summary */}
-          {currentData !== undefined && (
-            <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg mt-4">
-              {currentData.length === 0 ? (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-medium">Nenhuma duplicata encontrada!</span>
-                </div>
-              ) : (
+              {currentData && currentData.length > 0 && (
                 <>
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500" />
-                    <span className="font-medium">
-                      {currentData.length} grupo(s) de duplicatas
-                    </span>
-                  </div>
-                  <Badge variant="secondary">
-                    {totalDuplicates} duplicata(s)
-                  </Badge>
-                  {selectedForDeletion.size > 0 && (
-                    <Badge variant="destructive">
-                      {selectedForDeletion.size} selecionada(s)
-                    </Badge>
-                  )}
+                  <Button
+                    onClick={autoSelectDuplicates}
+                    variant="outline"
+                    disabled={currentMutation.isPending}
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Auto-Selecionar
+                  </Button>
+
+                  <Button
+                    onClick={() => setSelectedForDeletion(new Set())}
+                    variant="ghost"
+                    disabled={selectedForDeletion.size === 0}
+                  >
+                    Limpar Seleção
+                  </Button>
                 </>
               )}
             </div>
-          )}
 
-          {/* Delete button */}
-          {selectedForDeletion.size > 0 && (
-            <div className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg bg-destructive/5 mt-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                <span className="text-sm">
-                  {selectedForDeletion.size} item(ns) selecionado(s) para exclusão
-                </span>
+            {/* Merge info for members tab */}
+            {activeTab === "members" && memberGroups && memberGroups.length > 0 && (
+              <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg mt-4">
+                <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Mesclar membros:</strong> Selecione o membro "principal" em cada grupo usando o botão de rádio. 
+                  Ao mesclar, todas as contribuições, transações e vínculos de ministérios dos duplicados serão 
+                  transferidos para o membro principal antes de excluí-los.
+                </div>
               </div>
-              <Button
-                variant="destructive"
-                onClick={() => currentMutation.mutate(Array.from(selectedForDeletion))}
-                disabled={currentMutation.isPending}
-              >
-                {currentMutation.isPending ? (
-                  <LoadingSpinner size="sm" className="mr-2" />
+            )}
+
+            {/* Results summary */}
+            {currentData !== undefined && (
+              <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg mt-4">
+                {currentData.length === 0 ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="font-medium">Nenhuma duplicata encontrada!</span>
+                  </div>
                 ) : (
-                  <Trash2 className="h-4 w-4 mr-2" />
+                  <>
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5 text-amber-500" />
+                      <span className="font-medium">
+                        {currentData.length} grupo(s) de duplicatas
+                      </span>
+                    </div>
+                    <Badge variant="secondary">
+                      {totalDuplicates} duplicata(s)
+                    </Badge>
+                    {selectedForDeletion.size > 0 && (
+                      <Badge variant="destructive">
+                        {selectedForDeletion.size} selecionada(s)
+                      </Badge>
+                    )}
+                  </>
                 )}
-                Excluir Selecionadas
-              </Button>
-            </div>
-          )}
+              </div>
+            )}
 
-          {/* Loading state */}
-          {currentLoading && (
-            <div className="flex items-center justify-center py-8">
-              <LoadingSpinner size="lg" />
-            </div>
-          )}
+            {/* Delete button */}
+            {selectedForDeletion.size > 0 && (
+              <div className="flex items-center justify-between p-4 border border-destructive/50 rounded-lg bg-destructive/5 mt-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  <span className="text-sm">
+                    {selectedForDeletion.size} item(ns) selecionado(s) para exclusão
+                  </span>
+                </div>
+                <Button
+                  variant="destructive"
+                  onClick={() => currentMutation.mutate(Array.from(selectedForDeletion))}
+                  disabled={currentMutation.isPending}
+                >
+                  {currentMutation.isPending ? (
+                    <LoadingSpinner size="sm" className="mr-2" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Excluir Selecionadas
+                </Button>
+              </div>
+            )}
 
-          {/* Transactions Tab */}
-          <TabsContent value="transactions" className="mt-4">
-            {transactionGroups && transactionGroups.length > 0 && (
-              <ScrollArea className="h-[400px] rounded-lg border">
-                <div className="p-4 space-y-4">
-                  {transactionGroups.map((group, groupIndex) => (
-                    <div key={group.key} className="space-y-2">
-                      {groupIndex > 0 && <Separator className="my-4" />}
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
+            {/* Loading state */}
+            {currentLoading && (
+              <div className="flex items-center justify-center py-8">
+                <LoadingSpinner size="lg" />
+              </div>
+            )}
+
+            {/* Transactions Tab */}
+            <TabsContent value="transactions" className="mt-4">
+              {transactionGroups && transactionGroups.length > 0 && (
+                <ScrollArea className="h-[400px] rounded-lg border">
+                  <div className="p-4 space-y-4">
+                    {transactionGroups.map((group, groupIndex) => (
+                      <div key={group.key} className="space-y-2">
+                        {groupIndex > 0 && <Separator className="my-4" />}
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant={group.type === "Receita" ? "default" : "secondary"}>
+                                {group.type}
+                              </Badge>
+                              <span className="font-medium">{group.description}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {formatCurrency(group.amount)} • {formatDate(group.dueDate)}
+                            </div>
+                          </div>
+                          <Badge variant="outline">{group.items.length} cópias</Badge>
+                        </div>
+
+                        <div className="ml-4 space-y-2">
+                          {group.items.map((tx, txIndex) => (
+                            <div
+                              key={tx.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                selectedForDeletion.has(tx.id)
+                                  ? "bg-destructive/10 border-destructive/50"
+                                  : "bg-muted/30"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={selectedForDeletion.has(tx.id)}
+                                onCheckedChange={() => toggleItem(tx.id)}
+                              />
+                              
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {txIndex === 0 && (
+                                    <Badge variant="outline" className="text-green-600 border-green-600">
+                                      Original
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline">{tx.status}</Badge>
+                                  {tx.origin && (
+                                    <Badge variant="secondary" className="text-xs">{tx.origin}</Badge>
+                                  )}
+                                </div>
+                                
+                                <div className="text-xs text-muted-foreground">
+                                  Criado em: {formatDateTime(tx.created_at)}
+                                  {tx.category_name && ` • ${tx.category_name}`}
+                                  {tx.ministry_name && ` • ${tx.ministry_name}`}
+                                </div>
+                              </div>
+
+                              <div className="text-sm font-medium">
+                                {formatCurrency(tx.amount)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
+
+            {/* Members Tab with Merge functionality */}
+            <TabsContent value="members" className="mt-4">
+              {memberGroups && memberGroups.length > 0 && (
+                <ScrollArea className="h-[400px] rounded-lg border">
+                  <div className="p-4 space-y-4">
+                    {memberGroups.map((group, groupIndex) => (
+                      <div key={group.key} className="space-y-2">
+                        {groupIndex > 0 && <Separator className="my-4" />}
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <span className="font-medium">{group.fullName}</span>
+                            <div className="text-sm text-muted-foreground">
+                              {group.email || "Sem email"} • {group.phone || "Sem telefone"}
+                            </div>
+                          </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant={group.type === "Receita" ? "default" : "secondary"}>
-                              {group.type}
-                            </Badge>
-                            <span className="font-medium">{group.description}</span>
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {formatCurrency(group.amount)} • {formatDate(group.dueDate)}
-                          </div>
-                        </div>
-                        <Badge variant="outline">{group.items.length} cópias</Badge>
-                      </div>
-
-                      <div className="ml-4 space-y-2">
-                        {group.items.map((tx, txIndex) => (
-                          <div
-                            key={tx.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                              selectedForDeletion.has(tx.id)
-                                ? "bg-destructive/10 border-destructive/50"
-                                : "bg-muted/30"
-                            }`}
-                          >
-                            <Checkbox
-                              checked={selectedForDeletion.has(tx.id)}
-                              onCheckedChange={() => toggleItem(tx.id)}
-                            />
-                            
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {txIndex === 0 && (
-                                  <Badge variant="outline" className="text-green-600 border-green-600">
-                                    Original
-                                  </Badge>
-                                )}
-                                <Badge variant="outline">{tx.status}</Badge>
-                                {tx.origin && (
-                                  <Badge variant="secondary" className="text-xs">{tx.origin}</Badge>
-                                )}
-                              </div>
-                              
-                              <div className="text-xs text-muted-foreground">
-                                Criado em: {formatDateTime(tx.created_at)}
-                                {tx.category_name && ` • ${tx.category_name}`}
-                                {tx.ministry_name && ` • ${tx.ministry_name}`}
-                              </div>
-                            </div>
-
-                            <div className="text-sm font-medium">
-                              {formatCurrency(tx.amount)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          {/* Members Tab */}
-          <TabsContent value="members" className="mt-4">
-            {memberGroups && memberGroups.length > 0 && (
-              <ScrollArea className="h-[400px] rounded-lg border">
-                <div className="p-4 space-y-4">
-                  {memberGroups.map((group, groupIndex) => (
-                    <div key={group.key} className="space-y-2">
-                      {groupIndex > 0 && <Separator className="my-4" />}
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <span className="font-medium">{group.fullName}</span>
-                          <div className="text-sm text-muted-foreground">
-                            {group.email || "Sem email"} • {group.phone || "Sem telefone"}
+                            <Badge variant="outline">{group.items.length} cópias</Badge>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleMergeClick(group)}
+                              disabled={!selectedMasterMembers[group.key] || mergeMembersMutation.isPending}
+                            >
+                              {mergeMembersMutation.isPending ? (
+                                <LoadingSpinner size="sm" className="mr-2" />
+                              ) : (
+                                <Merge className="h-4 w-4 mr-2" />
+                              )}
+                              Mesclar
+                            </Button>
                           </div>
                         </div>
-                        <Badge variant="outline">{group.items.length} cópias</Badge>
-                      </div>
 
-                      <div className="ml-4 space-y-2">
-                        {group.items.map((member, idx) => (
-                          <div
-                            key={member.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                              selectedForDeletion.has(member.id)
-                                ? "bg-destructive/10 border-destructive/50"
-                                : "bg-muted/30"
-                            }`}
-                          >
-                            <Checkbox
-                              checked={selectedForDeletion.has(member.id)}
-                              onCheckedChange={() => toggleItem(member.id)}
-                            />
-                            
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {idx === 0 && (
-                                  <Badge variant="outline" className="text-green-600 border-green-600">
-                                    Original
-                                  </Badge>
-                                )}
-                                <Badge variant="outline">{member.status || "Ativo"}</Badge>
+                        <RadioGroup
+                          value={selectedMasterMembers[group.key] || ""}
+                          onValueChange={(value) => 
+                            setSelectedMasterMembers(prev => ({ ...prev, [group.key]: value }))
+                          }
+                          className="ml-4 space-y-2"
+                        >
+                          {group.items.map((member, idx) => (
+                            <div
+                              key={member.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                selectedMasterMembers[group.key] === member.id
+                                  ? "bg-primary/10 border-primary/50"
+                                  : selectedForDeletion.has(member.id)
+                                  ? "bg-destructive/10 border-destructive/50"
+                                  : "bg-muted/30"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value={member.id} id={`master-${member.id}`} />
+                                <Label htmlFor={`master-${member.id}`} className="text-xs text-muted-foreground cursor-pointer">
+                                  Principal
+                                </Label>
                               </div>
+
+                              <Checkbox
+                                checked={selectedForDeletion.has(member.id)}
+                                onCheckedChange={() => toggleItem(member.id)}
+                              />
                               
-                              <div className="text-xs text-muted-foreground">
-                                Criado em: {formatDateTime(member.created_at)}
-                                {member.member_since && ` • Membro desde: ${formatDate(member.member_since)}`}
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {idx === 0 && (
+                                    <Badge variant="outline" className="text-green-600 border-green-600">
+                                      Mais antigo
+                                    </Badge>
+                                  )}
+                                  {selectedMasterMembers[group.key] === member.id && (
+                                    <Badge variant="default" className="text-xs">
+                                      Será mantido
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline">{member.status || "Ativo"}</Badge>
+                                </div>
+                                
+                                <div className="text-xs text-muted-foreground">
+                                  Criado em: {formatDateTime(member.created_at)}
+                                  {member.member_since && ` • Membro desde: ${formatDate(member.member_since)}`}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                        </RadioGroup>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
 
-          {/* Contributions Tab */}
-          <TabsContent value="contributions" className="mt-4">
-            {contributionGroups && contributionGroups.length > 0 && (
-              <ScrollArea className="h-[400px] rounded-lg border">
-                <div className="p-4 space-y-4">
-                  {contributionGroups.map((group, groupIndex) => (
-                    <div key={group.key} className="space-y-2">
-                      {groupIndex > 0 && <Separator className="my-4" />}
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="default">
-                              {contributionTypeLabels[group.contributionType] || group.contributionType}
-                            </Badge>
-                            <span className="font-medium">{group.memberName || "Membro anônimo"}</span>
+            {/* Contributions Tab */}
+            <TabsContent value="contributions" className="mt-4">
+              {contributionGroups && contributionGroups.length > 0 && (
+                <ScrollArea className="h-[400px] rounded-lg border">
+                  <div className="p-4 space-y-4">
+                    {contributionGroups.map((group, groupIndex) => (
+                      <div key={group.key} className="space-y-2">
+                        {groupIndex > 0 && <Separator className="my-4" />}
+                        
+                        <div className="flex items-center justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="default">
+                                {contributionTypeLabels[group.contributionType] || group.contributionType}
+                              </Badge>
+                              <span className="font-medium">{group.memberName || "Membro anônimo"}</span>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {formatCurrency(group.amount)} • {formatDate(group.contributionDate)}
+                            </div>
                           </div>
-                          <div className="text-sm text-muted-foreground">
-                            {formatCurrency(group.amount)} • {formatDate(group.contributionDate)}
-                          </div>
+                          <Badge variant="outline">{group.items.length} cópias</Badge>
                         </div>
-                        <Badge variant="outline">{group.items.length} cópias</Badge>
-                      </div>
 
-                      <div className="ml-4 space-y-2">
-                        {group.items.map((c, idx) => (
-                          <div
-                            key={c.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                              selectedForDeletion.has(c.id)
-                                ? "bg-destructive/10 border-destructive/50"
-                                : "bg-muted/30"
-                            }`}
-                          >
-                            <Checkbox
-                              checked={selectedForDeletion.has(c.id)}
-                              onCheckedChange={() => toggleItem(c.id)}
-                            />
-                            
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {idx === 0 && (
-                                  <Badge variant="outline" className="text-green-600 border-green-600">
-                                    Original
-                                  </Badge>
-                                )}
-                                {c.receipt_number && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Recibo: {c.receipt_number}
-                                  </Badge>
-                                )}
-                              </div>
+                        <div className="ml-4 space-y-2">
+                          {group.items.map((c, idx) => (
+                            <div
+                              key={c.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                selectedForDeletion.has(c.id)
+                                  ? "bg-destructive/10 border-destructive/50"
+                                  : "bg-muted/30"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={selectedForDeletion.has(c.id)}
+                                onCheckedChange={() => toggleItem(c.id)}
+                              />
                               
-                              <div className="text-xs text-muted-foreground">
-                                Criado em: {formatDateTime(c.created_at)}
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {idx === 0 && (
+                                    <Badge variant="outline" className="text-green-600 border-green-600">
+                                      Original
+                                    </Badge>
+                                  )}
+                                  {c.receipt_number && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      Recibo: {c.receipt_number}
+                                    </Badge>
+                                  )}
+                                </div>
+                                
+                                <div className="text-xs text-muted-foreground">
+                                  Criado em: {formatDateTime(c.created_at)}
+                                </div>
+                              </div>
+
+                              <div className="text-sm font-medium">
+                                {formatCurrency(c.amount)}
                               </div>
                             </div>
-
-                            <div className="text-sm font-medium">
-                              {formatCurrency(c.amount)}
-                            </div>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Merge Confirmation Dialog */}
+      <AlertDialog open={mergeDialogOpen} onOpenChange={setMergeDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Merge className="h-5 w-5" />
+              Confirmar Mesclagem de Membros
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Você está prestes a mesclar <strong>{pendingMergeGroup?.items.length}</strong> registros de membro em um único registro.
+              </p>
+              <p className="text-sm">
+                As seguintes ações serão realizadas:
+              </p>
+              <ul className="list-disc list-inside text-sm space-y-1 ml-2">
+                <li>Todas as contribuições serão transferidas para o membro principal</li>
+                <li>Todas as transações vinculadas serão transferidas</li>
+                <li>Vínculos de ministérios únicos serão preservados</li>
+                <li>Os registros duplicados serão permanentemente excluídos</li>
+              </ul>
+              <p className="text-destructive font-medium mt-2">
+                Esta ação não pode ser desfeita!
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmMerge}>
+              Confirmar Mesclagem
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
