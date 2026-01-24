@@ -116,7 +116,7 @@ export default function Auth() {
       setLoading(false);
     }
   };
-  return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+  return <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="w-full max-w-md border-border/50 shadow-xl bg-secondary-foreground">
         <CardHeader className="text-center space-y-4 rounded shadow-none my-[10px] mx-[10px] border-double border-0 border-secondary-foreground">
           <div className="flex justify-center">
@@ -176,5 +176,5 @@ export default function Auth() {
           </Tabs>
         </CardContent>
       </Card>
-    </div>;
+    </main>;
 }
