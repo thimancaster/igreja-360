@@ -620,6 +620,51 @@ export type Database = {
           },
         ]
       }
+      leader_checkout_overrides: {
+        Row: {
+          check_in_id: string
+          created_at: string | null
+          id: string
+          leader_id: string
+          pickup_person_document: string | null
+          pickup_person_name: string
+          reason: string
+        }
+        Insert: {
+          check_in_id: string
+          created_at?: string | null
+          id?: string
+          leader_id: string
+          pickup_person_document?: string | null
+          pickup_person_name: string
+          reason: string
+        }
+        Update: {
+          check_in_id?: string
+          created_at?: string | null
+          id?: string
+          leader_id?: string
+          pickup_person_document?: string | null
+          pickup_person_name?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leader_checkout_overrides_check_in_id_fkey"
+            columns: ["check_in_id"]
+            isOneToOne: false
+            referencedRelation: "child_check_ins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leader_checkout_overrides_leader_id_fkey"
+            columns: ["leader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       member_ministries: {
         Row: {
           created_at: string | null
@@ -823,6 +868,108 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      pickup_authorizations: {
+        Row: {
+          approved_by_leader: string | null
+          authorization_type: string
+          authorized_by: string
+          authorized_person_document: string | null
+          authorized_person_name: string
+          authorized_person_phone: string | null
+          child_id: string
+          church_id: string
+          created_at: string | null
+          id: string
+          leader_approval_required: boolean | null
+          reason: string | null
+          security_pin: string
+          status: string | null
+          updated_at: string | null
+          used_at: string | null
+          used_by_checkin_id: string | null
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          approved_by_leader?: string | null
+          authorization_type?: string
+          authorized_by: string
+          authorized_person_document?: string | null
+          authorized_person_name: string
+          authorized_person_phone?: string | null
+          child_id: string
+          church_id: string
+          created_at?: string | null
+          id?: string
+          leader_approval_required?: boolean | null
+          reason?: string | null
+          security_pin: string
+          status?: string | null
+          updated_at?: string | null
+          used_at?: string | null
+          used_by_checkin_id?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          approved_by_leader?: string | null
+          authorization_type?: string
+          authorized_by?: string
+          authorized_person_document?: string | null
+          authorized_person_name?: string
+          authorized_person_phone?: string | null
+          child_id?: string
+          church_id?: string
+          created_at?: string | null
+          id?: string
+          leader_approval_required?: boolean | null
+          reason?: string | null
+          security_pin?: string
+          status?: string | null
+          updated_at?: string | null
+          used_at?: string | null
+          used_by_checkin_id?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pickup_authorizations_approved_by_leader_fkey"
+            columns: ["approved_by_leader"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickup_authorizations_authorized_by_fkey"
+            columns: ["authorized_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickup_authorizations_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickup_authorizations_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pickup_authorizations_used_by_checkin_id_fkey"
+            columns: ["used_by_checkin_id"]
+            isOneToOne: false
+            referencedRelation: "child_check_ins"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

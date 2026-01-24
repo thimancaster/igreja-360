@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-type AppRole = 'admin' | 'tesoureiro' | 'pastor' | 'lider' | 'user';
+type AppRole = 'admin' | 'tesoureiro' | 'pastor' | 'lider' | 'user' | 'parent';
 
 export function useRole() {
   const { user, loading: authLoading } = useAuth();
@@ -65,6 +65,7 @@ export function useRole() {
   const isPastor = hasRole('pastor');
   const isLider = hasRole('lider');
   const isUser = hasRole('user');
+  const isParent = hasRole('parent');
   
   // Permissões específicas
   const canManageUsers = isAdmin; // Apenas admin pode gerenciar usuários
@@ -96,6 +97,7 @@ export function useRole() {
     isPastor,
     isLider,
     isUser,
+    isParent,
     isPrivileged,
     isLoading,
     // Permissões

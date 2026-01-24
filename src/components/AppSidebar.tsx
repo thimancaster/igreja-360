@@ -1,4 +1,4 @@
-import { LayoutDashboard, ArrowLeftRight, Upload, Sheet, FileText, Settings, Users, Heart, UserCircle, Baby } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Upload, Sheet, FileText, Settings, Users, Heart, UserCircle, Baby, Home } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
 import { useRole } from "@/hooks/useRole";
@@ -46,6 +46,12 @@ const adminMenuItem = {
   url: "/app/admin",
   icon: Users
 };
+
+const parentPortalItem = {
+  title: "Portal do Responsável",
+  url: "/parent",
+  icon: Home
+};
 export function AppSidebar() {
   const {
     state
@@ -53,12 +59,25 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
   const {
     isAdmin,
+    isParent,
     isLoading
   } = useRole();
 
   // Mostrar menu admin apenas para admin
   const canAccessAdmin = isAdmin;
-  const menuItems = canAccessAdmin ? [...baseMenuItems.slice(0, 8), adminMenuItem, baseMenuItems[8]] : baseMenuItems;
+  
+  // Build menu items
+  let menuItems = [...baseMenuItems];
+  
+  // Add parent portal link for parents
+  if (isParent) {
+    menuItems = [parentPortalItem, ...menuItems];
+  }
+  
+  // Add admin menu for admins
+  if (canAccessAdmin) {
+    menuItems = [...menuItems.slice(0, menuItems.length - 1), adminMenuItem, menuItems[menuItems.length - 1]];
+  }
   return <Sidebar collapsible="icon" className="border-r border-sidebar-border glass-sidebar">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-2">
