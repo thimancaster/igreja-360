@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { usePresentChildren, useChildMutations, useChildWithGuardians, useAuthorizedPickups } from "@/hooks/useChildrenMinistry";
+import { useValidPickupAuthorizations, usePickupAuthorizationMutations } from "@/hooks/useParentData";
+import { useRole } from "@/hooks/useRole";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, Search, Camera, AlertTriangle, Check, Shield, Users, Key } from "lucide-react";
+import { LogOut, Search, Camera, AlertTriangle, Check, Shield, Users, Key, UserX } from "lucide-react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -13,14 +15,16 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { Html5Qrcode } from "html5-qrcode";
+import { LeaderOverrideDialog } from "./LeaderOverrideDialog";
 
 type PickupPerson = {
   id: string;
   name: string;
-  type: "guardian" | "authorized";
+  type: "guardian" | "authorized" | "temporary";
   relationship?: string;
   requiresPin: boolean;
   pin?: string | null;
+  authorizationId?: string; // For temporary authorizations
 };
 
 export function CheckOutPanel() {
@@ -28,19 +32,25 @@ export function CheckOutPanel() {
   const [scanning, setScanning] = useState(false);
   const [scannerReady, setScannerReady] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [overrideDialogOpen, setOverrideDialogOpen] = useState(false);
   const [selectedCheckIn, setSelectedCheckIn] = useState<any>(null);
   const [pickupPersonId, setPickupPersonId] = useState("");
   const [enteredPin, setEnteredPin] = useState("");
   const [pinError, setPinError] = useState("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
+  const { isAdmin, isPastor, isTesoureiro, isLider } = useRole();
+  const canOverride = isAdmin || isPastor || isTesoureiro || isLider;
+
   const { data: presentChildren, isLoading } = usePresentChildren();
   const { checkOut, findCheckInByQR } = useChildMutations();
+  const { markAsUsed } = usePickupAuthorizationMutations();
 
-  // Fetch guardians and authorized pickups for selected child
+  // Fetch guardians, authorized pickups, and temporary authorizations for selected child
   const childId = selectedCheckIn?.child_id;
   const { data: childWithGuardians } = useChildWithGuardians(childId);
   const { data: authorizedPickups } = useAuthorizedPickups(childId);
+  const { data: tempAuthorizations } = useValidPickupAuthorizations(childId);
 
   // Build list of valid pickup people
   const pickupPeople: PickupPerson[] = [
@@ -53,7 +63,7 @@ export function CheckOutPanel() {
       requiresPin: !!g.access_pin,
       pin: g.access_pin,
     })) || []),
-    // Authorized pickups
+    // Authorized pickups (permanent)
     ...(authorizedPickups?.filter(a => a.is_active).map(a => ({
       id: `authorized-${a.id}`,
       name: a.authorized_name,
@@ -61,6 +71,16 @@ export function CheckOutPanel() {
       relationship: a.relationship || undefined,
       requiresPin: true,
       pin: a.pickup_pin,
+    })) || []),
+    // Temporary authorizations from parents
+    ...(tempAuthorizations?.map(a => ({
+      id: `temp-${a.id}`,
+      name: a.authorized_person_name,
+      type: "temporary" as const,
+      relationship: a.authorization_type === 'one_time' ? 'Uso Único' : 'Autorização Temporária',
+      requiresPin: true,
+      pin: a.security_pin,
+      authorizationId: a.id,
     })) || []),
   ];
 
@@ -166,15 +186,29 @@ export function CheckOutPanel() {
     }
 
     try {
+      // If it's a temporary authorization, mark it as used
+      if (person.type === "temporary" && person.authorizationId) {
+        await markAsUsed.mutateAsync({
+          id: person.authorizationId,
+          checkInId: selectedCheckIn.id,
+        });
+      }
+
       await checkOut.mutateAsync({
         checkInId: selectedCheckIn.id,
         pickupPersonName: person.name,
-        pickupMethod: person.type === "guardian" ? "Responsável" : "Autorizado",
+        pickupMethod: person.type === "guardian" ? "Responsável" : 
+                      person.type === "temporary" ? "Autorização Temporária" : "Autorizado",
       });
       resetDialog();
     } catch (err) {
       // Error handled in mutation
     }
+  };
+
+  const handleLeaderOverride = () => {
+    setConfirmDialogOpen(false);
+    setOverrideDialogOpen(true);
   };
 
   useEffect(() => {
@@ -375,6 +409,8 @@ export function CheckOutPanel() {
                           <div className="flex items-center gap-2">
                             {person.type === "guardian" ? (
                               <Users className="h-4 w-4 text-primary" />
+                            ) : person.type === "temporary" ? (
+                              <Shield className="h-4 w-4 text-green-500" />
                             ) : (
                               <Shield className="h-4 w-4 text-amber-500" />
                             )}
@@ -383,6 +419,9 @@ export function CheckOutPanel() {
                               <span className="text-muted-foreground text-xs">
                                 ({person.relationship})
                               </span>
+                            )}
+                            {person.type === "temporary" && (
+                              <Badge variant="outline" className="text-xs ml-1">Temporário</Badge>
                             )}
                           </div>
                         </SelectItem>
@@ -438,10 +477,38 @@ export function CheckOutPanel() {
                   Confirmar Saída
                 </Button>
               </div>
+
+              {/* Leader Override Option */}
+              {canOverride && (
+                <div className="pt-2 border-t">
+                  <Button
+                    variant="ghost"
+                    className="w-full text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                    onClick={handleLeaderOverride}
+                  >
+                    <UserX className="h-4 w-4 mr-2" />
+                    Liberar sem autorização (Emergência)
+                  </Button>
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    Use apenas em casos de emergência. Esta ação será registrada.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Leader Override Dialog */}
+      {selectedCheckIn && (
+        <LeaderOverrideDialog
+          open={overrideDialogOpen}
+          onOpenChange={setOverrideDialogOpen}
+          checkInId={selectedCheckIn.id}
+          childName={selectedCheckIn.children?.full_name || ""}
+          onSuccess={resetDialog}
+        />
+      )}
     </>
   );
 }

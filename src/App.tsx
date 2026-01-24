@@ -43,6 +43,12 @@ const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const MinisterioInfantil = lazy(() => import('@/pages/MinisterioInfantil'));
 
+// Parent Portal pages
+const ParentDashboard = lazy(() => import('@/pages/parent/ParentDashboard'));
+const ParentAuthorizations = lazy(() => import('@/pages/parent/ParentAuthorizations'));
+const ParentHistory = lazy(() => import('@/pages/parent/ParentHistory'));
+import { ParentLayout } from '@/components/parent/ParentLayout';
+
 const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -85,6 +91,14 @@ const App: React.FC = () => {
                 <Route path="/create-church" element={<ProtectedRoute><CreateChurchPage /></ProtectedRoute>} />
                 <Route path="/church-confirmation" element={<ProtectedRoute><ChurchConfirmation /></ProtectedRoute>} />
                 <Route path="/select-church" element={<ProtectedRoute><SelectChurch /></ProtectedRoute>} />
+
+                {/* Portal dos Pais/Responsáveis */}
+                <Route path="/parent" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
+                <Route path="/parent/children" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
+                <Route path="/parent/authorizations" element={<ProtectedRoute><ParentLayout><ParentAuthorizations /></ParentLayout></ProtectedRoute>} />
+                <Route path="/parent/history" element={<ProtectedRoute><ParentLayout><ParentHistory /></ParentLayout></ProtectedRoute>} />
+                <Route path="/parent/notifications" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
+                <Route path="/parent/settings" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
 
                 {/* Fallback global */}
                 <Route path="*" element={<NotFound />} />
