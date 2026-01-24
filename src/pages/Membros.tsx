@@ -30,7 +30,7 @@ import { useMembers, useDeleteMember, Member } from '@/hooks/useMembers';
 import { MemberDialog } from '@/components/members/MemberDialog';
 import { BirthdayCard } from '@/components/members/BirthdayCard';
 import { useMemberContributions } from '@/hooks/useContributions';
-import { generateAnnualReport } from '@/utils/receiptGenerator';
+// Dynamic import for PDF - loaded only when user exports (see ContributionBooklet)
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Membros() {

@@ -32,7 +32,7 @@ import {
 } from '@/hooks/useContributions';
 import { ContributionDialog } from '@/components/contributions/ContributionDialog';
 import { ContributionStats } from '@/components/contributions/ContributionStats';
-import { generateContributionReceipt } from '@/utils/receiptGenerator';
+// Dynamic import for PDF generation - loaded only when needed
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -127,6 +127,8 @@ export default function Contribuicoes() {
         .eq('id', profile?.church_id)
         .maybeSingle();
 
+      // Dynamic import - PDF library loaded only when user clicks
+      const { generateContributionReceipt } = await import('@/utils/receiptGenerator');
       generateContributionReceipt({
         contribution,
         churchName: church?.name || 'Igreja',
