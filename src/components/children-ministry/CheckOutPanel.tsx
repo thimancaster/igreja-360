@@ -1,17 +1,27 @@
 import { useState, useEffect, useRef } from "react";
-import { usePresentChildren, useChildMutations } from "@/hooks/useChildrenMinistry";
+import { usePresentChildren, useChildMutations, useChildWithGuardians, useAuthorizedPickups } from "@/hooks/useChildrenMinistry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, Search, Camera, AlertTriangle, Check } from "lucide-react";
+import { LogOut, Search, Camera, AlertTriangle, Check, Shield, Users, Key } from "lucide-react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { Html5Qrcode } from "html5-qrcode";
+
+type PickupPerson = {
+  id: string;
+  name: string;
+  type: "guardian" | "authorized";
+  relationship?: string;
+  requiresPin: boolean;
+  pin?: string | null;
+};
 
 export function CheckOutPanel() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -19,11 +29,42 @@ export function CheckOutPanel() {
   const [scannerReady, setScannerReady] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [selectedCheckIn, setSelectedCheckIn] = useState<any>(null);
-  const [pickupName, setPickupName] = useState("");
+  const [pickupPersonId, setPickupPersonId] = useState("");
+  const [enteredPin, setEnteredPin] = useState("");
+  const [pinError, setPinError] = useState("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
 
   const { data: presentChildren, isLoading } = usePresentChildren();
   const { checkOut, findCheckInByQR } = useChildMutations();
+
+  // Fetch guardians and authorized pickups for selected child
+  const childId = selectedCheckIn?.child_id;
+  const { data: childWithGuardians } = useChildWithGuardians(childId);
+  const { data: authorizedPickups } = useAuthorizedPickups(childId);
+
+  // Build list of valid pickup people
+  const pickupPeople: PickupPerson[] = [
+    // Guardians who can pickup
+    ...(childWithGuardians?.guardians?.filter(g => g.can_pickup).map(g => ({
+      id: `guardian-${g.id}`,
+      name: g.full_name,
+      type: "guardian" as const,
+      relationship: g.relationship,
+      requiresPin: !!g.access_pin,
+      pin: g.access_pin,
+    })) || []),
+    // Authorized pickups
+    ...(authorizedPickups?.filter(a => a.is_active).map(a => ({
+      id: `authorized-${a.id}`,
+      name: a.authorized_name,
+      type: "authorized" as const,
+      relationship: a.relationship || undefined,
+      requiresPin: true,
+      pin: a.pickup_pin,
+    })) || []),
+  ];
+
+  const selectedPerson = pickupPeople.find(p => p.id === pickupPersonId);
 
   const filteredChildren = presentChildren?.filter((record: any) =>
     record.children?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -35,7 +76,6 @@ export function CheckOutPanel() {
       setScanning(true);
       setScannerReady(false);
       
-      // Wait for DOM element to be ready
       await new Promise(resolve => setTimeout(resolve, 100));
       
       const scanner = new Html5Qrcode("qr-reader");
@@ -48,7 +88,6 @@ export function CheckOutPanel() {
           qrbox: { width: 250, height: 250 },
         },
         async (decodedText) => {
-          // QR code found
           await stopScanner();
           await handleQRScan(decodedText);
         },
@@ -94,21 +133,45 @@ export function CheckOutPanel() {
     setConfirmDialogOpen(true);
   };
 
+  const resetDialog = () => {
+    setConfirmDialogOpen(false);
+    setSelectedCheckIn(null);
+    setPickupPersonId("");
+    setEnteredPin("");
+    setPinError("");
+  };
+
   const handleConfirmCheckOut = async () => {
-    if (!selectedCheckIn || !pickupName.trim()) {
-      toast.error("Informe o nome de quem está retirando");
+    if (!selectedCheckIn || !pickupPersonId) {
+      toast.error("Selecione quem está retirando");
       return;
+    }
+
+    const person = pickupPeople.find(p => p.id === pickupPersonId);
+    if (!person) {
+      toast.error("Pessoa não encontrada");
+      return;
+    }
+
+    // Validate PIN if required
+    if (person.requiresPin && person.pin) {
+      if (!enteredPin) {
+        setPinError("Digite o PIN de segurança");
+        return;
+      }
+      if (enteredPin !== person.pin) {
+        setPinError("PIN incorreto");
+        return;
+      }
     }
 
     try {
       await checkOut.mutateAsync({
         checkInId: selectedCheckIn.id,
-        pickupPersonName: pickupName,
-        pickupMethod: "Manual",
+        pickupPersonName: person.name,
+        pickupMethod: person.type === "guardian" ? "Responsável" : "Autorizado",
       });
-      setConfirmDialogOpen(false);
-      setSelectedCheckIn(null);
-      setPickupName("");
+      resetDialog();
     } catch (err) {
       // Error handled in mutation
     }
@@ -119,6 +182,12 @@ export function CheckOutPanel() {
       stopScanner();
     };
   }, []);
+
+  // Reset PIN error when person changes
+  useEffect(() => {
+    setPinError("");
+    setEnteredPin("");
+  }, [pickupPersonId]);
 
   if (isLoading) {
     return (
@@ -252,12 +321,12 @@ export function CheckOutPanel() {
       </div>
 
       {/* Confirm Checkout Dialog */}
-      <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+      <Dialog open={confirmDialogOpen} onOpenChange={(open) => !open && resetDialog()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Confirmar Check-out</DialogTitle>
             <DialogDescription>
-              Confirme a retirada da criança
+              Selecione quem está retirando a criança
             </DialogDescription>
           </DialogHeader>
           {selectedCheckIn && (
@@ -289,33 +358,81 @@ export function CheckOutPanel() {
                 </div>
               )}
 
+              {/* Pickup Person Selection */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4" />
                   Quem está retirando? *
                 </label>
-                <Input
-                  placeholder="Nome completo"
-                  value={pickupName}
-                  onChange={(e) => setPickupName(e.target.value)}
-                />
+                {pickupPeople.length > 0 ? (
+                  <Select value={pickupPersonId} onValueChange={setPickupPersonId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione uma pessoa autorizada" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pickupPeople.map((person) => (
+                        <SelectItem key={person.id} value={person.id}>
+                          <div className="flex items-center gap-2">
+                            {person.type === "guardian" ? (
+                              <Users className="h-4 w-4 text-primary" />
+                            ) : (
+                              <Shield className="h-4 w-4 text-amber-500" />
+                            )}
+                            <span>{person.name}</span>
+                            {person.relationship && (
+                              <span className="text-muted-foreground text-xs">
+                                ({person.relationship})
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground border rounded-lg">
+                    <p className="text-sm">Nenhum responsável ou autorizado cadastrado</p>
+                    <p className="text-xs mt-1">Cadastre responsáveis na ficha da criança</p>
+                  </div>
+                )}
               </div>
+
+              {/* PIN Validation */}
+              {selectedPerson?.requiresPin && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    PIN de Segurança *
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="Digite o PIN"
+                    value={enteredPin}
+                    onChange={(e) => {
+                      setEnteredPin(e.target.value);
+                      setPinError("");
+                    }}
+                    maxLength={6}
+                    className={pinError ? "border-destructive" : ""}
+                  />
+                  {pinError && (
+                    <p className="text-sm text-destructive">{pinError}</p>
+                  )}
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <Button
                   variant="outline"
                   className="flex-1"
-                  onClick={() => {
-                    setConfirmDialogOpen(false);
-                    setSelectedCheckIn(null);
-                    setPickupName("");
-                  }}
+                  onClick={resetDialog}
                 >
                   Cancelar
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={handleConfirmCheckOut}
-                  disabled={checkOut.isPending || !pickupName.trim()}
+                  disabled={checkOut.isPending || !pickupPersonId}
                 >
                   <Check className="h-4 w-4 mr-2" />
                   Confirmar Saída
