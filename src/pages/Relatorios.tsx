@@ -16,13 +16,7 @@ import { TrendingUp, TrendingDown, Scale, FileDown, FileText, ChevronDown } from
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from "@/utils/exportHelpers";
-import { 
-  exportFinancialSummaryPDF, 
-  exportCashFlowPDF, 
-  exportExpensesByCategoryPDF, 
-  exportRevenueByMinistryPDF,
-  exportFullReportPDF 
-} from "@/utils/pdfExportHelpers";
+// Dynamic imports for PDF generation - loaded only when user exports
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 const formatCurrency = (value: number) => {
@@ -143,12 +137,13 @@ export default function Relatorios() {
   };
 
   // PDF exports
-  const handleExportSummaryPDF = () => {
+  const handleExportSummaryPDF = async () => {
     if (!summary) {
       toast({ title: "Nenhum dado", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
     }
     try {
+      const { exportFinancialSummaryPDF } = await import("@/utils/pdfExportHelpers");
       exportFinancialSummaryPDF(
         { totalRevenue: summary.totalRevenue, totalExpenses: summary.totalExpenses, balance: summary.netBalance },
         getDateRange()
@@ -159,7 +154,7 @@ export default function Relatorios() {
     }
   };
 
-  const handleExportCashFlowPDF = () => {
+  const handleExportCashFlowPDF = async () => {
     if (!cashFlowData || cashFlowData.length === 0) {
       toast({ title: "Nenhum dado", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
@@ -172,6 +167,7 @@ export default function Relatorios() {
         amount: item.value,
         balance: item.balance,
       }));
+      const { exportCashFlowPDF } = await import("@/utils/pdfExportHelpers");
       exportCashFlowPDF(formattedData, getDateRange());
       toast({ title: "PDF Exportado", description: "O relatório PDF foi baixado." });
     } catch (error: any) {
@@ -179,7 +175,7 @@ export default function Relatorios() {
     }
   };
 
-  const handleExportExpensesPDF = () => {
+  const handleExportExpensesPDF = async () => {
     if (!expensesData || expensesData.length === 0) {
       toast({ title: "Nenhum dado", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
@@ -190,6 +186,7 @@ export default function Relatorios() {
         total: item.value,
         color: item.color,
       }));
+      const { exportExpensesByCategoryPDF } = await import("@/utils/pdfExportHelpers");
       exportExpensesByCategoryPDF(formattedData, getDateRange());
       toast({ title: "PDF Exportado", description: "O relatório PDF foi baixado." });
     } catch (error: any) {
@@ -197,7 +194,7 @@ export default function Relatorios() {
     }
   };
 
-  const handleExportRevenuePDF = () => {
+  const handleExportRevenuePDF = async () => {
     if (!revenueData || revenueData.length === 0) {
       toast({ title: "Nenhum dado", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
@@ -207,6 +204,7 @@ export default function Relatorios() {
         ministry: item.name,
         total: item.value,
       }));
+      const { exportRevenueByMinistryPDF } = await import("@/utils/pdfExportHelpers");
       exportRevenueByMinistryPDF(formattedData, getDateRange());
       toast({ title: "PDF Exportado", description: "O relatório PDF foi baixado." });
     } catch (error: any) {
@@ -214,7 +212,7 @@ export default function Relatorios() {
     }
   };
 
-  const handleExportFullReport = (format: 'pdf' | 'excel') => {
+  const handleExportFullReport = async (format: 'pdf' | 'excel') => {
     if (!summary || !cashFlowData) {
       toast({ title: "Nenhum dado", description: "Gere um relatório primeiro.", variant: "destructive" });
       return;
@@ -239,6 +237,7 @@ export default function Relatorios() {
           total: item.value,
         }));
         
+        const { exportFullReportPDF } = await import("@/utils/pdfExportHelpers");
         exportFullReportPDF(
           { totalRevenue: summary.totalRevenue, totalExpenses: summary.totalExpenses, balance: summary.netBalance },
           cashFlowFormatted,

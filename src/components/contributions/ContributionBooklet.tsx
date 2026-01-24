@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useContributions, Contribution } from '@/hooks/useContributions';
-import { generateAnnualReport } from '@/utils/receiptGenerator';
+// Dynamic import for PDF generation - loaded only when needed
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -96,6 +96,8 @@ export function ContributionBooklet({ memberId, memberName, year = new Date().ge
         .eq('id', profile?.church_id)
         .maybeSingle();
 
+      // Dynamic import - PDF library loaded only when user clicks
+      const { generateAnnualReport } = await import('@/utils/receiptGenerator');
       generateAnnualReport(
         contributions,
         memberName,
