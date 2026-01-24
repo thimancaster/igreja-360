@@ -41,6 +41,7 @@ const ChurchConfirmation = lazy(() => import('@/pages/ChurchConfirmation'));
 const SelectChurch = lazy(() => import('@/pages/SelectChurch'));
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
+const MinisterioInfantil = lazy(() => import('@/pages/MinisterioInfantil'));
 
 const App: React.FC = () => {
   return (
@@ -77,6 +78,7 @@ const App: React.FC = () => {
                 <Route path="/app/admin/dados" element={<ProtectedRoute><AdminRoute><AppLayout><GerenciarDados /></AppLayout></AdminRoute></ProtectedRoute>} />
                 <Route path="/app/admin/configuracoes-sistema" element={<ProtectedRoute><AdminRoute><AppLayout><ConfiguracoesSistema /></AppLayout></AdminRoute></ProtectedRoute>} />
                 <Route path="/app/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/ministerio-infantil" element={<ProtectedRoute><AppLayout><MinisterioInfantil /></AppLayout></ProtectedRoute>} />
                 <Route path="/app/*" element={<ProtectedRoute><AppLayout><NotFound /></AppLayout></ProtectedRoute>} />
 
                 {/* Rotas de fluxo de criação/seleção (fora do layout principal) */}
