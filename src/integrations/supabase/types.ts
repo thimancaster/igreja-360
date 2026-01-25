@@ -293,6 +293,13 @@ export type Database = {
             referencedRelation: "guardians"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "child_guardians_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians_safe"
+            referencedColumns: ["id"]
+          },
         ]
       }
       children: {
@@ -1356,7 +1363,54 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      guardians_safe: {
+        Row: {
+          church_id: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string | null
+          photo_url: string | null
+          profile_id: string | null
+          relationship: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          church_id?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          photo_url?: string | null
+          profile_id?: string | null
+          relationship?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          church_id?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          photo_url?: string | null
+          profile_id?: string | null
+          relationship?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardians_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guardians_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       check_and_update_overdue: { Args: never; Returns: Json }
@@ -1416,6 +1470,10 @@ export type Database = {
       }
       trigger_auto_sync_overdue: { Args: never; Returns: undefined }
       update_overdue_transactions: { Args: never; Returns: undefined }
+      verify_guardian_pin: {
+        Args: { p_guardian_id: string; p_pin: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "tesoureiro" | "pastor" | "lider" | "user" | "parent"
