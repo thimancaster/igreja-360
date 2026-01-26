@@ -1444,6 +1444,21 @@ export type Database = {
           refresh_token: string
         }[]
       }
+      get_guardians_for_management: {
+        Args: never
+        Returns: {
+          church_id: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          phone: string
+          photo_url: string
+          profile_id: string
+          relationship: string
+          updated_at: string
+        }[]
+      }
       get_user_church_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
