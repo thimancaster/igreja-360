@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Baby, Users, QrCode, LogOut, BarChart3 } from "lucide-react";
+import { Baby, Users, QrCode, LogOut, BarChart3, Megaphone, Calendar } from "lucide-react";
 import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 import { ChildrenList } from "@/components/children-ministry/ChildrenList";
 import { GuardiansList } from "@/components/children-ministry/GuardiansList";
 import { CheckInPanel } from "@/components/children-ministry/CheckInPanel";
 import { CheckOutPanel } from "@/components/children-ministry/CheckOutPanel";
 import { MinistryDashboard } from "@/components/children-ministry/MinistryDashboard";
+import { AnnouncementsPanel } from "@/components/children-ministry/announcements/AnnouncementsPanel";
+import { MinistryCalendar } from "@/components/children-ministry/calendar/MinistryCalendar";
 
 export default function MinisterioInfantil() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -32,7 +33,7 @@ export default function MinisterioInfantil() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:inline-grid">
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -44,6 +45,14 @@ export default function MinisterioInfantil() {
           <TabsTrigger value="guardians" className="gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">Responsáveis</span>
+          </TabsTrigger>
+          <TabsTrigger value="announcements" className="gap-2">
+            <Megaphone className="h-4 w-4" />
+            <span className="hidden sm:inline">Comunicados</span>
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">Calendário</span>
           </TabsTrigger>
           <TabsTrigger value="checkin" className="gap-2">
             <QrCode className="h-4 w-4" />
@@ -65,6 +74,14 @@ export default function MinisterioInfantil() {
 
         <TabsContent value="guardians" className="space-y-4">
           <GuardiansList />
+        </TabsContent>
+
+        <TabsContent value="announcements" className="space-y-4">
+          <AnnouncementsPanel />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="space-y-4">
+          <MinistryCalendar />
         </TabsContent>
 
         <TabsContent value="checkin" className="space-y-4">
