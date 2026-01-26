@@ -201,7 +201,8 @@ export function useGuardians() {
   });
 }
 
-// Hook to get full guardian data for management (admin/tesoureiro/pastor only)
+// Hook to get guardian data for management (admin/tesoureiro/pastor only)
+// Uses a SECURITY DEFINER RPC that returns only necessary fields (excludes access_pin)
 export function useGuardianManagement() {
   const { profile } = useAuth();
 
@@ -210,15 +211,16 @@ export function useGuardianManagement() {
     queryFn: async () => {
       if (!profile?.church_id) return [];
 
-      // Full guardians table access for management purposes
-      const { data, error } = await supabase
-        .from("guardians")
-        .select("*")
-        .eq("church_id", profile.church_id)
-        .order("full_name");
+      // Use secure RPC that enforces role checks and excludes access_pin
+      const { data, error } = await supabase.rpc("get_guardians_for_management");
 
       if (error) throw error;
-      return data as Guardian[];
+      
+      // Map to Guardian type with null access_pin for compatibility
+      return (data || []).map((g: any) => ({
+        ...g,
+        access_pin: null,
+      })) as Guardian[];
     },
     enabled: !!profile?.church_id,
   });
