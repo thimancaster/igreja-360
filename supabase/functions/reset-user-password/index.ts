@@ -1,6 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { isValidUUID, isValidPassword, sanitizeText } from "../_shared/validation.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rate-limit.ts";
 
 interface ResetPasswordRequest {
   userId: string;
@@ -64,20 +66,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Rate limiting check
+    const rateLimitResult = checkRateLimit(`password-reset:${caller.id}`, RATE_LIMITS.PASSWORD_RESET);
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, corsHeaders);
+    }
+
     // Parse request body
     const { userId, newPassword }: ResetPasswordRequest = await req.json();
 
-    if (!userId || !newPassword) {
+    // Validate userId format
+    if (!userId || !isValidUUID(userId)) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields: userId and newPassword" }),
+        JSON.stringify({ error: "ID de usuário inválido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Validate password length
-    if (newPassword.length < 8) {
+    // Validate password with complexity requirements
+    const passwordValidation = isValidPassword(newPassword);
+    if (!passwordValidation.valid) {
       return new Response(
-        JSON.stringify({ error: "A senha deve ter no mínimo 8 caracteres" }),
+        JSON.stringify({ error: passwordValidation.message }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -114,6 +124,9 @@ Deno.serve(async (req) => {
       .eq("id", caller.id)
       .single();
 
+    // Sanitize caller name for email
+    const sanitizedCallerName = sanitizeText(callerProfile?.full_name || caller.email || 'Admin');
+
     // Get church name for email
     let churchName = "sua organização";
     if (callerProfile?.church_id) {
@@ -123,7 +136,7 @@ Deno.serve(async (req) => {
         .eq("id", callerProfile.church_id)
         .single();
       if (church?.name) {
-        churchName = church.name;
+        churchName = sanitizeText(church.name);
       }
     }
 
@@ -150,7 +163,7 @@ Deno.serve(async (req) => {
                   <strong>Data:</strong> ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
                 </p>
                 <p style="margin: 10px 0 0 0; color: #333;">
-                  <strong>Alterado por:</strong> ${callerProfile?.full_name || caller.email}
+                  <strong>Alterado por:</strong> ${sanitizedCallerName}
                 </p>
               </div>
               <p style="font-size: 16px; color: #555;">
@@ -175,7 +188,7 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("audit_logs").insert({
         church_id: callerProfile.church_id,
         user_id: caller.id,
-        user_name: callerProfile.full_name || caller.email,
+        user_name: sanitizedCallerName,
         action: "password_reset",
         entity_type: "user",
         details: {

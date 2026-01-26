@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { isValidSheetId } from "../_shared/validation.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rate-limit.ts";
 
 // Function to refresh Google access token using refresh token
 async function refreshGoogleToken(refreshToken: string, clientId: string, clientSecret: string): Promise<string | null> {
@@ -51,9 +53,10 @@ serve(async (req) => {
       );
     }
 
-    if (!sheetId) {
+    // Validate sheetId format
+    if (!sheetId || !isValidSheetId(sheetId)) {
       return new Response(
-        JSON.stringify({ error: 'Sheet ID is required' }),
+        JSON.stringify({ error: 'ID da planilha inválido. Verifique a URL da planilha.' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -69,6 +72,24 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
+    }
+
+    // Extract user ID from auth header for rate limiting
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (supabaseUrl && supabaseServiceKey) {
+      const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user } } = await supabaseClient.auth.getUser(token);
+      
+      if (user) {
+        // Rate limiting check
+        const rateLimitResult = checkRateLimit(`sheet-headers:${user.id}`, RATE_LIMITS.SHEET_HEADERS);
+        if (!rateLimitResult.allowed) {
+          return createRateLimitResponse(rateLimitResult, corsHeaders);
+        }
+      }
     }
 
     const googleClientId = Deno.env.get('GOOGLE_CLIENT_ID');

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGuardians, useChildMutations, Guardian, RELATIONSHIPS } from "@/hooks/useChildrenMinistry";
+import { useGuardianManagement, Guardian, RELATIONSHIPS } from "@/hooks/useChildrenMinistry";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,8 @@ export function GuardiansList() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedGuardian, setSelectedGuardian] = useState<Guardian | null>(null);
 
-  const { data: guardians, isLoading } = useGuardians();
+  // Use management hook for full PII access (staff only - RLS enforced)
+  const { data: guardians, isLoading } = useGuardianManagement();
 
   const filteredGuardians = guardians?.filter((guardian) =>
     guardian.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
