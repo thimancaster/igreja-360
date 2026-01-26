@@ -164,6 +164,13 @@ export function useChildWithGuardians(childId: string | undefined) {
   });
 }
 
+// Safe guardian type for display (excludes PII like access_pin)
+export type GuardianSafe = Omit<Guardian, 'access_pin' | 'email' | 'phone'> & {
+  access_pin?: never;
+  email?: never;
+  phone?: never;
+};
+
 export function useGuardians() {
   const { profile } = useAuth();
 
@@ -172,6 +179,38 @@ export function useGuardians() {
     queryFn: async () => {
       if (!profile?.church_id) return [];
 
+      // Use guardians_safe view to prevent PII exposure (hashed PINs, emails, phones)
+      // Staff with management access can still use the full guardians table when needed
+      const { data, error } = await supabase
+        .from("guardians_safe")
+        .select("*")
+        .eq("church_id", profile.church_id)
+        .order("full_name");
+
+      if (error) throw error;
+      
+      // Map to Guardian type with null PII fields for compatibility
+      return (data || []).map(g => ({
+        ...g,
+        email: null,
+        phone: null,
+        access_pin: null,
+      })) as Guardian[];
+    },
+    enabled: !!profile?.church_id,
+  });
+}
+
+// Hook to get full guardian data for management (admin/tesoureiro/pastor only)
+export function useGuardianManagement() {
+  const { profile } = useAuth();
+
+  return useQuery({
+    queryKey: ["guardians-management", profile?.church_id],
+    queryFn: async () => {
+      if (!profile?.church_id) return [];
+
+      // Full guardians table access for management purposes
       const { data, error } = await supabase
         .from("guardians")
         .select("*")

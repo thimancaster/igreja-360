@@ -1,5 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { isValidEmail, validateName, isValidUUID, isValidRole, isValidPassword } from "../_shared/validation.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rate-limit.ts";
 
 interface InviteRequest {
   email: string;
@@ -65,27 +67,63 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Rate limiting check
+    const rateLimitResult = checkRateLimit(`invite-user:${caller.id}`, RATE_LIMITS.INVITE_USER);
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, corsHeaders);
+    }
+
     // Parse request body
     const { email, fullName, role, churchId, directRegistration, temporaryPassword }: InviteRequest = await req.json();
 
-    if (!email || !fullName || !role || !churchId) {
+    // Validate email format
+    if (!email || !isValidEmail(email)) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Email inválido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Validate password for direct registration
-    if (directRegistration && (!temporaryPassword || temporaryPassword.length < 8)) {
+    // Validate and sanitize name
+    const nameValidation = validateName(fullName);
+    if (!nameValidation.valid) {
       return new Response(
-        JSON.stringify({ error: "Senha temporária deve ter no mínimo 8 caracteres" }),
+        JSON.stringify({ error: nameValidation.message }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+    const sanitizedName = nameValidation.sanitized!;
+
+    // Validate role
+    if (!role || !isValidRole(role)) {
+      return new Response(
+        JSON.stringify({ error: "Perfil inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate churchId
+    if (!churchId || !isValidUUID(churchId)) {
+      return new Response(
+        JSON.stringify({ error: "ID da igreja inválido" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate password for direct registration with complexity requirements
+    if (directRegistration) {
+      const passwordValidation = isValidPassword(temporaryPassword || '');
+      if (!passwordValidation.valid) {
+        return new Response(
+          JSON.stringify({ error: passwordValidation.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    const existingUser = existingUsers?.users?.find(u => u.email === email.trim().toLowerCase());
 
     if (existingUser) {
       // User exists - check if already associated with a church
@@ -107,7 +145,7 @@ Deno.serve(async (req) => {
         .from("profiles")
         .update({ 
           church_id: churchId, 
-          full_name: fullName 
+          full_name: sanitizedName 
         })
         .eq("id", existingUser.id);
 
@@ -134,11 +172,11 @@ Deno.serve(async (req) => {
     // Handle direct registration (create user without email confirmation)
     if (directRegistration && temporaryPassword) {
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email,
+        email: email.trim().toLowerCase(),
         password: temporaryPassword,
         email_confirm: true, // Auto-confirm email
         user_metadata: {
-          full_name: fullName,
+          full_name: sanitizedName,
         },
       });
 
@@ -165,7 +203,7 @@ Deno.serve(async (req) => {
         .from("profiles")
         .update({ 
           church_id: churchId,
-          full_name: fullName 
+          full_name: sanitizedName 
         })
         .eq("id", newUser.user.id);
 
@@ -194,10 +232,10 @@ Deno.serve(async (req) => {
 
     // Create new user with invite (email confirmation required)
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
+      email.trim().toLowerCase(),
       {
         data: {
-          full_name: fullName,
+          full_name: sanitizedName,
         },
         redirectTo: `${Deno.env.get("APP_BASE_URL") || "https://igreja-360.lovable.app"}/auth`,
       }
@@ -226,7 +264,7 @@ Deno.serve(async (req) => {
       .from("profiles")
       .update({ 
         church_id: churchId,
-        full_name: fullName 
+        full_name: sanitizedName 
       })
       .eq("id", newUser.user.id);
 

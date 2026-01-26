@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { sanitizeText, isValidUUID } from "../_shared/validation.ts";
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from "../_shared/rate-limit.ts";
 
 interface PushNotificationPayload {
   title: string;
@@ -77,12 +79,40 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Rate limiting check (per church to prevent notification spam)
+    const rateLimitResult = checkRateLimit(
+      `push-notification:${callerProfile.church_id}`, 
+      RATE_LIMITS.PUSH_NOTIFICATION
+    );
+    if (!rateLimitResult.allowed) {
+      return createRateLimitResponse(rateLimitResult, corsHeaders);
+    }
+
     const { user_id, church_id, payload }: SendPushRequest = await req.json();
 
-    // Validate payload
+    // Validate and sanitize payload
     if (!payload?.title || !payload?.body) {
       return new Response(
         JSON.stringify({ error: "Invalid payload: title and body are required" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Sanitize title and body to prevent XSS
+    const sanitizedPayload: PushNotificationPayload = {
+      title: sanitizeText(payload.title).substring(0, 100),
+      body: sanitizeText(payload.body).substring(0, 500),
+      url: payload.url ? sanitizeText(payload.url) : undefined,
+      actions: payload.actions?.map(a => ({
+        action: sanitizeText(a.action).substring(0, 50),
+        title: sanitizeText(a.title).substring(0, 50),
+      })),
+    };
+
+    // Validate user_id format if provided
+    if (user_id && !isValidUUID(user_id)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid user_id format" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -138,10 +168,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Would send push to ${subscriptions.length} subscriptions:`, payload);
+    console.log(`Would send push to ${subscriptions.length} subscriptions:`, sanitizedPayload);
 
     return new Response(
-      JSON.stringify({ message: "Push notifications queued", sent: subscriptions.length, payload }),
+      JSON.stringify({ message: "Push notifications queued", sent: subscriptions.length, payload: sanitizedPayload }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   } catch (error: unknown) {
