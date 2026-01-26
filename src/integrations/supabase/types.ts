@@ -14,6 +14,108 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcement_reads: {
+        Row: {
+          announcement_id: string
+          id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          id?: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          church_id: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          ministry_id: string | null
+          priority: string
+          published_at: string | null
+          scheduled_at: string | null
+          target_audience: string
+          target_child_ids: string[] | null
+          target_classrooms: string[] | null
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          church_id: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          ministry_id?: string | null
+          priority?: string
+          published_at?: string | null
+          scheduled_at?: string | null
+          target_audience?: string
+          target_child_ids?: string[] | null
+          target_classrooms?: string[] | null
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          church_id?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          ministry_id?: string | null
+          priority?: string
+          published_at?: string | null
+          scheduled_at?: string | null
+          target_audience?: string
+          target_child_ids?: string[] | null
+          target_classrooms?: string[] | null
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_ministry_id_fkey"
+            columns: ["ministry_id"]
+            isOneToOne: false
+            referencedRelation: "ministries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           church_id: string
@@ -520,6 +622,65 @@ export type Database = {
           },
         ]
       }
+      event_registrations: {
+        Row: {
+          child_id: string
+          event_id: string
+          guardian_id: string
+          id: string
+          notes: string | null
+          registered_at: string | null
+          status: string
+        }
+        Insert: {
+          child_id: string
+          event_id: string
+          guardian_id: string
+          id?: string
+          notes?: string | null
+          registered_at?: string | null
+          status?: string
+        }
+        Update: {
+          child_id?: string
+          event_id?: string
+          guardian_id?: string
+          id?: string
+          notes?: string | null
+          registered_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "ministry_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_registrations_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_registrations_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "guardians_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       google_integrations: {
         Row: {
           access_token_enc: string | null
@@ -807,6 +968,88 @@ export type Database = {
             columns: ["church_id"]
             isOneToOne: false
             referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ministry_events: {
+        Row: {
+          all_day: boolean | null
+          church_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_datetime: string | null
+          event_type: string
+          id: string
+          location: string | null
+          max_capacity: number | null
+          ministry_id: string | null
+          recurrence_rule: string | null
+          recurring: boolean | null
+          registration_required: boolean | null
+          start_datetime: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          all_day?: boolean | null
+          church_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_datetime?: string | null
+          event_type?: string
+          id?: string
+          location?: string | null
+          max_capacity?: number | null
+          ministry_id?: string | null
+          recurrence_rule?: string | null
+          recurring?: boolean | null
+          registration_required?: boolean | null
+          start_datetime: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          all_day?: boolean | null
+          church_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_datetime?: string | null
+          event_type?: string
+          id?: string
+          location?: string | null
+          max_capacity?: number | null
+          ministry_id?: string | null
+          recurrence_rule?: string | null
+          recurring?: boolean | null
+          registration_required?: boolean | null
+          start_datetime?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ministry_events_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ministry_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ministry_events_ministry_id_fkey"
+            columns: ["ministry_id"]
+            isOneToOne: false
+            referencedRelation: "ministries"
             referencedColumns: ["id"]
           },
         ]

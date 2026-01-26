@@ -47,6 +47,8 @@ const MinisterioInfantil = lazy(() => import('@/pages/MinisterioInfantil'));
 const ParentDashboard = lazy(() => import('@/pages/parent/ParentDashboard'));
 const ParentAuthorizations = lazy(() => import('@/pages/parent/ParentAuthorizations'));
 const ParentHistory = lazy(() => import('@/pages/parent/ParentHistory'));
+const ParentAnnouncements = lazy(() => import('@/pages/parent/ParentAnnouncements'));
+const ParentEvents = lazy(() => import('@/pages/parent/ParentEvents'));
 import { ParentLayout } from '@/components/parent/ParentLayout';
 
 const App: React.FC = () => {
@@ -97,6 +99,8 @@ const App: React.FC = () => {
                 <Route path="/parent/children" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
                 <Route path="/parent/authorizations" element={<ProtectedRoute><ParentLayout><ParentAuthorizations /></ParentLayout></ProtectedRoute>} />
                 <Route path="/parent/history" element={<ProtectedRoute><ParentLayout><ParentHistory /></ParentLayout></ProtectedRoute>} />
+                <Route path="/parent/announcements" element={<ProtectedRoute><ParentLayout><ParentAnnouncements /></ParentLayout></ProtectedRoute>} />
+                <Route path="/parent/events" element={<ProtectedRoute><ParentLayout><ParentEvents /></ParentLayout></ProtectedRoute>} />
                 <Route path="/parent/notifications" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
                 <Route path="/parent/settings" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
 
