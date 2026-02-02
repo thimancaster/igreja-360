@@ -508,6 +508,53 @@ export type Database = {
         }
         Relationships: []
       }
+      classroom_settings: {
+        Row: {
+          church_id: string
+          classroom_name: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          max_age_months: number | null
+          max_capacity: number
+          min_age_months: number | null
+          ratio_children_per_adult: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          church_id: string
+          classroom_name: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_age_months?: number | null
+          max_capacity?: number
+          min_age_months?: number | null
+          ratio_children_per_adult?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          church_id?: string
+          classroom_name?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_age_months?: number | null
+          max_capacity?: number
+          min_age_months?: number | null
+          ratio_children_per_adult?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classroom_settings_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       column_mappings: {
         Row: {
           church_id: string
@@ -1054,6 +1101,72 @@ export type Database = {
           },
         ]
       }
+      ministry_staff: {
+        Row: {
+          background_check_date: string | null
+          certifications: string | null
+          church_id: string
+          created_at: string | null
+          email: string | null
+          full_name: string
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          phone: string | null
+          profile_id: string | null
+          role: string
+          trained_classrooms: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          background_check_date?: string | null
+          certifications?: string | null
+          church_id: string
+          created_at?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          role?: string
+          trained_classrooms?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          background_check_date?: string | null
+          certifications?: string | null
+          church_id?: string
+          created_at?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          role?: string
+          trained_classrooms?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ministry_staff_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ministry_staff_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           church_id: string
@@ -1400,6 +1513,76 @@ export type Database = {
           },
         ]
       }
+      staff_schedules: {
+        Row: {
+          church_id: string
+          classroom: string | null
+          confirmed: boolean | null
+          confirmed_at: string | null
+          created_at: string | null
+          event_id: string | null
+          id: string
+          notes: string | null
+          role: string
+          shift_end: string
+          shift_start: string
+          staff_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          church_id: string
+          classroom?: string | null
+          confirmed?: boolean | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          notes?: string | null
+          role?: string
+          shift_end: string
+          shift_start: string
+          staff_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          church_id?: string
+          classroom?: string | null
+          confirmed?: boolean | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          event_id?: string | null
+          id?: string
+          notes?: string | null
+          role?: string
+          shift_end?: string
+          shift_start?: string
+          staff_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_schedules_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_schedules_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "ministry_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_schedules_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "ministry_staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sync_history: {
         Row: {
           church_id: string
@@ -1603,6 +1786,63 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      waitlist: {
+        Row: {
+          child_id: string
+          church_id: string
+          classroom: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          notified_at: string | null
+          position: number
+          requested_at: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          child_id: string
+          church_id: string
+          classroom: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          notified_at?: string | null
+          position?: number
+          requested_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          child_id?: string
+          church_id?: string
+          classroom?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          notified_at?: string | null
+          position?: number
+          requested_at?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitlist_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
