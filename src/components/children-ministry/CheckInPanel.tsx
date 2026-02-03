@@ -1,17 +1,21 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useChildren, useChildMutations, useTodayCheckIns, Child, CLASSROOMS } from "@/hooks/useChildrenMinistry";
+import { useClassroomSettings, useClassroomOccupancy } from "@/hooks/useCapacityManagement";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { QrCode, Search, Check, Baby, Clock } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { QrCode, Search, Check, Baby, Clock, AlertTriangle, Users } from "lucide-react";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { QRCodeSVG } from "qrcode.react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
+import { CapacityIndicator } from "./capacity";
 
 const EVENT_OPTIONS = [
   "Culto Matutino",
@@ -29,6 +33,7 @@ export function CheckInPanel() {
 
   const { data: children, isLoading: loadingChildren } = useChildren();
   const { data: todayCheckIns, isLoading: loadingCheckIns } = useTodayCheckIns();
+  const { data: classrooms } = useClassroomSettings();
   const { checkIn } = useChildMutations();
 
   const checkedInIds = new Set(todayCheckIns?.map((c: any) => c.child_id));
@@ -41,7 +46,42 @@ export function CheckInPanel() {
         child.classroom.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Calculate occupancy per classroom
+  const classroomOccupancy = useMemo(() => {
+    if (!todayCheckIns || !classrooms) return {};
+    
+    const occupancy: Record<string, { current: number; max: number; isFull: boolean }> = {};
+    
+    // Count checked-in children per classroom (only those still present)
+    const presentByClassroom: Record<string, number> = {};
+    todayCheckIns.forEach((checkin: any) => {
+      if (!checkin.checked_out_at && checkin.classroom) {
+        presentByClassroom[checkin.classroom] = (presentByClassroom[checkin.classroom] || 0) + 1;
+      }
+    });
+
+    // Match with classroom settings
+    classrooms.forEach((room) => {
+      const current = presentByClassroom[room.classroom_name] || 0;
+      occupancy[room.classroom_name] = {
+        current,
+        max: room.max_capacity,
+        isFull: current >= room.max_capacity,
+      };
+    });
+
+    return occupancy;
+  }, [todayCheckIns, classrooms]);
+
+  const isClassroomFull = (classroom: string) => {
+    return classroomOccupancy[classroom]?.isFull || false;
+  };
+
   const handleCheckIn = async (child: Child) => {
+    // Block if classroom is full
+    if (isClassroomFull(child.classroom)) {
+      return;
+    }
     try {
       const result = await checkIn.mutateAsync({
         childId: child.id,
@@ -108,37 +148,97 @@ export function CheckInPanel() {
               </div>
             </div>
 
+            {/* Capacity Overview */}
+            {classrooms && classrooms.length > 0 && (
+              <div className="mb-4 p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Capacidade das Salas</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {classrooms.filter(r => r.is_active).map((room) => {
+                    const occ = classroomOccupancy[room.classroom_name];
+                    const percentage = occ ? (occ.current / occ.max) * 100 : 0;
+                    return (
+                      <div
+                        key={room.id}
+                        className={cn(
+                          "px-3 py-1.5 rounded-lg text-sm flex items-center gap-2",
+                          percentage >= 100
+                            ? "bg-destructive/10 text-destructive border border-destructive/20"
+                            : percentage >= 80
+                            ? "bg-yellow-500/10 text-yellow-700 border border-yellow-500/20"
+                            : "bg-green-500/10 text-green-700 border border-green-500/20"
+                        )}
+                      >
+                        <span className="font-medium">{room.classroom_name}</span>
+                        <span className="text-xs">
+                          {occ?.current || 0}/{occ?.max || room.max_capacity}
+                        </span>
+                        {percentage >= 100 && (
+                          <AlertTriangle className="h-3 w-3" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {availableChildren && availableChildren.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-2">
-                {availableChildren.map((child) => (
-                  <div
-                    key={child.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={child.photo_url || undefined} />
-                        <AvatarFallback>
-                          {child.full_name.substring(0, 2).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{child.full_name}</p>
-                        <Badge variant="outline" className="text-xs">
-                          {child.classroom}
-                        </Badge>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleCheckIn(child)}
-                      disabled={checkIn.isPending}
+                {availableChildren.map((child) => {
+                  const isFull = isClassroomFull(child.classroom);
+                  return (
+                    <div
+                      key={child.id}
+                      className={cn(
+                        "flex items-center justify-between p-4 border rounded-lg transition-colors",
+                        isFull
+                          ? "bg-destructive/5 border-destructive/20 opacity-75"
+                          : "hover:bg-muted/50"
+                      )}
                     >
-                      <Check className="h-4 w-4 mr-1" />
-                      Check-in
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <Avatar>
+                          <AvatarImage src={child.photo_url || undefined} />
+                          <AvatarFallback>
+                            {child.full_name.substring(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{child.full_name}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {child.classroom}
+                            </Badge>
+                            {isFull && (
+                              <Badge variant="destructive" className="text-xs">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Lotado
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleCheckIn(child)}
+                        disabled={checkIn.isPending || isFull}
+                        variant={isFull ? "outline" : "default"}
+                      >
+                        {isFull ? (
+                          "Sala Lotada"
+                        ) : (
+                          <>
+                            <Check className="h-4 w-4 mr-1" />
+                            Check-in
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8">

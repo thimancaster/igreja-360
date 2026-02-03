@@ -283,6 +283,122 @@ export type Database = {
           },
         ]
       }
+      child_anamnesis: {
+        Row: {
+          behavioral_notes: string | null
+          blood_type: string | null
+          child_id: string
+          chronic_conditions: string | null
+          church_id: string
+          consent_signed_at: string | null
+          consent_signed_by: string | null
+          created_at: string | null
+          current_medications: string | null
+          dietary_restrictions: string | null
+          emergency_transport_consent: boolean | null
+          health_insurance: string | null
+          health_insurance_number: string | null
+          hospitalizations: string | null
+          id: string
+          last_reviewed_at: string | null
+          medical_treatment_consent: boolean | null
+          pediatrician_name: string | null
+          pediatrician_phone: string | null
+          photo_consent: boolean | null
+          physical_restrictions: string | null
+          previous_surgeries: string | null
+          reviewed_by: string | null
+          updated_at: string | null
+          vaccination_notes: string | null
+          vaccination_up_to_date: boolean | null
+        }
+        Insert: {
+          behavioral_notes?: string | null
+          blood_type?: string | null
+          child_id: string
+          chronic_conditions?: string | null
+          church_id: string
+          consent_signed_at?: string | null
+          consent_signed_by?: string | null
+          created_at?: string | null
+          current_medications?: string | null
+          dietary_restrictions?: string | null
+          emergency_transport_consent?: boolean | null
+          health_insurance?: string | null
+          health_insurance_number?: string | null
+          hospitalizations?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          medical_treatment_consent?: boolean | null
+          pediatrician_name?: string | null
+          pediatrician_phone?: string | null
+          photo_consent?: boolean | null
+          physical_restrictions?: string | null
+          previous_surgeries?: string | null
+          reviewed_by?: string | null
+          updated_at?: string | null
+          vaccination_notes?: string | null
+          vaccination_up_to_date?: boolean | null
+        }
+        Update: {
+          behavioral_notes?: string | null
+          blood_type?: string | null
+          child_id?: string
+          chronic_conditions?: string | null
+          church_id?: string
+          consent_signed_at?: string | null
+          consent_signed_by?: string | null
+          created_at?: string | null
+          current_medications?: string | null
+          dietary_restrictions?: string | null
+          emergency_transport_consent?: boolean | null
+          health_insurance?: string | null
+          health_insurance_number?: string | null
+          hospitalizations?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          medical_treatment_consent?: boolean | null
+          pediatrician_name?: string | null
+          pediatrician_phone?: string | null
+          photo_consent?: boolean | null
+          physical_restrictions?: string | null
+          previous_surgeries?: string | null
+          reviewed_by?: string | null
+          updated_at?: string | null
+          vaccination_notes?: string | null
+          vaccination_up_to_date?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "child_anamnesis_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: true
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "child_anamnesis_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "child_anamnesis_consent_signed_by_fkey"
+            columns: ["consent_signed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "child_anamnesis_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       child_check_ins: {
         Row: {
           checked_in_at: string | null
@@ -835,6 +951,145 @@ export type Database = {
           },
         ]
       }
+      incident_reports: {
+        Row: {
+          check_in_id: string | null
+          child_id: string
+          church_id: string
+          created_at: string | null
+          description: string
+          first_aid_administered: boolean | null
+          first_aid_details: string | null
+          follow_up_completed_at: string | null
+          follow_up_notes: string | null
+          follow_up_required: boolean | null
+          id: string
+          immediate_action_taken: string | null
+          incident_date: string
+          incident_time: string
+          incident_type: string
+          location: string | null
+          medical_attention_details: string | null
+          medical_attention_required: boolean | null
+          parent_notified_at: string | null
+          parent_notified_by: string | null
+          parent_response: string | null
+          reported_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          severity: string
+          staff_present: string[] | null
+          status: string | null
+          updated_at: string | null
+          witnesses: string[] | null
+        }
+        Insert: {
+          check_in_id?: string | null
+          child_id: string
+          church_id: string
+          created_at?: string | null
+          description: string
+          first_aid_administered?: boolean | null
+          first_aid_details?: string | null
+          follow_up_completed_at?: string | null
+          follow_up_notes?: string | null
+          follow_up_required?: boolean | null
+          id?: string
+          immediate_action_taken?: string | null
+          incident_date?: string
+          incident_time?: string
+          incident_type: string
+          location?: string | null
+          medical_attention_details?: string | null
+          medical_attention_required?: boolean | null
+          parent_notified_at?: string | null
+          parent_notified_by?: string | null
+          parent_response?: string | null
+          reported_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string
+          staff_present?: string[] | null
+          status?: string | null
+          updated_at?: string | null
+          witnesses?: string[] | null
+        }
+        Update: {
+          check_in_id?: string | null
+          child_id?: string
+          church_id?: string
+          created_at?: string | null
+          description?: string
+          first_aid_administered?: boolean | null
+          first_aid_details?: string | null
+          follow_up_completed_at?: string | null
+          follow_up_notes?: string | null
+          follow_up_required?: boolean | null
+          id?: string
+          immediate_action_taken?: string | null
+          incident_date?: string
+          incident_time?: string
+          incident_type?: string
+          location?: string | null
+          medical_attention_details?: string | null
+          medical_attention_required?: boolean | null
+          parent_notified_at?: string | null
+          parent_notified_by?: string | null
+          parent_response?: string | null
+          reported_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          severity?: string
+          staff_present?: string[] | null
+          status?: string | null
+          updated_at?: string | null
+          witnesses?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_reports_check_in_id_fkey"
+            columns: ["check_in_id"]
+            isOneToOne: false
+            referencedRelation: "child_check_ins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_reports_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_reports_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_reports_parent_notified_by_fkey"
+            columns: ["parent_notified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_reports_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leader_checkout_overrides: {
         Row: {
           check_in_id: string
@@ -876,6 +1131,160 @@ export type Database = {
             columns: ["leader_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medication_logs: {
+        Row: {
+          administered_at: string
+          administered_by: string
+          child_id: string
+          church_id: string
+          created_at: string | null
+          dosage_given: string
+          id: string
+          notes: string | null
+          schedule_id: string
+          witnessed_by: string | null
+        }
+        Insert: {
+          administered_at?: string
+          administered_by: string
+          child_id: string
+          church_id: string
+          created_at?: string | null
+          dosage_given: string
+          id?: string
+          notes?: string | null
+          schedule_id: string
+          witnessed_by?: string | null
+        }
+        Update: {
+          administered_at?: string
+          administered_by?: string
+          child_id?: string
+          church_id?: string
+          created_at?: string | null
+          dosage_given?: string
+          id?: string
+          notes?: string | null
+          schedule_id?: string
+          witnessed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medication_logs_administered_by_fkey"
+            columns: ["administered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medication_logs_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medication_logs_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medication_logs_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "medication_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medication_logs_witnessed_by_fkey"
+            columns: ["witnessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      medication_schedules: {
+        Row: {
+          administration_times: string[] | null
+          authorized_by: string | null
+          child_id: string
+          church_id: string
+          created_at: string | null
+          dosage: string
+          end_date: string | null
+          frequency: string
+          id: string
+          instructions: string | null
+          is_active: boolean | null
+          medication_name: string
+          parent_authorization_date: string | null
+          requires_refrigeration: boolean | null
+          start_date: string
+          updated_at: string | null
+        }
+        Insert: {
+          administration_times?: string[] | null
+          authorized_by?: string | null
+          child_id: string
+          church_id: string
+          created_at?: string | null
+          dosage: string
+          end_date?: string | null
+          frequency: string
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          medication_name: string
+          parent_authorization_date?: string | null
+          requires_refrigeration?: boolean | null
+          start_date?: string
+          updated_at?: string | null
+        }
+        Update: {
+          administration_times?: string[] | null
+          authorized_by?: string | null
+          child_id?: string
+          church_id?: string
+          created_at?: string | null
+          dosage?: string
+          end_date?: string | null
+          frequency?: string
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          medication_name?: string
+          parent_authorization_date?: string | null
+          requires_refrigeration?: boolean | null
+          start_date?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medication_schedules_authorized_by_fkey"
+            columns: ["authorized_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medication_schedules_child_id_fkey"
+            columns: ["child_id"]
+            isOneToOne: false
+            referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medication_schedules_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
             referencedColumns: ["id"]
           },
         ]

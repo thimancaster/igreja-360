@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Baby, Users, QrCode, LogOut, BarChart3, Megaphone, Calendar, Settings, UserCheck } from "lucide-react";
+import { Baby, Users, QrCode, LogOut, BarChart3, Megaphone, Calendar, Settings, UserCheck, HeartPulse } from "lucide-react";
 import { pageVariants, pageTransition } from "@/lib/pageAnimations";
 import { ChildrenList } from "@/components/children-ministry/ChildrenList";
 import { GuardiansList } from "@/components/children-ministry/GuardiansList";
@@ -12,6 +12,7 @@ import { AnnouncementsPanel } from "@/components/children-ministry/announcements
 import { MinistryCalendar } from "@/components/children-ministry/calendar/MinistryCalendar";
 import { ClassroomCapacityManager, WaitlistPanel } from "@/components/children-ministry/capacity";
 import { StaffList, StaffScheduler } from "@/components/children-ministry/staff";
+import { MedicationPanel, IncidentReportPanel } from "@/components/children-ministry/health";
 
 export default function MinisterioInfantil() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -35,7 +36,7 @@ export default function MinisterioInfantil() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-9 lg:w-auto lg:inline-grid">
+        <TabsList className="grid w-full grid-cols-10 lg:w-auto lg:inline-grid">
           <TabsTrigger value="dashboard" className="gap-2">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
@@ -55,6 +56,10 @@ export default function MinisterioInfantil() {
           <TabsTrigger value="capacity" className="gap-2">
             <Settings className="h-4 w-4" />
             <span className="hidden sm:inline">Salas</span>
+          </TabsTrigger>
+          <TabsTrigger value="health" className="gap-2">
+            <HeartPulse className="h-4 w-4" />
+            <span className="hidden sm:inline">Saúde</span>
           </TabsTrigger>
           <TabsTrigger value="announcements" className="gap-2">
             <Megaphone className="h-4 w-4" />
@@ -94,6 +99,11 @@ export default function MinisterioInfantil() {
         <TabsContent value="capacity" className="space-y-4">
           <ClassroomCapacityManager />
           <WaitlistPanel />
+        </TabsContent>
+
+        <TabsContent value="health" className="space-y-6">
+          <MedicationPanel />
+          <IncidentReportPanel />
         </TabsContent>
 
         <TabsContent value="announcements" className="space-y-4">
