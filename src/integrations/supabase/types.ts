@@ -785,6 +785,98 @@ export type Database = {
           },
         ]
       }
+      department_volunteers: {
+        Row: {
+          church_id: string
+          created_at: string | null
+          email: string | null
+          full_name: string
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          is_active: boolean | null
+          ministry_id: string
+          notes: string | null
+          phone: string | null
+          profile_id: string | null
+          role: string
+          skills: string[] | null
+          status: Database["public"]["Enums"]["volunteer_status"]
+          term_accepted_at: string | null
+          term_version: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          church_id: string
+          created_at?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_active?: boolean | null
+          ministry_id: string
+          notes?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          role?: string
+          skills?: string[] | null
+          status?: Database["public"]["Enums"]["volunteer_status"]
+          term_accepted_at?: string | null
+          term_version?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          church_id?: string
+          created_at?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          is_active?: boolean | null
+          ministry_id?: string
+          notes?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          role?: string
+          skills?: string[] | null
+          status?: Database["public"]["Enums"]["volunteer_status"]
+          term_accepted_at?: string | null
+          term_version?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "department_volunteers_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_volunteers_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_volunteers_ministry_id_fkey"
+            columns: ["ministry_id"]
+            isOneToOne: false
+            referencedRelation: "ministries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "department_volunteers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_registrations: {
         Row: {
           child_id: string
@@ -2196,6 +2288,234 @@ export type Database = {
         }
         Relationships: []
       }
+      volunteer_announcement_reads: {
+        Row: {
+          announcement_id: string
+          id: string
+          read_at: string | null
+          volunteer_id: string
+        }
+        Insert: {
+          announcement_id: string
+          id?: string
+          read_at?: string | null
+          volunteer_id: string
+        }
+        Update: {
+          announcement_id?: string
+          id?: string
+          read_at?: string | null
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_announcement_reads_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "volunteer_announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_announcement_reads_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "department_volunteers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      volunteer_announcements: {
+        Row: {
+          church_id: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_published: boolean | null
+          meeting_date: string | null
+          ministry_id: string
+          priority: Database["public"]["Enums"]["announcement_priority"]
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          church_id: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_published?: boolean | null
+          meeting_date?: string | null
+          ministry_id: string
+          priority?: Database["public"]["Enums"]["announcement_priority"]
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          church_id?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_published?: boolean | null
+          meeting_date?: string | null
+          ministry_id?: string
+          priority?: Database["public"]["Enums"]["announcement_priority"]
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_announcements_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_announcements_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_announcements_ministry_id_fkey"
+            columns: ["ministry_id"]
+            isOneToOne: false
+            referencedRelation: "ministries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      volunteer_commitment_terms: {
+        Row: {
+          church_id: string
+          content: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          title: string
+          version: string
+        }
+        Insert: {
+          church_id: string
+          content: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          title: string
+          version: string
+        }
+        Update: {
+          church_id?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          title?: string
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_commitment_terms_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_commitment_terms_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      volunteer_schedules: {
+        Row: {
+          church_id: string
+          confirmed: boolean | null
+          confirmed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          ministry_id: string
+          notes: string | null
+          schedule_date: string
+          schedule_type: Database["public"]["Enums"]["schedule_type"]
+          shift_end: string
+          shift_start: string
+          updated_at: string | null
+          volunteer_id: string
+        }
+        Insert: {
+          church_id: string
+          confirmed?: boolean | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          ministry_id: string
+          notes?: string | null
+          schedule_date: string
+          schedule_type?: Database["public"]["Enums"]["schedule_type"]
+          shift_end: string
+          shift_start: string
+          updated_at?: string | null
+          volunteer_id: string
+        }
+        Update: {
+          church_id?: string
+          confirmed?: boolean | null
+          confirmed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          ministry_id?: string
+          notes?: string | null
+          schedule_date?: string
+          schedule_type?: Database["public"]["Enums"]["schedule_type"]
+          shift_end?: string
+          shift_start?: string
+          updated_at?: string | null
+          volunteer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "volunteer_schedules_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_schedules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_schedules_ministry_id_fkey"
+            columns: ["ministry_id"]
+            isOneToOne: false
+            referencedRelation: "ministries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "volunteer_schedules_volunteer_id_fkey"
+            columns: ["volunteer_id"]
+            isOneToOne: false
+            referencedRelation: "department_volunteers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       waitlist: {
         Row: {
           child_id: string
@@ -2352,6 +2672,10 @@ export type Database = {
         }[]
       }
       get_user_church_id: { Args: { _user_id: string }; Returns: string }
+      get_volunteer_ministries: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2359,6 +2683,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_volunteer_of_ministry: {
+        Args: { _ministry_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_ministry_leader: {
+        Args: { _ministry_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_volunteer: { Args: { _user_id: string }; Returns: boolean }
       store_encrypted_integration_tokens: {
         Args: {
           p_access_token: string
@@ -2383,7 +2716,10 @@ export type Database = {
       }
     }
     Enums: {
+      announcement_priority: "normal" | "urgent" | "meeting"
       app_role: "admin" | "tesoureiro" | "pastor" | "lider" | "user" | "parent"
+      schedule_type: "primary" | "backup"
+      volunteer_status: "pending" | "active" | "inactive"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2511,7 +2847,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      announcement_priority: ["normal", "urgent", "meeting"],
       app_role: ["admin", "tesoureiro", "pastor", "lider", "user", "parent"],
+      schedule_type: ["primary", "backup"],
+      volunteer_status: ["pending", "active", "inactive"],
     },
   },
 } as const
