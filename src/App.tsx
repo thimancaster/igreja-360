@@ -42,6 +42,8 @@ const SelectChurch = lazy(() => import('@/pages/SelectChurch'));
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const MinisterioInfantil = lazy(() => import('@/pages/MinisterioInfantil'));
+const Escalas = lazy(() => import('@/pages/Escalas'));
+const AceitarTermoVoluntario = lazy(() => import('@/pages/AceitarTermoVoluntario'));
 
 // Parent Portal pages
 const ParentDashboard = lazy(() => import('@/pages/parent/ParentDashboard'));
@@ -87,6 +89,8 @@ const App: React.FC = () => {
                 <Route path="/app/admin/configuracoes-sistema" element={<ProtectedRoute><AdminRoute><AppLayout><ConfiguracoesSistema /></AppLayout></AdminRoute></ProtectedRoute>} />
                 <Route path="/app/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
                 <Route path="/app/ministerio-infantil" element={<ProtectedRoute><AppLayout><MinisterioInfantil /></AppLayout></ProtectedRoute>} />
+                <Route path="/app/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
+                <Route path="/app/voluntario/aceitar-termo" element={<ProtectedRoute><AceitarTermoVoluntario /></ProtectedRoute>} />
                 <Route path="/app/*" element={<ProtectedRoute><AppLayout><NotFound /></AppLayout></ProtectedRoute>} />
 
                 {/* Rotas de fluxo de criação/seleção (fora do layout principal) */}
