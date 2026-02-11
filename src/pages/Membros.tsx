@@ -127,13 +127,13 @@ export default function Membros() {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Ativos</p>
-                <p className="text-2xl font-bold text-green-500">{stats.active}</p>
-              </div>
-              <UserCheck className="h-8 w-8 text-green-500/50" />
-            </div>
+              <div className="flex items-center justify-between">
+               <div>
+                 <p className="text-sm text-muted-foreground">Ativos</p>
+                 <p className="text-2xl font-bold text-primary">{stats.active}</p>
+               </div>
+               <UserCheck className="h-8 w-8 text-primary/50" />
+             </div>
           </CardContent>
         </Card>
         <Card>
@@ -205,6 +205,11 @@ export default function Membros() {
                             <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="shrink-0">
                               {member.status === 'active' ? 'Ativo' : 'Inativo'}
                             </Badge>
+                            {member.admission_type === 'transfer' && (
+                              <Badge variant="outline" className="shrink-0">
+                                Transferência
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
                             {member.phone && (

@@ -19,6 +19,33 @@ export interface Member {
   member_since: string | null;
   created_at: string;
   updated_at: string;
+
+  // Transfer & onboarding fields
+  admission_type?: string | null;
+  marital_status?: string | null;
+  profession?: string | null;
+  spouse_name?: string | null;
+  spouse_attends_church?: string | null;
+  children_names?: string | null;
+  baptism_date?: string | null;
+  baptism_church?: string | null;
+  baptism_pastor?: string | null;
+  holy_spirit_baptism?: string | null;
+  previous_church?: string | null;
+  previous_church_duration?: string | null;
+  previous_denominations?: string | null;
+  time_without_church?: string | null;
+  previous_ministry?: string | null;
+  previous_ministry_roles?: string | null;
+  technical_skills?: string | null;
+  departure_conversation?: boolean | null;
+  departure_details?: string | null;
+  departure_reason?: string | null;
+  has_transfer_letter?: boolean | null;
+  transfer_letter_url?: string | null;
+  wants_pastoral_visit?: boolean | null;
+  leadership_notes?: string | null;
+
   member_ministries?: {
     ministry_id: string;
     role: string;
@@ -27,7 +54,8 @@ export interface Member {
 }
 
 export interface MemberFormData {
-  full_name: string;
+  // Required on create (validated in useCreateMember)
+  full_name?: string;
   email?: string;
   phone?: string;
   birth_date?: string;
@@ -39,6 +67,32 @@ export interface MemberFormData {
   status?: 'active' | 'inactive';
   member_since?: string;
   ministry_ids?: string[];
+
+  // Transfer & onboarding fields
+  admission_type?: string;
+  marital_status?: string;
+  profession?: string;
+  spouse_name?: string;
+  spouse_attends_church?: string;
+  children_names?: string;
+  baptism_date?: string;
+  baptism_church?: string;
+  baptism_pastor?: string;
+  holy_spirit_baptism?: string;
+  previous_church?: string;
+  previous_church_duration?: string;
+  previous_denominations?: string;
+  time_without_church?: string;
+  previous_ministry?: string;
+  previous_ministry_roles?: string;
+  technical_skills?: string;
+  departure_conversation?: boolean;
+  departure_details?: string;
+  departure_reason?: string;
+  has_transfer_letter?: boolean;
+  transfer_letter_url?: string;
+  wants_pastoral_visit?: boolean;
+  leadership_notes?: string;
 }
 
 export function useMembers() {
@@ -122,12 +176,15 @@ export function useCreateMember() {
   return useMutation({
     mutationFn: async (memberData: MemberFormData) => {
       if (!profile?.church_id) throw new Error('Igreja não encontrada');
+      if (!memberData.full_name || !memberData.full_name.trim()) {
+        throw new Error('Nome do membro é obrigatório');
+      }
       
       const { ministry_ids, ...memberFields } = memberData;
       
       const { data: member, error: memberError } = await supabase
         .from('members')
-        .insert({ ...memberFields, church_id: profile.church_id })
+        .insert({ ...memberFields, church_id: profile.church_id } as any)
         .select()
         .single();
       

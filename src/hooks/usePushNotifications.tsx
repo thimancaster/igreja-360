@@ -13,10 +13,12 @@ export function usePushNotifications() {
     // Check if push notifications are supported
     setIsSupported('serviceWorker' in navigator && 'PushManager' in window);
     
-    // Check if already subscribed
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
-        registration.pushManager.getSubscription().then((subscription) => {
+        const pushManager = (registration as unknown as { pushManager?: PushManager }).pushManager;
+        if (!pushManager) return;
+
+        pushManager.getSubscription().then((subscription) => {
           setIsSubscribed(!!subscription);
         });
       });
@@ -48,12 +50,17 @@ export function usePushNotifications() {
       }
 
       const registration = await navigator.serviceWorker.ready;
-      
+      const pushManager = (registration as unknown as { pushManager?: PushManager }).pushManager;
+      if (!pushManager) {
+        toast.error('Notificações push não são suportadas neste navegador');
+        return;
+      }
+
       // For demo purposes, we'll use a placeholder VAPID key
       // In production, you'd generate this and store it as a secret
       const vapidPublicKey = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
-      
-      const subscription = await registration.pushManager.subscribe({
+
+      const subscription = await pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: vapidPublicKey,
       });
@@ -91,7 +98,8 @@ export function usePushNotifications() {
     setIsLoading(true);
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const pushManager = (registration as unknown as { pushManager?: PushManager }).pushManager;
+      const subscription = pushManager ? await pushManager.getSubscription() : null;
       
       if (subscription) {
         await subscription.unsubscribe();
