@@ -1426,53 +1426,125 @@ export type Database = {
       members: {
         Row: {
           address: string | null
+          admission_type: string | null
+          baptism_church: string | null
+          baptism_date: string | null
+          baptism_pastor: string | null
           birth_date: string | null
+          children_names: string | null
           church_id: string
           city: string | null
           created_at: string | null
+          departure_conversation: boolean | null
+          departure_details: string | null
+          departure_reason: string | null
           email: string | null
           full_name: string
+          has_transfer_letter: boolean | null
+          holy_spirit_baptism: string | null
           id: string
+          leadership_notes: string | null
+          marital_status: string | null
           member_since: string | null
           notes: string | null
           phone: string | null
+          previous_church: string | null
+          previous_church_duration: string | null
+          previous_denominations: string | null
+          previous_ministry: string | null
+          previous_ministry_roles: string | null
+          profession: string | null
+          spouse_attends_church: string | null
+          spouse_name: string | null
           state: string | null
           status: string | null
+          technical_skills: string | null
+          time_without_church: string | null
+          transfer_letter_url: string | null
           updated_at: string | null
+          wants_pastoral_visit: boolean | null
           zip_code: string | null
         }
         Insert: {
           address?: string | null
+          admission_type?: string | null
+          baptism_church?: string | null
+          baptism_date?: string | null
+          baptism_pastor?: string | null
           birth_date?: string | null
+          children_names?: string | null
           church_id: string
           city?: string | null
           created_at?: string | null
+          departure_conversation?: boolean | null
+          departure_details?: string | null
+          departure_reason?: string | null
           email?: string | null
           full_name: string
+          has_transfer_letter?: boolean | null
+          holy_spirit_baptism?: string | null
           id?: string
+          leadership_notes?: string | null
+          marital_status?: string | null
           member_since?: string | null
           notes?: string | null
           phone?: string | null
+          previous_church?: string | null
+          previous_church_duration?: string | null
+          previous_denominations?: string | null
+          previous_ministry?: string | null
+          previous_ministry_roles?: string | null
+          profession?: string | null
+          spouse_attends_church?: string | null
+          spouse_name?: string | null
           state?: string | null
           status?: string | null
+          technical_skills?: string | null
+          time_without_church?: string | null
+          transfer_letter_url?: string | null
           updated_at?: string | null
+          wants_pastoral_visit?: boolean | null
           zip_code?: string | null
         }
         Update: {
           address?: string | null
+          admission_type?: string | null
+          baptism_church?: string | null
+          baptism_date?: string | null
+          baptism_pastor?: string | null
           birth_date?: string | null
+          children_names?: string | null
           church_id?: string
           city?: string | null
           created_at?: string | null
+          departure_conversation?: boolean | null
+          departure_details?: string | null
+          departure_reason?: string | null
           email?: string | null
           full_name?: string
+          has_transfer_letter?: boolean | null
+          holy_spirit_baptism?: string | null
           id?: string
+          leadership_notes?: string | null
+          marital_status?: string | null
           member_since?: string | null
           notes?: string | null
           phone?: string | null
+          previous_church?: string | null
+          previous_church_duration?: string | null
+          previous_denominations?: string | null
+          previous_ministry?: string | null
+          previous_ministry_roles?: string | null
+          profession?: string | null
+          spouse_attends_church?: string | null
+          spouse_name?: string | null
           state?: string | null
           status?: string | null
+          technical_skills?: string | null
+          time_without_church?: string | null
+          transfer_letter_url?: string | null
           updated_at?: string | null
+          wants_pastoral_visit?: boolean | null
           zip_code?: string | null
         }
         Relationships: [
