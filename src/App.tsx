@@ -45,13 +45,21 @@ const MinisterioInfantil = lazy(() => import('@/pages/MinisterioInfantil'));
 const Escalas = lazy(() => import('@/pages/Escalas'));
 const AceitarTermoVoluntario = lazy(() => import('@/pages/AceitarTermoVoluntario'));
 
-// Parent Portal pages
+// Parent Portal pages (kept for backward compatibility)
 const ParentDashboard = lazy(() => import('@/pages/parent/ParentDashboard'));
 const ParentAuthorizations = lazy(() => import('@/pages/parent/ParentAuthorizations'));
 const ParentHistory = lazy(() => import('@/pages/parent/ParentHistory'));
 const ParentAnnouncements = lazy(() => import('@/pages/parent/ParentAnnouncements'));
 const ParentEvents = lazy(() => import('@/pages/parent/ParentEvents'));
 import { ParentLayout } from '@/components/parent/ParentLayout';
+
+// Portal do Membro (unified)
+const PortalDashboard = lazy(() => import('@/pages/portal/PortalDashboard'));
+const PortalSchedules = lazy(() => import('@/pages/portal/PortalSchedules'));
+const PortalAnnouncements = lazy(() => import('@/pages/portal/PortalAnnouncements'));
+const PortalChildren = lazy(() => import('@/pages/portal/PortalChildren'));
+const PortalProfile = lazy(() => import('@/pages/portal/PortalProfile'));
+import { PortalLayout } from '@/components/portal/PortalLayout';
 
 const App: React.FC = () => {
   return (
@@ -98,7 +106,14 @@ const App: React.FC = () => {
                 <Route path="/church-confirmation" element={<ProtectedRoute><ChurchConfirmation /></ProtectedRoute>} />
                 <Route path="/select-church" element={<ProtectedRoute><SelectChurch /></ProtectedRoute>} />
 
-                {/* Portal dos Pais/Responsáveis */}
+                {/* Portal do Membro (unified) */}
+                <Route path="/portal" element={<ProtectedRoute><PortalLayout><PortalDashboard /></PortalLayout></ProtectedRoute>} />
+                <Route path="/portal/escalas" element={<ProtectedRoute><PortalLayout><PortalSchedules /></PortalLayout></ProtectedRoute>} />
+                <Route path="/portal/comunicados" element={<ProtectedRoute><PortalLayout><PortalAnnouncements /></PortalLayout></ProtectedRoute>} />
+                <Route path="/portal/filhos" element={<ProtectedRoute><PortalLayout><PortalChildren /></PortalLayout></ProtectedRoute>} />
+                <Route path="/portal/perfil" element={<ProtectedRoute><PortalLayout><PortalProfile /></PortalLayout></ProtectedRoute>} />
+
+                {/* Legacy Parent Portal - redirects to unified portal */}
                 <Route path="/parent" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
                 <Route path="/parent/children" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
                 <Route path="/parent/authorizations" element={<ProtectedRoute><ParentLayout><ParentAuthorizations /></ParentLayout></ProtectedRoute>} />
