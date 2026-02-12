@@ -787,6 +787,8 @@ export type Database = {
       }
       department_volunteers: {
         Row: {
+          background_check_date: string | null
+          certifications: string | null
           church_id: string
           created_at: string | null
           email: string | null
@@ -804,9 +806,12 @@ export type Database = {
           status: Database["public"]["Enums"]["volunteer_status"]
           term_accepted_at: string | null
           term_version: string | null
+          trained_classrooms: string[] | null
           updated_at: string | null
         }
         Insert: {
+          background_check_date?: string | null
+          certifications?: string | null
           church_id: string
           created_at?: string | null
           email?: string | null
@@ -824,9 +829,12 @@ export type Database = {
           status?: Database["public"]["Enums"]["volunteer_status"]
           term_accepted_at?: string | null
           term_version?: string | null
+          trained_classrooms?: string[] | null
           updated_at?: string | null
         }
         Update: {
+          background_check_date?: string | null
+          certifications?: string | null
           church_id?: string
           created_at?: string | null
           email?: string | null
@@ -844,6 +852,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["volunteer_status"]
           term_accepted_at?: string | null
           term_version?: string | null
+          trained_classrooms?: string[] | null
           updated_at?: string | null
         }
         Relationships: [
