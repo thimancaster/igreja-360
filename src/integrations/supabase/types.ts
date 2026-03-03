@@ -410,6 +410,7 @@ export type Database = {
           classroom: string | null
           created_at: string | null
           event_date: string
+          event_id: string | null
           event_name: string
           id: string
           label_number: string | null
@@ -428,6 +429,7 @@ export type Database = {
           classroom?: string | null
           created_at?: string | null
           event_date?: string
+          event_id?: string | null
           event_name?: string
           id?: string
           label_number?: string | null
@@ -446,6 +448,7 @@ export type Database = {
           classroom?: string | null
           created_at?: string | null
           event_date?: string
+          event_id?: string | null
           event_name?: string
           id?: string
           label_number?: string | null
@@ -467,6 +470,13 @@ export type Database = {
             columns: ["church_id"]
             isOneToOne: false
             referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "child_check_ins_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "ministry_events"
             referencedColumns: ["id"]
           },
         ]
@@ -886,33 +896,121 @@ export type Database = {
           },
         ]
       }
-      event_registrations: {
+      event_attendance: {
         Row: {
-          child_id: string
+          check_in_at: string
+          check_out_at: string | null
+          checked_in_by: string | null
+          church_id: string
+          created_at: string | null
           event_id: string
-          guardian_id: string
           id: string
+          method: string
           notes: string | null
-          registered_at: string | null
-          status: string
+          registration_id: string | null
         }
         Insert: {
-          child_id: string
+          check_in_at?: string
+          check_out_at?: string | null
+          checked_in_by?: string | null
+          church_id: string
+          created_at?: string | null
           event_id: string
-          guardian_id: string
           id?: string
+          method?: string
           notes?: string | null
-          registered_at?: string | null
-          status?: string
+          registration_id?: string | null
         }
         Update: {
-          child_id?: string
+          check_in_at?: string
+          check_out_at?: string | null
+          checked_in_by?: string | null
+          church_id?: string
+          created_at?: string | null
           event_id?: string
-          guardian_id?: string
           id?: string
+          method?: string
           notes?: string | null
+          registration_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_attendance_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_attendance_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "ministry_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_attendance_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_registrations: {
+        Row: {
+          check_in_at: string | null
+          check_out_at: string | null
+          child_id: string | null
+          church_id: string | null
+          event_id: string
+          guardian_id: string | null
+          id: string
+          member_id: string | null
+          notes: string | null
+          payment_amount: number | null
+          payment_date: string | null
+          payment_status: string
+          profile_id: string | null
+          registered_at: string | null
+          status: string
+          ticket_number: string | null
+        }
+        Insert: {
+          check_in_at?: string | null
+          check_out_at?: string | null
+          child_id?: string | null
+          church_id?: string | null
+          event_id: string
+          guardian_id?: string | null
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          payment_amount?: number | null
+          payment_date?: string | null
+          payment_status?: string
+          profile_id?: string | null
           registered_at?: string | null
           status?: string
+          ticket_number?: string | null
+        }
+        Update: {
+          check_in_at?: string | null
+          check_out_at?: string | null
+          child_id?: string | null
+          church_id?: string | null
+          event_id?: string
+          guardian_id?: string | null
+          id?: string
+          member_id?: string | null
+          notes?: string | null
+          payment_amount?: number | null
+          payment_date?: string | null
+          payment_status?: string
+          profile_id?: string | null
+          registered_at?: string | null
+          status?: string
+          ticket_number?: string | null
         }
         Relationships: [
           {
@@ -920,6 +1018,13 @@ export type Database = {
             columns: ["child_id"]
             isOneToOne: false
             referencedRelation: "children"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_registrations_church_id_fkey"
+            columns: ["church_id"]
+            isOneToOne: false
+            referencedRelation: "churches"
             referencedColumns: ["id"]
           },
           {
@@ -941,6 +1046,13 @@ export type Database = {
             columns: ["guardian_id"]
             isOneToOne: false
             referencedRelation: "guardians_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_registrations_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
             referencedColumns: ["id"]
           },
         ]
@@ -1605,59 +1717,80 @@ export type Database = {
         Row: {
           all_day: boolean | null
           church_id: string
+          cover_image_url: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
           end_datetime: string | null
           event_type: string
           id: string
+          is_paid_event: boolean | null
           location: string | null
           max_capacity: number | null
           ministry_id: string | null
           recurrence_rule: string | null
           recurring: boolean | null
+          registration_deadline: string | null
           registration_required: boolean | null
           start_datetime: string
+          status: string
+          tags: string[] | null
+          ticket_price: number | null
           title: string
           updated_at: string | null
+          visibility: string
         }
         Insert: {
           all_day?: boolean | null
           church_id: string
+          cover_image_url?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
           end_datetime?: string | null
           event_type?: string
           id?: string
+          is_paid_event?: boolean | null
           location?: string | null
           max_capacity?: number | null
           ministry_id?: string | null
           recurrence_rule?: string | null
           recurring?: boolean | null
+          registration_deadline?: string | null
           registration_required?: boolean | null
           start_datetime: string
+          status?: string
+          tags?: string[] | null
+          ticket_price?: number | null
           title: string
           updated_at?: string | null
+          visibility?: string
         }
         Update: {
           all_day?: boolean | null
           church_id?: string
+          cover_image_url?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
           end_datetime?: string | null
           event_type?: string
           id?: string
+          is_paid_event?: boolean | null
           location?: string | null
           max_capacity?: number | null
           ministry_id?: string | null
           recurrence_rule?: string | null
           recurring?: boolean | null
+          registration_deadline?: string | null
           registration_required?: boolean | null
           start_datetime?: string
+          status?: string
+          tags?: string[] | null
+          ticket_price?: number | null
           title?: string
           updated_at?: string | null
+          visibility?: string
         }
         Relationships: [
           {

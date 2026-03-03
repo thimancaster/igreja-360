@@ -20,6 +20,7 @@ import {
   Menu,
   ChevronLeft,
   Megaphone,
+  CalendarDays,
 } from "lucide-react";
 
 interface PortalLayoutProps {
@@ -28,6 +29,7 @@ interface PortalLayoutProps {
 
 const navItems = [
   { href: "/portal", label: "Início", icon: Home },
+  { href: "/portal/eventos", label: "Eventos", icon: CalendarDays },
   { href: "/portal/escalas", label: "Escalas", icon: Calendar },
   { href: "/portal/comunicados", label: "Comunicados", icon: Megaphone },
   { href: "/portal/filhos", label: "Meus Filhos", icon: Baby },
@@ -36,7 +38,7 @@ const navItems = [
 
 const bottomNavItems = [
   { href: "/portal", label: "Início", icon: Home },
-  { href: "/portal/escalas", label: "Escalas", icon: Calendar },
+  { href: "/portal/eventos", label: "Eventos", icon: CalendarDays },
   { href: "/portal/comunicados", label: "Avisos", icon: Megaphone, hasBadge: true },
   { href: "/portal/filhos", label: "Filhos", icon: Baby },
   { href: "/portal/perfil", label: "Perfil", icon: User },

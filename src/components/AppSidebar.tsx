@@ -1,4 +1,4 @@
-import { LayoutDashboard, ArrowLeftRight, Upload, Sheet, FileText, Settings, Users, Heart, UserCircle, Baby, Home, Calendar, UserCog } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, Upload, Sheet, FileText, Settings, Users, Heart, UserCircle, Baby, Home, Calendar, UserCog, CalendarDays } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, useSidebar } from "@/components/ui/sidebar";
 import { useRole } from "@/hooks/useRole";
@@ -23,6 +23,10 @@ const baseMenuItems = [{
   title: "Min. Infantil",
   url: "/app/ministerio-infantil",
   icon: Baby
+}, {
+  title: "Eventos",
+  url: "/app/eventos",
+  icon: CalendarDays
 }, {
   title: "Escalas",
   url: "/app/escalas",
