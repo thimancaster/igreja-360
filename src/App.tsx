@@ -44,6 +44,8 @@ const FAQPage = lazy(() => import('@/pages/FAQPage'));
 const MinisterioInfantil = lazy(() => import('@/pages/MinisterioInfantil'));
 const Escalas = lazy(() => import('@/pages/Escalas'));
 const AceitarTermoVoluntario = lazy(() => import('@/pages/AceitarTermoVoluntario'));
+const Eventos = lazy(() => import('@/pages/Eventos'));
+const EventRegistrationPage = lazy(() => import('@/pages/EventRegistration'));
 
 // Parent Portal pages (kept for backward compatibility)
 const ParentDashboard = lazy(() => import('@/pages/parent/ParentDashboard'));
@@ -59,6 +61,7 @@ const PortalSchedules = lazy(() => import('@/pages/portal/PortalSchedules'));
 const PortalAnnouncements = lazy(() => import('@/pages/portal/PortalAnnouncements'));
 const PortalChildren = lazy(() => import('@/pages/portal/PortalChildren'));
 const PortalProfile = lazy(() => import('@/pages/portal/PortalProfile'));
+const PortalEvents = lazy(() => import('@/pages/portal/PortalEvents'));
 import { PortalLayout } from '@/components/portal/PortalLayout';
 
 const App: React.FC = () => {
@@ -98,7 +101,9 @@ const App: React.FC = () => {
                 <Route path="/app/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
                 <Route path="/app/ministerio-infantil" element={<ProtectedRoute><AppLayout><MinisterioInfantil /></AppLayout></ProtectedRoute>} />
                 <Route path="/app/escalas" element={<ProtectedRoute><Escalas /></ProtectedRoute>} />
+                <Route path="/app/eventos" element={<ProtectedRoute><AppLayout><Eventos /></AppLayout></ProtectedRoute>} />
                 <Route path="/app/voluntario/aceitar-termo" element={<ProtectedRoute><AceitarTermoVoluntario /></ProtectedRoute>} />
+                <Route path="/inscricao/:eventId" element={<EventRegistrationPage />} />
                 <Route path="/app/*" element={<ProtectedRoute><AppLayout><NotFound /></AppLayout></ProtectedRoute>} />
 
                 {/* Rotas de fluxo de criação/seleção (fora do layout principal) */}
@@ -112,6 +117,7 @@ const App: React.FC = () => {
                 <Route path="/portal/comunicados" element={<ProtectedRoute><PortalLayout><PortalAnnouncements /></PortalLayout></ProtectedRoute>} />
                 <Route path="/portal/filhos" element={<ProtectedRoute><PortalLayout><PortalChildren /></PortalLayout></ProtectedRoute>} />
                 <Route path="/portal/perfil" element={<ProtectedRoute><PortalLayout><PortalProfile /></PortalLayout></ProtectedRoute>} />
+                <Route path="/portal/eventos" element={<ProtectedRoute><PortalLayout><PortalEvents /></PortalLayout></ProtectedRoute>} />
 
                 {/* Legacy Parent Portal - redirects to unified portal */}
                 <Route path="/parent" element={<ProtectedRoute><ParentLayout><ParentDashboard /></ParentLayout></ProtectedRoute>} />
