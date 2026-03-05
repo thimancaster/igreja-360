@@ -50,22 +50,23 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b p-4">
+      {/* Sidebar header with gradient */}
+      <div className="bg-gradient-to-br from-primary to-secondary p-6">
         <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12">
+          <Avatar className="h-14 w-14 border-2 border-white/30 shadow-lg">
             <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-primary/10">
-              <User className="h-6 w-6 text-primary" />
+            <AvatarFallback className="bg-white/20 text-white font-bold text-lg">
+              {profile?.full_name?.[0] || "M"}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <h2 className="font-semibold truncate">{profile?.full_name || "Membro"}</h2>
-            <p className="text-sm text-muted-foreground">Portal do Membro</p>
+            <h2 className="font-bold text-white truncate">{profile?.full_name || "Membro"}</h2>
+            <p className="text-sm text-white/70">Portal do Membro</p>
           </div>
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-3">
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => {
             const isActive =
@@ -78,9 +79,9 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
                 to={item.href}
                 onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-all",
+                  "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-sm"
+                    ? "bg-primary text-primary-foreground shadow-md"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
@@ -94,14 +95,14 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="border-t p-4 space-y-2">
         <Link to="/app/dashboard" onClick={onNavigate}>
-          <Button variant="outline" className="w-full justify-start gap-3">
+          <Button variant="outline" className="w-full justify-start gap-3 rounded-xl">
             <ChevronLeft className="h-4 w-4" />
             Ir para App Principal
           </Button>
         </Link>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10"
+          className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-xl"
           onClick={() => signOut()}
         >
           <LogOut className="h-4 w-4" />
@@ -119,7 +120,7 @@ function BottomNavigation() {
   const totalUnread = (parentUnread || 0) + (volunteerUnread || 0);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur-lg safe-area-pb lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/80 backdrop-blur-xl safe-area-pb lg:hidden">
       <div className="flex items-center justify-around">
         {bottomNavItems.map((item) => {
           const isActive =
@@ -131,27 +132,27 @@ function BottomNavigation() {
               key={item.href}
               to={item.href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-3 px-2 transition-colors relative",
+                "flex flex-1 flex-col items-center gap-0.5 py-2.5 px-2 transition-all relative",
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <div className="relative">
-                <item.icon className={cn("h-5 w-5", isActive && "scale-110")} />
+              <div className={cn(
+                "relative p-1.5 rounded-xl transition-all",
+                isActive && "bg-primary/10"
+              )}>
+                <item.icon className={cn("h-5 w-5 transition-transform", isActive && "scale-110")} />
                 {item.hasBadge && totalUnread > 0 && (
                   <Badge
                     variant="destructive"
-                    className="absolute -top-2 -right-2 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+                    className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
                   >
                     {totalUnread > 9 ? "9+" : totalUnread}
                   </Badge>
                 )}
               </div>
-              <span className={cn("text-[10px] font-medium", isActive && "font-semibold")}>
+              <span className={cn("text-[10px]", isActive ? "font-bold" : "font-medium")}>
                 {item.label}
               </span>
-              {isActive && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
-              )}
             </Link>
           );
         })}
@@ -166,16 +167,17 @@ export function PortalLayout({ children }: PortalLayoutProps) {
   return (
     <div className="flex min-h-screen bg-background">
       {/* Desktop Sidebar */}
-      <aside className="hidden w-64 border-r bg-card lg:block">
+      <aside className="hidden w-72 border-r bg-card lg:block">
         <NavContent />
       </aside>
 
       {/* Mobile */}
       <div className="flex flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-4 border-b bg-background/95 backdrop-blur-lg px-4 lg:hidden">
+        {/* Mobile header - minimal, transparent */}
+        <header className="sticky top-0 z-40 flex h-12 items-center gap-4 bg-background/60 backdrop-blur-xl px-4 lg:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="-ml-2">
+              <Button variant="ghost" size="icon" className="-ml-2 h-9 w-9">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -183,7 +185,7 @@ export function PortalLayout({ children }: PortalLayoutProps) {
               <NavContent onNavigate={() => setMobileOpen(false)} />
             </SheetContent>
           </Sheet>
-          <h1 className="text-lg font-semibold">Portal do Membro</h1>
+          <h1 className="text-sm font-semibold text-muted-foreground">Portal do Membro</h1>
         </header>
 
         <main className="flex-1 overflow-auto pb-20 lg:pb-0">{children}</main>
