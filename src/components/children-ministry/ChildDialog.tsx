@@ -144,6 +144,9 @@ export function ChildDialog({ open, onOpenChange, child }: ChildDialogProps) {
                 <DatePicker
                   date={field.value}
                   setDate={field.onChange}
+                  disabled={(date) => date > new Date()}
+                  fromYear={2010}
+                  toYear={new Date().getFullYear()}
                 />
               </FormControl>
               <FormMessage />
