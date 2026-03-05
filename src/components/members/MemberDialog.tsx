@@ -470,6 +470,9 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                               onSelect={field.onChange}
                               disabled={(date) => date > new Date()}
                               initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={1920}
+                              toYear={new Date().getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>
@@ -511,6 +514,9 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                               onSelect={field.onChange}
                               disabled={(date) => date > new Date()}
                               initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={1950}
+                              toYear={new Date().getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>
@@ -740,6 +746,9 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                               onSelect={field.onChange}
                               disabled={(date) => date > new Date()}
                               initialFocus
+                              captionLayout="dropdown-buttons"
+                              fromYear={1950}
+                              toYear={new Date().getFullYear()}
                             />
                           </PopoverContent>
                         </Popover>

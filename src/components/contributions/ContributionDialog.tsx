@@ -217,6 +217,9 @@ export function ContributionDialog({ open, onOpenChange, defaultMemberId }: Cont
                         onSelect={field.onChange}
                         disabled={(date) => date > new Date()}
                         initialFocus
+                        captionLayout="dropdown-buttons"
+                        fromYear={2020}
+                        toYear={new Date().getFullYear()}
                       />
                     </PopoverContent>
                   </Popover>
