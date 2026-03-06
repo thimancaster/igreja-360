@@ -5,10 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { UserPlus, X, Shield, Star, Trash2 } from "lucide-react";
+import { UserPlus, X, Shield, Star, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { GuardianDialog } from "./GuardianDialog";
 
 type ChildGuardianLinkSectionProps = {
   childId: string | undefined;
@@ -18,6 +19,7 @@ export function ChildGuardianLinkSection({ childId }: ChildGuardianLinkSectionPr
   const [selectedGuardianId, setSelectedGuardianId] = useState("");
   const [isPrimary, setIsPrimary] = useState(false);
   const [canPickup, setCanPickup] = useState(true);
+  const [showNewGuardianDialog, setShowNewGuardianDialog] = useState(false);
 
   const { data: allGuardians, isLoading: guardiansLoading } = useGuardians();
   const { data: childWithGuardians, isLoading: childLoading } = useChildWithGuardians(childId);
@@ -69,6 +71,22 @@ export function ChildGuardianLinkSection({ childId }: ChildGuardianLinkSectionPr
   const handleUnlink = async (guardianId: string) => {
     if (!childId) return;
     await unlinkGuardian.mutateAsync({ childId, guardianId });
+  };
+
+  const handleNewGuardianCreated = async (newGuardian: any) => {
+    if (!childId || !newGuardian?.id) return;
+    // Auto-link the new guardian to this child
+    try {
+      await linkGuardianToChild.mutateAsync({
+        childId,
+        guardianId: newGuardian.id,
+        isPrimary: false,
+        canPickup: true,
+      });
+    } catch (error) {
+      // Link error handled in mutation, guardian still created
+    }
+    queryClient.invalidateQueries({ queryKey: ["guardians"] });
   };
 
   if (!childId) {
@@ -143,63 +161,83 @@ export function ChildGuardianLinkSection({ childId }: ChildGuardianLinkSectionPr
       )}
 
       {/* Add New Link */}
-      {availableGuardians.length > 0 ? (
-        <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
+      <div className="space-y-3 p-4 border rounded-lg bg-muted/20">
+        <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium">Vincular Responsável</h4>
-          
-          <Select value={selectedGuardianId} onValueChange={setSelectedGuardianId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione um responsável cadastrado" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableGuardians.map((guardian) => (
-                <SelectItem key={guardian.id} value={guardian.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{guardian.full_name}</span>
-                    <span className="text-muted-foreground text-xs">
-                      ({guardian.relationship})
-                    </span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={isPrimary}
-                onCheckedChange={(checked) => setIsPrimary(checked === true)}
-              />
-              <span className="text-sm">Responsável principal</span>
-            </label>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <Checkbox
-                checked={canPickup}
-                onCheckedChange={(checked) => setCanPickup(checked === true)}
-              />
-              <span className="text-sm">Pode retirar a criança</span>
-            </label>
-          </div>
-
           <Button
             type="button"
-            variant="secondary"
+            variant="outline"
             size="sm"
-            onClick={handleLink}
-            disabled={!selectedGuardianId || linkGuardianToChild.isPending}
+            onClick={() => setShowNewGuardianDialog(true)}
           >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Vincular Responsável
+            <Plus className="h-4 w-4 mr-1" />
+            Cadastrar Novo
           </Button>
         </div>
-      ) : (
-        <div className="text-center py-4 text-muted-foreground border rounded-lg">
-          <p className="text-sm">Todos os responsáveis já estão vinculados</p>
-          <p className="text-xs mt-1">Cadastre novos responsáveis na aba "Responsáveis"</p>
-        </div>
-      )}
+
+        {availableGuardians.length > 0 ? (
+          <>
+            <Select value={selectedGuardianId} onValueChange={setSelectedGuardianId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione um responsável cadastrado" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableGuardians.map((guardian) => (
+                  <SelectItem key={guardian.id} value={guardian.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{guardian.full_name}</span>
+                      <span className="text-muted-foreground text-xs">
+                        ({guardian.relationship})
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={isPrimary}
+                  onCheckedChange={(checked) => setIsPrimary(checked === true)}
+                />
+                <span className="text-sm">Responsável principal</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <Checkbox
+                  checked={canPickup}
+                  onCheckedChange={(checked) => setCanPickup(checked === true)}
+                />
+                <span className="text-sm">Pode retirar a criança</span>
+              </label>
+            </div>
+
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={handleLink}
+              disabled={!selectedGuardianId || linkGuardianToChild.isPending}
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Vincular Responsável
+            </Button>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Todos os responsáveis já estão vinculados. Use o botão acima para cadastrar um novo.
+          </p>
+        )}
+      </div>
+
+      {/* Inline Guardian Creation Dialog */}
+      <GuardianDialog
+        open={showNewGuardianDialog}
+        onOpenChange={setShowNewGuardianDialog}
+        guardian={null}
+        onCreated={handleNewGuardianCreated}
+      />
     </div>
   );
 }

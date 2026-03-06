@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useParentChildren, useParentPresentChildren } from "@/hooks/useParentData";
 import { useAnnouncements } from "@/hooks/useAnnouncements";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { format, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -26,6 +26,9 @@ export default function ParentDashboard() {
   const { data: children, isLoading: loadingChildren } = useParentChildren();
   const { data: presentChildren, isLoading: loadingPresent } = useParentPresentChildren();
   const { parentAnnouncements, unreadCount, isLoadingParent } = useAnnouncements();
+  const navigate = useNavigate();
+
+  const goToTab = (tab: string) => navigate(`/portal/filhos?tab=${tab}`);
 
   const getTimePresent = (checkedInAt: string) => {
     const minutes = differenceInMinutes(new Date(), new Date(checkedInAt));
@@ -120,8 +123,8 @@ export default function ParentDashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          <Link to="/parent/announcements">
-            <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-amber-500/10 cursor-pointer hover:shadow-md transition-shadow">
+          <div onClick={() => goToTab("announcements")} className="cursor-pointer">
+            <Card className="border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-amber-500/10 hover:shadow-md transition-shadow">
               <CardContent className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-3">
                   <div className="rounded-full bg-amber-500/20 p-2">
@@ -137,7 +140,7 @@ export default function ParentDashboard() {
                 <ChevronRight className="h-5 w-5 text-muted-foreground" />
               </CardContent>
             </Card>
-          </Link>
+          </div>
         </motion.div>
       )}
 
@@ -174,11 +177,14 @@ export default function ParentDashboard() {
                           )}
                         </div>
                       </div>
-                      <Link to={`/parent/authorizations?childId=${child.id}`}>
-                        <Button size="icon" variant="outline" className="shrink-0">
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </Link>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => goToTab("authorizations")}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -202,8 +208,8 @@ export default function ParentDashboard() {
       <div className="space-y-3">
         <h2 className="font-semibold text-lg">Ações Rápidas</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Link to="/parent/authorizations">
-            <Card className="h-full cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]">
+          <div onClick={() => goToTab("authorizations")} className="cursor-pointer">
+            <Card className="h-full hover:shadow-md transition-shadow active:scale-[0.98]">
               <CardContent className="flex flex-col items-center justify-center py-6 text-center">
                 <div className="rounded-full bg-primary/10 p-3 mb-2">
                   <Plus className="h-6 w-6 text-primary" />
@@ -211,10 +217,10 @@ export default function ParentDashboard() {
                 <p className="font-medium text-sm">Nova Autorização</p>
               </CardContent>
             </Card>
-          </Link>
+          </div>
 
-          <Link to="/parent/history">
-            <Card className="h-full cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]">
+          <div onClick={() => goToTab("history")} className="cursor-pointer">
+            <Card className="h-full hover:shadow-md transition-shadow active:scale-[0.98]">
               <CardContent className="flex flex-col items-center justify-center py-6 text-center">
                 <div className="rounded-full bg-secondary p-3 mb-2">
                   <History className="h-6 w-6" />
@@ -222,10 +228,10 @@ export default function ParentDashboard() {
                 <p className="font-medium text-sm">Ver Histórico</p>
               </CardContent>
             </Card>
-          </Link>
+          </div>
 
-          <Link to="/parent/events">
-            <Card className="h-full cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]">
+          <div onClick={() => goToTab("events")} className="cursor-pointer">
+            <Card className="h-full hover:shadow-md transition-shadow active:scale-[0.98]">
               <CardContent className="flex flex-col items-center justify-center py-6 text-center">
                 <div className="rounded-full bg-accent p-3 mb-2">
                   <Calendar className="h-6 w-6" />
@@ -233,10 +239,10 @@ export default function ParentDashboard() {
                 <p className="font-medium text-sm">Eventos</p>
               </CardContent>
             </Card>
-          </Link>
+          </div>
 
-          <Link to="/parent/announcements">
-            <Card className="h-full cursor-pointer hover:shadow-md transition-shadow active:scale-[0.98]">
+          <div onClick={() => goToTab("announcements")} className="cursor-pointer">
+            <Card className="h-full hover:shadow-md transition-shadow active:scale-[0.98]">
               <CardContent className="flex flex-col items-center justify-center py-6 text-center relative">
                 <div className="rounded-full bg-muted p-3 mb-2">
                   <Megaphone className="h-6 w-6" />
@@ -252,7 +258,7 @@ export default function ParentDashboard() {
                 )}
               </CardContent>
             </Card>
-          </Link>
+          </div>
         </div>
       </div>
 
@@ -261,18 +267,16 @@ export default function ParentDashboard() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-lg">Comunicados Recentes</h2>
-            <Link to="/parent/announcements">
-              <Button variant="ghost" size="sm" className="gap-1 text-primary">
-                Ver todos
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="sm" className="gap-1 text-primary" onClick={() => goToTab("announcements")}>
+              Ver todos
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
           <div className="space-y-2">
             {recentAnnouncements.map((announcement: any) => (
-              <Link key={announcement.id} to="/parent/announcements">
+              <div key={announcement.id} onClick={() => goToTab("announcements")} className="cursor-pointer">
                 <Card 
-                  className={`cursor-pointer hover:shadow-md transition-shadow ${
+                  className={`hover:shadow-md transition-shadow ${
                     !announcement.is_read ? "border-primary/30 bg-primary/5" : ""
                   }`}
                 >
@@ -303,7 +307,7 @@ export default function ParentDashboard() {
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             ))}
           </div>
         </div>

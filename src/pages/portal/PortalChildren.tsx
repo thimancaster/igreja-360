@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Baby, Shield, History, Calendar, Megaphone } from "lucide-react";
 import { useRole } from "@/hooks/useRole";
+import { useSearchParams } from "react-router-dom";
 
 // Re-use existing parent pages as tab content
 import ParentDashboardContent from "@/pages/parent/ParentDashboard";
@@ -12,8 +13,16 @@ import ParentEventsContent from "@/pages/parent/ParentEvents";
 import ParentAnnouncementsContent from "@/pages/parent/ParentAnnouncements";
 
 export default function PortalChildren() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "overview");
   const { isParent } = useRole();
+
+  useEffect(() => {
+    if (tabFromUrl) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 space-y-4 p-4">
