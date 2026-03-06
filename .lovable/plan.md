@@ -1,68 +1,134 @@
 
-# Plano: Integração Completa Responsáveis ↔ Portal do Membro
 
-## Problema Atual
+# Plano: Sistema de Eventos Integrado para a Igreja
 
-1. **`profile_id` nunca é preenchido**: O `GuardianDialog` sempre envia `profile_id: null`, então nenhum responsável está vinculado a uma conta de usuário
-2. **Portal "Meus Filhos" vazio**: O `useParentChildren` busca `guardians.profile_id = user.id` — como nunca é preenchido, nada aparece
-3. **Sem busca de usuários no cadastro**: O form de responsável não oferece opção de vincular a um usuário existente do sistema
-4. **Sem gestão completa no ChildDialog**: A aba "Responsáveis" permite vincular guardians existentes, mas não criar novos inline
+## Contexto Atual
 
-## Mudanças Propostas
+- Tabela `ministry_events` existe, com 1 evento ("Tarde Kids") com `registration_required=true`
+- Tabela `event_registrations` existe mas e limitada a criancas (child_id + guardian_id)
+- O check-in do ministerio infantil usa opcoes hardcoded ("Culto Matutino", "Culto Noturno", etc.) e nao e vinculado ao calendario de eventos
+- Eventos sao criados apenas dentro do Ministerio Infantil, sem pagina propria
 
-### 1. GuardianDialog — Vincular a Usuário do Sistema
+## Arquitetura Proposta
 
-- Adicionar campo **"Vincular a Usuário"** com select que busca `profiles` da mesma igreja
-- Ao selecionar um perfil, preencher automaticamente nome/email e salvar `profile_id`
-- Mostrar badge "Vinculado ao Portal" quando `profile_id` está preenchido
-- Permitir desvincular (setar `profile_id = null`)
+### 1. Schema de Banco de Dados - Novas Tabelas e Alteracoes
 
-### 2. GuardiansList — Melhorias de Gestão
+**Alterar `ministry_events`** para ser a tabela central de eventos da igreja:
+- Adicionar: `ticket_price` (numeric), `is_paid_event` (boolean), `registration_deadline` (timestamptz), `cover_image_url` (text), `status` (varchar: draft/published/cancelled/completed), `visibility` (varchar: public/members/ministry), `tags` (text[])
 
-- Adicionar botão de **excluir** responsável (com confirmação)
-- Mostrar **quantidade de crianças vinculadas** por responsável
-- Filtro por status (com/sem acesso ao portal)
-- Ação rápida para vincular ao portal
+**Nova tabela `event_registrations_v2`** (ou alterar a existente):
+- `id`, `event_id`, `church_id`, `profile_id` (uuid - qualquer membro, nao apenas criancas), `member_id` (uuid nullable - ref members), `child_id` (uuid nullable - para criancas), `guardian_id` (uuid nullable), `status` (registered/waitlisted/cancelled/checked_in/checked_out), `payment_status` (pending/paid/refunded/free), `payment_amount` (numeric), `payment_date` (timestamptz), `check_in_at` (timestamptz), `check_out_at` (timestamptz), `ticket_number` (varchar), `notes` (text), `registered_at`, `created_at`
 
-### 3. ChildDialog — Criar Responsável Inline
+**Nova tabela `event_attendance`** (log de presenca para metricas):
+- `id`, `event_id`, `church_id`, `registration_id`, `check_in_at`, `check_out_at`, `checked_in_by` (uuid), `method` (varchar: manual/qr), `notes`
 
-- Na aba "Responsáveis", além de vincular existentes, adicionar botão **"Cadastrar Novo Responsável"** que abre o GuardianDialog inline
-- Após criação, vincular automaticamente à criança
+### 2. Frontend - Nova Pagina de Eventos (`/app/eventos`)
 
-### 4. Portal "Meus Filhos" — Links Corretos
+Nova pagina principal no sidebar com sub-abas:
 
-- Atualizar links do `ParentDashboard` de `/parent/*` para `/portal/filhos?tab=*` (já que agora está dentro do portal unificado)
-- Garantir que o hook `useParentChildren` funcione quando `profile_id` está corretamente preenchido
+**Aba Calendario**: Calendario visual com todos os eventos da igreja (reutilizar o componente existente, adaptado)
 
-### 5. useRole — Detectar Pais Automaticamente
+**Aba Dashboard de Eventos**:
+- Cards: Total de eventos no mes, Total de inscritos, Taxa de presenca media, Receita de eventos
+- Grafico de barras: Publico por evento (ultimos 10)
+- Grafico de pizza: Distribuicao por tipo de evento
+- Grafico de linha: Evolucao de publico mensal
+- Grafico de barras empilhadas: Receita por evento/ministerio
+- Top 5 eventos com mais publico
+- Taxa de conversao inscricao -> presenca
 
-- Criar query que verifica se o usuário tem `guardians.profile_id = auth.uid()` 
-- Se sim, considerar `isParent = true` automaticamente (sem precisar de role manual na tabela `user_roles`)
+**Aba Lista de Eventos**: Tabela com filtros (ministerio, tipo, status, periodo), acoes rapidas (editar, cancelar, ver inscritos, duplicar evento)
 
-### 6. Melhorias Profissionais Adicionais
+**Aba Inscricoes**: Visao geral de todas as inscricoes com status de pagamento
 
-- **Foto do responsável**: Upload de foto no GuardianDialog
-- **Histórico de check-ins por responsável**: Na lista de responsáveis, ver últimos check-ins/check-outs realizados
-- **Notificação ao responsável**: Badge no portal quando criança faz check-in/check-out
-- **QR Code do responsável**: Gerar QR pessoal para check-out rápido
+### 3. Pagina de Evento Individual (`/app/eventos/:id`)
+
+- Detalhes do evento com banner
+- Painel de inscritos com busca e filtros
+- Check-in/Check-out direto na pagina do evento
+- Metricas do evento especifico (inscritos vs capacidade, presentes, receita)
+- Exportacao da lista de inscritos (PDF/Excel)
+
+### 4. Pagina Publica de Inscricao (`/inscricao/:eventId`)
+
+Quando `registration_required=true`, gerar link publico:
+- Formulario de inscricao com campos configurados pelo evento
+- Exibicao de vagas disponiveis
+- Suporte a pagamento (integracao futura com Stripe/PIX)
+- Confirmacao de inscricao com QR code
+
+### 5. Integracao Check-in Ministerio Infantil com Eventos
+
+- No select de eventos do CheckInPanel, popular automaticamente com eventos do dia vindos de `ministry_events` (tipo "service", "special" com ministry_id do infantil)
+- Ao selecionar um evento do calendario, registrar o check-in vinculado ao `event_id`
+- Adicionar coluna `event_id` a `child_check_ins` para vincular
+
+### 6. Portal do Membro - Aba Eventos
+
+- Adicionar aba "Eventos" no portal do membro
+- Listar eventos abertos para inscricao
+- Mostrar "Meus Eventos" (inscritos)
+- Permitir inscricao direto do portal
+
+### 7. Ideias Adicionais de Integracao Inteligente
+
+- **Recorrencia Inteligente**: Eventos recorrentes (todo domingo, toda quarta) gerando automaticamente no calendario
+- **Notificacoes Push**: Lembrete 24h antes do evento para inscritos
+- **Certificados**: Gerar certificado de participacao para eventos de treinamento
+- **Feedback pos-evento**: Formulario de avaliacao enviado apos o evento
+- **QR Code de Presenca**: Gerar QR code unico por evento para check-in rapido via celular
+- **Historico do Membro**: No perfil do membro, timeline de todos os eventos participados
+- **Relatorios Automaticos**: Relatorio pos-evento gerado automaticamente com metricas
+- **Comparativo Anual**: Dashboard comparando eventos ano a ano
+- **Previsao de Publico**: Baseado em historico, sugerir capacidade ideal
+- **Integracao Financeira**: Receitas de eventos aparecendo no dashboard financeiro como categoria "Eventos"
+
+## Arquivos a Criar
+
+| Arquivo | Descricao |
+|---------|-----------|
+| `src/pages/Eventos.tsx` | Pagina principal com tabs (Dashboard, Calendario, Lista, Inscricoes) |
+| `src/components/events/EventDashboard.tsx` | Dashboard com graficos e metricas |
+| `src/components/events/EventCalendar.tsx` | Calendario adaptado do MinistryCalendar |
+| `src/components/events/EventList.tsx` | Lista com filtros e acoes |
+| `src/components/events/EventDetail.tsx` | Detalhe do evento com inscritos e check-in |
+| `src/components/events/EventDialog.tsx` | Dialog de criacao/edicao expandido (com preco, imagem, visibilidade) |
+| `src/components/events/EventRegistrationForm.tsx` | Formulario de inscricao |
+| `src/components/events/EventStatsCards.tsx` | Cards de estatisticas |
+| `src/components/events/EventCharts.tsx` | Graficos de metricas |
+| `src/hooks/useEvents.tsx` | Hook principal de eventos |
+| `src/hooks/useEventRegistrations.tsx` | Hook de inscricoes |
+| `src/hooks/useEventStats.tsx` | Hook de estatisticas |
+| `src/pages/EventRegistration.tsx` | Pagina publica de inscricao |
+| `src/pages/portal/PortalEvents.tsx` | Eventos no portal do membro |
 
 ## Arquivos a Modificar
 
-| Arquivo | Alteração |
+| Arquivo | Alteracao |
 |---------|-----------|
-| `src/components/children-ministry/GuardianDialog.tsx` | Adicionar campo profile_id com select de profiles, lógica de vinculação |
-| `src/components/children-ministry/GuardiansList.tsx` | Excluir responsável, contagem de crianças, filtros |
-| `src/components/children-ministry/ChildGuardianLinkSection.tsx` | Botão criar responsável inline |
-| `src/hooks/useChildrenMinistry.tsx` | Mutation deleteGuardian, query guardians com contagem de filhos |
-| `src/hooks/useRole.tsx` | Detectar isParent via guardians.profile_id automaticamente |
-| `src/pages/parent/ParentDashboard.tsx` | Corrigir links `/parent/*` → `/portal/filhos` |
-| `src/pages/portal/PortalChildren.tsx` | Passar tab via URL params |
+| `src/App.tsx` | Novas rotas `/app/eventos`, `/app/eventos/:id`, `/inscricao/:eventId`, `/portal/eventos` |
+| `src/components/AppSidebar.tsx` | Adicionar "Eventos" no menu |
+| `src/components/children-ministry/CheckInPanel.tsx` | Popular select com eventos do dia do banco |
+| `src/components/portal/PortalLayout.tsx` | Adicionar aba Eventos |
+| `src/pages/MinisterioInfantil.tsx` | Remover aba Calendario (agora e centralizado em Eventos) |
 
-## Ordem de Execução
+## Migracao SQL
 
-1. Atualizar `GuardianDialog` com campo de vinculação a usuário
-2. Melhorar `GuardiansList` com exclusão e contagem
-3. Adicionar criação inline no `ChildGuardianLinkSection`
-4. Atualizar `useRole` para detectar pais automaticamente
-5. Corrigir links no `ParentDashboard`
-6. Ajustar `PortalChildren` para receber tab params
+1. Adicionar colunas a `ministry_events` (price, status, visibility, tags, etc.)
+2. Alterar `event_registrations` para suportar membros alem de criancas (profile_id, payment)
+3. Adicionar `event_id` a `child_check_ins`
+4. Criar RLS policies adequadas
+5. Criar indice em `ministry_events(church_id, start_datetime)`
+
+## Ordem de Execucao
+
+1. Migracao SQL (schema + RLS)
+2. Hooks (`useEvents`, `useEventRegistrations`, `useEventStats`)
+3. Pagina de Eventos com Dashboard + Calendario + Lista
+4. Dialog de criacao expandido
+5. Pagina de detalhe do evento com check-in
+6. Pagina publica de inscricao
+7. Integracao com CheckInPanel do infantil
+8. Portal do Membro - aba Eventos
+9. Sidebar e rotas
+

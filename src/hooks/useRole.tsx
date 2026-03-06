@@ -49,6 +49,28 @@ export function useRole() {
     enabled: !!user?.id,
   });
 
+  // Auto-detect parent status via guardians.profile_id
+  const { data: isGuardian } = useQuery({
+    queryKey: ["is-guardian", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      
+      const { data, error } = await supabase
+        .from("guardians")
+        .select("id")
+        .eq("profile_id", user.id)
+        .limit(1);
+
+      if (error) {
+        console.error('Error checking guardian status:', error);
+        return false;
+      }
+
+      return (data?.length || 0) > 0;
+    },
+    enabled: !!user?.id,
+  });
+
   // isLoading deve ser true se auth está carregando OU (tem user E query está carregando)
   const isLoading = authLoading || (!!user?.id && queryLoading);
 
@@ -65,14 +87,15 @@ export function useRole() {
   const isPastor = hasRole('pastor');
   const isLider = hasRole('lider');
   const isUser = hasRole('user');
-  const isParent = hasRole('parent');
+  // Parent is true if they have the role OR if they're linked as a guardian
+  const isParent = hasRole('parent') || (isGuardian === true);
   
   // Permissões específicas
-  const canManageUsers = isAdmin; // Apenas admin pode gerenciar usuários
-  const canDeleteData = isAdmin || isTesoureiro; // Admin e tesoureiro podem apagar dados
+  const canManageUsers = isAdmin;
+  const canDeleteData = isAdmin || isTesoureiro;
   const canManageTransactions = isAdmin || isTesoureiro || isPastor;
   const canAddExpenses = isAdmin || isTesoureiro || isPastor;
-  const canAddRevenue = true; // Todos podem adicionar receitas
+  const canAddRevenue = true;
   const canViewAllTransactions = isAdmin || isTesoureiro || isPastor;
   const canViewMinistryTransactions = isLider;
   const canOnlyViewOwnTransactions = isUser && !isAdmin && !isTesoureiro && !isPastor && !isLider;
