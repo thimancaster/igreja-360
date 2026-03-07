@@ -145,7 +145,7 @@ export function GuardianDialog({ open, onOpenChange, guardian, onCreated }: Guar
       if (guardian) {
         await updateGuardian.mutateAsync({ id: guardian.id, ...payload });
       } else {
-        const result = await createGuardian.mutateAsync(payload);
+        const result = await createGuardian.mutateAsync(payload as any);
         onCreated?.(result);
       }
       onOpenChange(false);
