@@ -125,20 +125,27 @@ export function GuardianDialog({ open, onOpenChange, guardian, onCreated }: Guar
 
   const onSubmit = async (data: GuardianFormData) => {
     try {
-      const payload = {
+      const payload: Record<string, any> = {
         full_name: data.full_name,
         email: data.email || null,
         phone: data.phone || null,
         relationship: data.relationship,
-        access_pin: data.access_pin || null,
         photo_url: null,
         profile_id: data.profile_id || null,
       };
 
+      // Only send access_pin if it was actually filled in
+      if (data.access_pin && data.access_pin.length === 6) {
+        payload.access_pin = data.access_pin;
+      } else if (!guardian) {
+        // For new guardians, explicitly set null if no PIN provided
+        payload.access_pin = null;
+      }
+
       if (guardian) {
         await updateGuardian.mutateAsync({ id: guardian.id, ...payload });
       } else {
-        const result = await createGuardian.mutateAsync(payload);
+        const result = await createGuardian.mutateAsync(payload as any);
         onCreated?.(result);
       }
       onOpenChange(false);
