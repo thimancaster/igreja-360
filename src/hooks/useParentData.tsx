@@ -65,7 +65,14 @@ export function useParentChildren() {
             photo_url,
             classroom,
             birth_date,
-            status
+            status,
+            allergies,
+            medications,
+            special_needs,
+            emergency_contact,
+            emergency_phone,
+            image_consent,
+            notes
           )
         `)
         .eq("guardian_id", guardianData.id);
