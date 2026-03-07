@@ -17,23 +17,48 @@ type CreateChildData = {
 };
 
 export function useParentChildMutations() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+
+  // Helper to get or auto-create guardian record for the current user
+  const getOrCreateGuardian = async () => {
+    if (!user?.id) throw new Error("Não autenticado");
+
+    // Try to find existing guardian
+    const { data: existingGuardian, error: findError } = await supabase
+      .from("guardians")
+      .select("id, church_id")
+      .eq("profile_id", user.id)
+      .maybeSingle();
+
+    if (findError) throw findError;
+
+    if (existingGuardian) return existingGuardian;
+
+    // Auto-create guardian record linked to this user
+    const churchId = profile?.church_id;
+    if (!churchId) {
+      throw new Error("Você precisa estar vinculado a uma igreja para cadastrar filhos.");
+    }
+
+    const { data: newGuardian, error: createError } = await supabase
+      .from("guardians")
+      .insert({
+        profile_id: user.id,
+        full_name: profile?.full_name || user.email || "Responsável",
+        church_id: churchId,
+        relationship: "Pai/Mãe",
+      })
+      .select("id, church_id")
+      .single();
+
+    if (createError) throw createError;
+    return newGuardian;
+  };
 
   const createChild = useMutation({
     mutationFn: async (data: CreateChildData) => {
-      if (!user?.id) throw new Error("Não autenticado");
-
-      // Get guardian record for this user
-      const { data: guardian, error: guardianError } = await supabase
-        .from("guardians")
-        .select("id, church_id")
-        .eq("profile_id", user.id)
-        .single();
-
-      if (guardianError || !guardian) {
-        throw new Error("Você precisa estar cadastrado como responsável. Entre em contato com a liderança.");
-      }
+      const guardian = await getOrCreateGuardian();
 
       // Insert child
       const { data: child, error: childError } = await supabase
@@ -66,6 +91,7 @@ export function useParentChildMutations() {
     onSuccess: () => {
       toast.success("Filho cadastrado com sucesso!");
       queryClient.invalidateQueries({ queryKey: ["parent-children"] });
+      queryClient.invalidateQueries({ queryKey: ["guardians"] });
     },
     onError: (error) => {
       toast.error(error.message);
