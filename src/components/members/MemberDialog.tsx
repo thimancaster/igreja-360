@@ -168,6 +168,52 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
     },
   });
 
+  // Reset form when member changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        full_name: member?.full_name || '',
+        email: member?.email || '',
+        phone: member?.phone || '',
+        birth_date: member?.birth_date ? new Date(member.birth_date) : undefined,
+        status: member?.status || 'active',
+        member_since: member?.member_since ? new Date(member.member_since) : new Date(),
+        address: member?.address || '',
+        city: member?.city || '',
+        state: member?.state || '',
+        zip_code: member?.zip_code || '',
+        notes: member?.notes || '',
+        leadership_notes: member?.leadership_notes || '',
+        admission_type: (member?.admission_type as any) || 'new',
+        marital_status: (member?.marital_status as any) || '',
+        profession: member?.profession || '',
+        spouse_name: member?.spouse_name || '',
+        spouse_attends_church: (member?.spouse_attends_church as any) || '',
+        children_names: member?.children_names || '',
+        baptism_date: member?.baptism_date ? new Date(member.baptism_date) : undefined,
+        baptism_church: member?.baptism_church || '',
+        baptism_pastor: member?.baptism_pastor || '',
+        holy_spirit_baptism: (member?.holy_spirit_baptism as any) || '',
+        previous_church: member?.previous_church || '',
+        previous_church_duration: member?.previous_church_duration || '',
+        time_without_church: (member?.time_without_church as any) || '',
+        previous_denominations: member?.previous_denominations || '',
+        previous_ministry: member?.previous_ministry || '',
+        previous_ministry_roles: member?.previous_ministry_roles || '',
+        technical_skills: member?.technical_skills || '',
+        departure_conversation: member?.departure_conversation ?? undefined,
+        departure_details: member?.departure_details || '',
+        departure_reason: member?.departure_reason || '',
+        wants_pastoral_visit: member?.wants_pastoral_visit ?? undefined,
+        has_transfer_letter: member?.has_transfer_letter ?? false,
+        transfer_letter_url: member?.transfer_letter_url || '',
+        ministry_ids: member?.member_ministries?.map(mm => mm.ministry_id) || [],
+      });
+      setSelectedMinistries(member?.member_ministries?.map(mm => mm.ministry_id) || []);
+      setTransferFile(null);
+    }
+  }, [open, member]);
+
   const admissionType = form.watch('admission_type');
 
   const toggleMinistry = (ministryId: string) => {
