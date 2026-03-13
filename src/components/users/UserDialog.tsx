@@ -36,6 +36,14 @@ export function UserDialog({ open, onOpenChange, mode, user, onSubmit, isLoading
   const [fullName, setFullName] = useState(user?.full_name || "");
   const [role, setRole] = useState<AppRole>(user?.role || "user");
 
+  useEffect(() => {
+    if (open) {
+      setEmail(user?.email || "");
+      setFullName(user?.full_name || "");
+      setRole(user?.role || "user");
+    }
+  }, [open, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await onSubmit({ email, full_name: fullName, role });
