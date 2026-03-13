@@ -1003,7 +1003,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                             <FormLabel>Houve conversa com a liderança anterior?</FormLabel>
                             <Select
                               onValueChange={(v) => field.onChange(v === 'yes')}
-                              defaultValue={field.value === true ? 'yes' : field.value === false ? 'no' : ''}
+                              value={field.value === true ? 'yes' : field.value === false ? 'no' : ''}
                             >
                               <FormControl>
                                 <SelectTrigger>
