@@ -450,7 +450,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Estado civil</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
