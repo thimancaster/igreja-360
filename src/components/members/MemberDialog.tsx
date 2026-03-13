@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -167,6 +167,52 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
       ministry_ids: member?.member_ministries?.map(mm => mm.ministry_id) || [],
     },
   });
+
+  // Reset form when member changes or dialog opens
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        full_name: member?.full_name || '',
+        email: member?.email || '',
+        phone: member?.phone || '',
+        birth_date: member?.birth_date ? new Date(member.birth_date) : undefined,
+        status: member?.status || 'active',
+        member_since: member?.member_since ? new Date(member.member_since) : new Date(),
+        address: member?.address || '',
+        city: member?.city || '',
+        state: member?.state || '',
+        zip_code: member?.zip_code || '',
+        notes: member?.notes || '',
+        leadership_notes: member?.leadership_notes || '',
+        admission_type: (member?.admission_type as any) || 'new',
+        marital_status: (member?.marital_status as any) || '',
+        profession: member?.profession || '',
+        spouse_name: member?.spouse_name || '',
+        spouse_attends_church: (member?.spouse_attends_church as any) || '',
+        children_names: member?.children_names || '',
+        baptism_date: member?.baptism_date ? new Date(member.baptism_date) : undefined,
+        baptism_church: member?.baptism_church || '',
+        baptism_pastor: member?.baptism_pastor || '',
+        holy_spirit_baptism: (member?.holy_spirit_baptism as any) || '',
+        previous_church: member?.previous_church || '',
+        previous_church_duration: member?.previous_church_duration || '',
+        time_without_church: (member?.time_without_church as any) || '',
+        previous_denominations: member?.previous_denominations || '',
+        previous_ministry: member?.previous_ministry || '',
+        previous_ministry_roles: member?.previous_ministry_roles || '',
+        technical_skills: member?.technical_skills || '',
+        departure_conversation: member?.departure_conversation ?? undefined,
+        departure_details: member?.departure_details || '',
+        departure_reason: member?.departure_reason || '',
+        wants_pastoral_visit: member?.wants_pastoral_visit ?? undefined,
+        has_transfer_letter: member?.has_transfer_letter ?? false,
+        transfer_letter_url: member?.transfer_letter_url || '',
+        ministry_ids: member?.member_ministries?.map(mm => mm.ministry_id) || [],
+      });
+      setSelectedMinistries(member?.member_ministries?.map(mm => mm.ministry_id) || []);
+      setTransferFile(null);
+    }
+  }, [open, member]);
 
   const admissionType = form.watch('admission_type');
 
@@ -354,7 +400,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Tipo de Admissão</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
@@ -404,7 +450,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Estado civil</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
@@ -531,7 +577,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
@@ -676,7 +722,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>O cônjuge frequenta a igreja?</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
@@ -791,7 +837,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Batismo no Espírito Santo</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Selecione" />
@@ -825,7 +871,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Há quanto tempo está sem congregar?</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
+                            <Select onValueChange={field.onChange} value={field.value || ''}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Selecione" />
@@ -957,7 +1003,7 @@ export function MemberDialog({ open, onOpenChange, member }: MemberDialogProps) 
                             <FormLabel>Houve conversa com a liderança anterior?</FormLabel>
                             <Select
                               onValueChange={(v) => field.onChange(v === 'yes')}
-                              defaultValue={field.value === true ? 'yes' : field.value === false ? 'no' : ''}
+                              value={field.value === true ? 'yes' : field.value === false ? 'no' : ''}
                             >
                               <FormControl>
                                 <SelectTrigger>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +60,17 @@ export function ScheduleDialog({
   );
   const [notes, setNotes] = useState(selectedSchedule?.notes || "");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setVolunteerId(selectedSchedule?.volunteer_id || "");
+      setShiftStart(selectedSchedule?.shift_start?.slice(0, 5) || "09:00");
+      setShiftEnd(selectedSchedule?.shift_end?.slice(0, 5) || "12:00");
+      setScheduleType(selectedSchedule?.schedule_type || "primary");
+      setNotes(selectedSchedule?.notes || "");
+      setError("");
+    }
+  }, [open, selectedSchedule]);
 
   const handleSubmit = async () => {
     if (!volunteerId) {

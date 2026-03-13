@@ -99,7 +99,7 @@ export function ContributionDialog({ open, onOpenChange, defaultMemberId }: Cont
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Contribuição *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione o tipo" />
